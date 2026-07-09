@@ -19,7 +19,6 @@ function withTimeout(promise, ms, label) {
 async function callGemini({ system, messages, max_tokens }) {
   const model = 'gemini-2.5-flash';
 
-  // Convert format
   const contents = (messages || []).map((m) => {
     const role = m.role === 'assistant' ? 'model' : 'user';
     let parts = [];
@@ -74,7 +73,6 @@ async function callGemini({ system, messages, max_tokens }) {
 
   const data = await response.json();
 
-  // Deteksi error yang harus trigger fallback
   if (!response.ok) {
     throw new Error(`Gemini HTTP ${response.status}: ${data?.error?.message || 'unknown'}`);
   }
@@ -85,7 +83,6 @@ async function callGemini({ system, messages, max_tokens }) {
 
   const candidate = data?.candidates?.[0];
 
-  // Kalau di-block sama safety filter atau finish reason aneh → trigger fallback
   if (candidate?.finishReason && !['STOP', 'MAX_TOKENS'].includes(candidate.finishReason)) {
     throw new Error(`Gemini finishReason: ${candidate.finishReason}`);
   }
@@ -169,7 +166,7 @@ async function callGroq({ system, messages, max_tokens }) {
 // ─────────────────────────────────────────────────────────────
 // HANDLER UTAMA — try Gemini, fallback ke Groq
 // ─────────────────────────────────────────────────────────────
-module.exports = async function handler(req, res) {
+export default async function handler(req, res) {
   if (req.method !== 'POST') {
     res.status(405).json({ error: 'Method not allowed' });
     return;
@@ -220,10 +217,9 @@ module.exports = async function handler(req, res) {
   if (finalText) {
     res.status(200).json({
       content: [{ type: 'text', text: finalText }],
-      _meta: { provider: usedProvider }, // debug info (bisa dihapus kalau gak perlu)
+      _meta: { provider: usedProvider },
     });
   } else {
-    // Semua provider gagal — response error yang ramah
     console.error('[AI] All providers failed:', errors);
     res.status(200).json({
       content: [
@@ -235,4 +231,4 @@ module.exports = async function handler(req, res) {
       _meta: { errors },
     });
   }
-};
+}
