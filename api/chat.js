@@ -1,9 +1,5 @@
-// Fungsi ini berjalan di server Vercel (bukan di browser), jadi API key aman tersimpan
-// sebagai environment variable dan tidak pernah terlihat oleh pengunjung halaman.
-//
-// Proxy ini memanggil Google Gemini API (gratis, tanpa kartu kredit), tapi membungkus
-// hasilnya supaya formatnya tetap sama seperti sebelumnya (gaya Anthropic),
-// jadi kode di dashboard (index.html) TIDAK perlu diubah sama sekali.
+// Serverless function untuk chat AI (Google Gemini)
+// Berjalan di Vercel — API key aman di environment variable
 
 async function callGemini(geminiBody, model, retriesLeft) {
   const response = await fetch(
@@ -12,17 +8,16 @@ async function callGemini(geminiBody, model, retriesLeft) {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-goog-api-key': process.env.GEMINI_API_KEY
+        'x-goog-api-key': process.env.GEMINI_API_KEY,
       },
-      body: JSON.stringify(geminiBody)
+      body: JSON.stringify(geminiBody),
     }
   );
   const data = await response.json();
 
-  // Kalau kena rate limit (429) dan masih ada kesempatan retry, tunggu sebentar lalu coba lagi
   if (response.status === 429 && retriesLeft > 0) {
     console.log('Gemini rate limited, retrying in 2s... sisa retry:', retriesLeft);
-    await new Promise(r => setTimeout(r, 2000));
+    await new Promise((r) => setTimeout(r, 2000));
     return callGemini(geminiBody, model, retriesLeft - 1);
   }
 
@@ -37,21 +32,21 @@ module.exports = async function handler(req, res) {
   try {
     const { system, messages, max_tokens } = req.body;
 
-    // Ubah format pesan (role: user/assistant, content: string atau array blok) ke format Gemini
-    const contents = (messages || []).map(m => {
+    // Convert format ke Gemini
+    const contents = (messages || []).map((m) => {
       const role = m.role === 'assistant' ? 'model' : 'user';
       let parts = [];
       if (typeof m.content === 'string') {
         parts = [{ text: m.content }];
       } else if (Array.isArray(m.content)) {
-        parts = m.content.map(block => {
+        parts = m.content.map((block) => {
           if (block.type === 'text') return { text: block.text };
           if (block.type === 'image') {
             return {
               inlineData: {
                 mimeType: block.source?.media_type || 'image/jpeg',
-                data: block.source?.data
-              }
+                data: block.source?.data,
+              },
             };
           }
           return { text: '' };
@@ -62,46 +57,62 @@ module.exports = async function handler(req, res) {
 
     const geminiBody = {
       contents,
-      generationConfig: { maxOutputTokens: max_tokens || 800 }
+      generationConfig: {
+        maxOutputTokens: max_tokens || 1200,
+        temperature: 0.9,
+        topP: 0.95,
+      },
+      // Safety settings lebih relaxed biar bisa bahas topik sensitif (politik, dll)
+      safetySettings: [
+        { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_ONLY_HIGH' },
+        { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_ONLY_HIGH' },
+        { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_MEDIUM_AND_ABOVE' },
+        { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_ONLY_HIGH' },
+      ],
     };
     if (system) {
       geminiBody.systemInstruction = { parts: [{ text: system }] };
     }
 
     const model = 'gemini-2.5-flash';
-
-    // Coba sampai 2x kalau kena rate limit (429)
     const { response, data } = await callGemini(geminiBody, model, 2);
 
-    // Kalau Gemini mengembalikan error, log detailnya dan kirim pesan yang lebih jelas
     if (data?.error) {
       console.error('Gemini API error:', JSON.stringify(data.error));
       res.status(response.status).json({
-        content: [{
-          type: 'text',
-          text: `Maaf, AI sedang bermasalah (${data.error.status || response.status}): ${data.error.message || 'unknown error'}. Coba lagi sebentar.`
-        }]
+        content: [
+          {
+            type: 'text',
+            text: `Yah, aku lagi bermasalah nih (${data.error.status || response.status}). Coba lagi bentar ya 🙏`,
+          },
+        ],
       });
       return;
     }
 
     const candidate = data?.candidates?.[0];
 
-    // Kalau dihentikan karena alasan selain selesai normal (misal diblokir safety filter)
-    if (candidate?.finishReason && candidate.finishReason !== 'STOP' && candidate.finishReason !== 'MAX_TOKENS') {
+    if (
+      candidate?.finishReason &&
+      candidate.finishReason !== 'STOP' &&
+      candidate.finishReason !== 'MAX_TOKENS'
+    ) {
       console.error('Gemini finishReason tidak normal:', candidate.finishReason);
       res.status(200).json({
-        content: [{
-          type: 'text',
-          text: `Maaf, respons dihentikan (alasan: ${candidate.finishReason}). Coba ubah pertanyaan kamu.`
-        }]
+        content: [
+          {
+            type: 'text',
+            text: `Hmm, respons aku ke-cut (${candidate.finishReason}). Coba tanya dengan cara lain? 🤔`,
+          },
+        ],
       });
       return;
     }
 
-    const text = candidate?.content?.parts?.map(p => p.text).join('') || 'Maaf, tidak ada respons (kosong dari Gemini).';
+    const text =
+      candidate?.content?.parts?.map((p) => p.text).join('') ||
+      'Maaf, aku blank sebentar 😅 Coba tanya lagi ya.';
 
-    // Bungkus balik ke format {content:[{type:'text', text:...}]} agar kode dashboard tetap sama
     res.status(response.status).json({ content: [{ type: 'text', text }] });
   } catch (err) {
     console.error('Server error di chat.js:', err);

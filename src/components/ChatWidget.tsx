@@ -8,34 +8,104 @@ interface Message {
   text: string;
 }
 
-const suggestions = [
-  "Analisis keuangan bulan ini",
-  "Kategori mana yang paling boros?",
-  "Tips menabung yang efektif",
+// ═══════════════════════════════════════════════════════════════
+// SYSTEM PROMPT — Persona: teman ngobrol serba bisa
+// ═══════════════════════════════════════════════════════════════
+const SYSTEM_PROMPT = `Kamu adalah "DUIT" — asisten personal & teman ngobrol yang santai, cerdas, dan supportive. Nama kamu memang DUIT (dari nama app-nya), tapi kamu bukan sekadar asisten keuangan — kamu bisa ngobrol apa aja.
+
+## Kepribadian kamu:
+- Santai kayak temen deket, gak formal atau kaku
+- Cerdas, punya opini, gak takut kasih perspektif
+- Empatik & supportive kalau user lagi curhat
+- Punya sense of humor, boleh becanda tipis-tipis
+- Boleh pakai emoji secukupnya (jangan berlebihan)
+- Bahasa Indonesia casual, boleh mix bahasa Inggris/gaul kalau natural
+
+## Topik yang bisa kamu bahas:
+- Curhat & masalah pribadi (dengerin dulu, jangan langsung nge-judge/kasih solusi)
+- Politik dalam negeri, geopolitik, isu sosial (kasih opini yang balanced tapi jelas)
+- Teknologi, sains, filsafat, sejarah
+- Hiburan: film, musik, buku, game, K-pop, meme, dll
+- Saran hidup, karir, hubungan
+- Keuangan pribadi (kamu punya akses ke data user)
+- Random fun facts, obrolan santai
+- Apapun yang user mau bahas
+
+## Style menjawab:
+- Jangan terlalu panjang kalau gak perlu — to the point tapi hangat
+- Kalau user curhat: acknowledge dulu perasaannya, baru respons
+- Kalau ditanya opini: kasih opini beneran, jangan "tergantung sudut pandang"
+- Kalau soal politik: boleh kritis, tapi fair & berbasis fakta
+- Kalau ditanya soal keuangan: pakai data user di bawah (kalau ada)
+- Jangan sok tau — kalau gak yakin, bilang aja
+
+## Yang JANGAN dilakuin:
+- Jangan paksa bahas keuangan kalau user gak nanya
+- Jangan terlalu formal atau kayak customer service
+- Jangan disclaimer berlebihan ("saya AI jadi mungkin...")
+- Jangan lecture panjang lebar kalau user cuma mau ngobrol santai
+
+Kalau user nyapa/basa-basi, respons kayak temen — jangan langsung "ada yang bisa saya bantu?"`;
+
+// ═══════════════════════════════════════════════════════════════
+// Keyword deteksi topik keuangan (untuk conditional context)
+// ═══════════════════════════════════════════════════════════════
+const FINANCE_KEYWORDS = [
+  "saldo", "duit", "uang", "keuangan", "finansial",
+  "pengeluaran", "pemasukan", "belanja", "beli",
+  "tabungan", "nabung", "hemat", "boros",
+  "budget", "anggaran", "cicilan", "utang",
+  "gaji", "income", "kategori", "transaksi",
+  "goal", "target", "dompet", "wallet",
+  "bulan ini", "bulan lalu", "minggu ini",
+  "berapa", "total", "rekap", "laporan",
 ];
 
-const SYSTEM_PROMPT =
-  "Kamu adalah asisten keuangan pribadi bernama DUIT AI. Jawab dengan singkat, ramah, dan praktis dalam Bahasa Indonesia. Gunakan data konteks yang diberikan untuk menjawab pertanyaan seputar keuangan dan jadwal pengguna.";
+function needsFinanceContext(text: string): boolean {
+  const lower = text.toLowerCase();
+  return FINANCE_KEYWORDS.some((kw) => lower.includes(kw));
+}
 
-export default function ChatWidget() {
-  const { buildAIContext } = useStore();
-  const [open, setOpen] = useState(false);
+// ═══════════════════════════════════════════════════════════════
+// COMPONENT — Modal Popup Chat AI
+// ═══════════════════════════════════════════════════════════════
+interface ChatWidgetProps {
+  open: boolean;
+  onClose: () => void;
+}
+
+export default function ChatWidget({ open, onClose }: ChatWidgetProps) {
+  const { buildAIContext, settings, todayMood } = useStore();
+
   const [messages, setMessages] = useState<Message[]>([
-    { id: 1, role: "assistant", text: "Hai! Aku asisten DUIT ✨ Tanya apa saja soal keuanganmu hari ini." },
+    {
+      id: 1,
+      role: "assistant",
+      text: `Halo${
+        settings.name && settings.name !== "Kamu" ? " " + settings.name : ""
+      }! 👋 Aku DUIT — bukan cuma soal duit, tapi juga temen ngobrol kamu. Mau curhat, tanya berita, cek keuangan, atau sekadar becanda? Gas aja ✨`,
+    },
   ]);
   const [input, setInput] = useState("");
   const [typing, setTyping] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
 
+  // Auto scroll ke bawah tiap ada pesan baru
   useEffect(() => {
-    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
+    scrollRef.current?.scrollTo({
+      top: scrollRef.current.scrollHeight,
+      behavior: "smooth",
+    });
   }, [messages, typing]);
 
-  // Lock body scroll saat modal terbuka di mobile
+  // Lock body scroll saat modal open
   useEffect(() => {
-    if (open && window.innerWidth < 768) {
+    if (open) {
       document.body.style.overflow = "hidden";
+      // Auto focus input
+      setTimeout(() => inputRef.current?.focus(), 100);
     } else {
       document.body.style.overflow = "";
     }
@@ -43,6 +113,16 @@ export default function ChatWidget() {
       document.body.style.overflow = "";
     };
   }, [open]);
+
+  // Close on ESC
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [open, onClose]);
 
   const send = async (text: string) => {
     if (!text.trim() || typing) return;
@@ -54,169 +134,267 @@ export default function ChatWidget() {
     setError(null);
 
     try {
-      const context = buildAIContext();
+      // ═══ Build system prompt dengan context conditional ═══
+      let fullSystem = SYSTEM_PROMPT;
+
+      // Info nama user
+      if (settings.name && settings.name !== "Kamu") {
+        fullSystem += `\n\n## Info User:\nNama: ${settings.name}`;
+      }
+
+      // Mood hari ini (kalau ada) — biar AI bisa adjust tone
+      if (todayMood) {
+        fullSystem += `\nMood hari ini: ${todayMood.mood} ${todayMood.label}`;
+        if (todayMood.note) {
+          fullSystem += `\nCatatan mood: "${todayMood.note}"`;
+        }
+      }
+
+      // Data keuangan — cuma dikirim kalau pesan user relate ke finansial
+      const isFinanceTopic =
+        needsFinanceContext(text) ||
+        nextMessages.slice(-3).some((m) => needsFinanceContext(m.text));
+
+      if (isFinanceTopic) {
+        const context = buildAIContext();
+        fullSystem += `\n\n## Data Keuangan User (untuk referensi):\n${context}`;
+      }
+
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          system: `${SYSTEM_PROMPT}\n\nKonteks data pengguna saat ini: ${context}`,
-          messages: nextMessages.map((m) => ({ role: m.role, content: m.text })),
-          max_tokens: 800,
+          system: fullSystem,
+          messages: nextMessages.map((m) => ({
+            role: m.role,
+            content: m.text,
+          })),
+          max_tokens: 1200,
         }),
       });
 
-      if (!res.ok) throw new Error(`Server merespons status ${res.status}`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
       const data = await res.json();
-      const textBlock = Array.isArray(data?.content)
-        ? data.content.find((b: { type: string; text?: string }) => b.type === "text")
-        : null;
-      const reply = textBlock?.text || "Maaf, aku tidak bisa memproses itu sekarang.";
-      setMessages((prev) => [...prev, { id: Date.now() + 1, role: "assistant", text: reply }]);
-    } catch {
-      setError("Gagal menghubungi AI. Pastikan endpoint /api/chat aktif (perlu deploy ke Vercel dengan GEMINI_API_KEY).");
+      const aiText =
+        data?.content?.[0]?.text ||
+        "Hmm, aku bingung mau jawab apa 😅 Coba tanya lagi ya.";
+
       setMessages((prev) => [
         ...prev,
-        { id: Date.now() + 1, role: "assistant", text: "Maaf, aku sedang tidak bisa terhubung ke server AI. Coba lagi nanti ya." },
+        { id: Date.now() + 1, role: "assistant", text: aiText },
+      ]);
+    } catch (err: any) {
+      console.error("Chat error:", err);
+      setError("Yah, koneksi lagi bermasalah. Coba lagi bentar ya 🙏");
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: Date.now() + 1,
+          role: "assistant",
+          text: "Duh, aku lagi susah nyambung ke server nih 😅 Coba lagi sebentar ya!",
+        },
       ]);
     } finally {
       setTyping(false);
     }
   };
 
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    send(input);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      send(input);
+    }
+  };
+
   return (
-    <>
-      {/* Tombol Floating "Tanya AI" */}
-      <motion.button
-        onClick={() => setOpen((o) => !o)}
-        whileHover={{ scale: 1.05 }}
-        whileTap={{ scale: 0.95 }}
-        className="fixed bottom-24 right-4 z-40 flex items-center gap-2 rounded-full bg-gradient-to-r from-cyan-400 to-emerald-400 px-4 py-3 text-sm font-bold text-slate-900 shadow-2xl shadow-emerald-500/30 md:bottom-6 md:right-6 md:px-5 md:py-3.5 md:text-base"
-      >
-        <motion.span
-          animate={{ rotate: [0, 15, -15, 0] }}
-          transition={{ duration: 2.5, repeat: Infinity, repeatDelay: 2 }}
-        >
-          ✨
-        </motion.span>
-        Tanya AI
-      </motion.button>
+    <AnimatePresence>
+      {open && (
+        <>
+          {/* Backdrop */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            onClick={onClose}
+            className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm"
+          />
 
-      <AnimatePresence>
-        {open && (
-          <>
-            {/* Backdrop untuk mobile */}
+          {/* Modal container */}
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-0 md:p-6 pointer-events-none">
             <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setOpen(false)}
-              className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm md:hidden"
-            />
-
-            {/* Panel Chat */}
-            <motion.div
-              initial={{ opacity: 0, y: 40, scale: 0.95 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: 40, scale: 0.95 }}
-              transition={{ type: "spring", damping: 22, stiffness: 260 }}
-              className="fixed inset-x-2 bottom-2 z-40 flex h-[75vh] max-h-[36rem] flex-col overflow-hidden rounded-3xl border border-white/10 bg-slate-900/95 shadow-2xl backdrop-blur-xl md:inset-x-auto md:bottom-24 md:right-6 md:h-[28rem] md:w-96"
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              transition={{ duration: 0.25, ease: "easeOut" }}
+              className="pointer-events-auto w-full h-full md:w-[700px] md:h-[85vh] md:max-h-[720px] bg-[#1a1a1a] md:rounded-2xl md:border md:border-zinc-800 shadow-2xl flex flex-col overflow-hidden"
             >
               {/* Header */}
-              <div className="flex items-center justify-between border-b border-white/10 bg-gradient-to-r from-cyan-500/10 to-emerald-500/10 px-4 py-3">
-                <div className="flex items-center gap-2">
-                  <span className="flex h-8 w-8 items-center justify-center rounded-full bg-emerald-400/20 text-lg">
-                    🤖
-                  </span>
+              <div className="flex items-center justify-between px-5 py-4 border-b border-zinc-800 shrink-0">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-teal-400 to-blue-500 flex items-center justify-center shadow-lg">
+                    <span className="text-zinc-900 font-black text-lg">D</span>
+                  </div>
                   <div>
-                    <p className="text-sm font-bold text-white">Asisten DUIT</p>
-                    <p className="text-[11px] text-emerald-400">● Online</p>
+                    <h2 className="text-white font-bold text-base leading-tight">
+                      Tanya DUIT
+                    </h2>
+                    <p className="text-zinc-400 text-xs">
+                      Teman ngobrol serba bisa
+                    </p>
                   </div>
                 </div>
                 <button
-                  onClick={() => setOpen(false)}
-                  className="flex h-8 w-8 items-center justify-center rounded-full text-slate-400 hover:bg-white/10 hover:text-white"
+                  onClick={onClose}
+                  className="w-9 h-9 rounded-full flex items-center justify-center text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors"
+                  aria-label="Close chat"
                 >
-                  ✕
+                  <svg
+                    width="20"
+                    height="20"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <line x1="18" y1="6" x2="6" y2="18" />
+                    <line x1="6" y1="6" x2="18" y2="18" />
+                  </svg>
                 </button>
               </div>
 
               {/* Messages */}
-              <div ref={scrollRef} className="flex-1 space-y-3 overflow-y-auto px-4 py-4">
-                {messages.map((m) => (
+              <div
+                ref={scrollRef}
+                className="flex-1 overflow-y-auto px-5 py-4 space-y-4"
+              >
+                {messages.map((msg) => (
                   <motion.div
-                    key={m.id}
+                    key={msg.id}
                     initial={{ opacity: 0, y: 8 }}
                     animate={{ opacity: 1, y: 0 }}
-                    className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}
+                    transition={{ duration: 0.2 }}
+                    className={`flex ${
+                      msg.role === "user" ? "justify-end" : "justify-start"
+                    }`}
                   >
                     <div
-                      className={`max-w-[80%] rounded-2xl px-3.5 py-2.5 text-sm ${
-                        m.role === "user"
-                          ? "bg-emerald-400 text-slate-900"
-                          : "border border-white/10 bg-white/5 text-slate-200"
+                      className={`max-w-[85%] px-4 py-3 rounded-2xl text-sm leading-relaxed whitespace-pre-wrap break-words ${
+                        msg.role === "user"
+                          ? "bg-gradient-to-br from-teal-400 to-blue-500 text-zinc-900 font-medium rounded-br-sm"
+                          : "bg-zinc-800 text-zinc-100 rounded-bl-sm"
                       }`}
                     >
-                      {m.text}
+                      {msg.text}
                     </div>
                   </motion.div>
                 ))}
+
+                {/* Typing indicator */}
                 {typing && (
-                  <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex justify-start">
-                    <div className="flex gap-1 rounded-2xl border border-white/10 bg-white/5 px-4 py-3">
-                      {[0, 1, 2].map((i) => (
-                        <motion.span
-                          key={i}
-                          className="h-1.5 w-1.5 rounded-full bg-slate-400"
-                          animate={{ y: [0, -4, 0] }}
-                          transition={{ duration: 0.6, repeat: Infinity, delay: i * 0.15 }}
-                        />
-                      ))}
+                  <motion.div
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="flex justify-start"
+                  >
+                    <div className="bg-zinc-800 rounded-2xl rounded-bl-sm px-4 py-3 flex items-center gap-1.5">
+                      <motion.span
+                        animate={{ opacity: [0.3, 1, 0.3] }}
+                        transition={{
+                          duration: 1.2,
+                          repeat: Infinity,
+                          delay: 0,
+                        }}
+                        className="w-2 h-2 rounded-full bg-zinc-400"
+                      />
+                      <motion.span
+                        animate={{ opacity: [0.3, 1, 0.3] }}
+                        transition={{
+                          duration: 1.2,
+                          repeat: Infinity,
+                          delay: 0.2,
+                        }}
+                        className="w-2 h-2 rounded-full bg-zinc-400"
+                      />
+                      <motion.span
+                        animate={{ opacity: [0.3, 1, 0.3] }}
+                        transition={{
+                          duration: 1.2,
+                          repeat: Infinity,
+                          delay: 0.4,
+                        }}
+                        className="w-2 h-2 rounded-full bg-zinc-400"
+                      />
                     </div>
                   </motion.div>
                 )}
-                {error && <p className="text-center text-[11px] text-rose-400">{error}</p>}
+
+                {error && (
+                  <div className="text-center text-xs text-red-400 py-2">
+                    {error}
+                  </div>
+                )}
               </div>
 
-              {/* Suggestions */}
-              {messages.length < 2 && (
-                <div className="flex flex-wrap gap-2 px-4 pb-2">
-                  {suggestions.map((s) => (
-                    <button
-                      key={s}
-                      onClick={() => send(s)}
-                      className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-slate-300 hover:bg-white/10"
-                    >
-                      {s}
-                    </button>
-                  ))}
-                </div>
-              )}
-
-              {/* Input */}
+              {/* Input area */}
               <form
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  send(input);
-                }}
-                className="flex items-center gap-2 border-t border-white/10 p-3"
+                onSubmit={handleSubmit}
+                className="border-t border-zinc-800 px-4 py-3 shrink-0 bg-[#1a1a1a]"
               >
-                <input
-                  value={input}
-                  onChange={(e) => setInput(e.target.value)}
-                  placeholder="Ketik pertanyaan..."
-                  className="flex-1 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm text-white placeholder:text-slate-500 focus:border-emerald-400/50 focus:outline-none"
-                />
-                <button
-                  type="submit"
-                  className="flex h-9 w-9 items-center justify-center rounded-full bg-emerald-400 text-slate-900 transition-transform hover:scale-105"
-                >
-                  ➤
-                </button>
+                <div className="flex items-end gap-2">
+                  <textarea
+                    ref={inputRef}
+                    value={input}
+                    onChange={(e) => setInput(e.target.value)}
+                    onKeyDown={handleKeyDown}
+                    placeholder="Ketik sesuatu... (Enter untuk kirim, Shift+Enter untuk baris baru)"
+                    rows={1}
+                    className="flex-1 resize-none bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-3 text-sm text-white placeholder:text-zinc-500 focus:outline-none focus:border-teal-400/50 focus:ring-1 focus:ring-teal-400/30 transition-all max-h-32"
+                    style={{
+                      minHeight: "44px",
+                    }}
+                    onInput={(e) => {
+                      const target = e.currentTarget;
+                      target.style.height = "auto";
+                      target.style.height =
+                        Math.min(target.scrollHeight, 128) + "px";
+                    }}
+                    disabled={typing}
+                  />
+                  <button
+                    type="submit"
+                    disabled={!input.trim() || typing}
+                    className="shrink-0 w-11 h-11 rounded-xl bg-gradient-to-br from-teal-400 to-blue-500 flex items-center justify-center text-zinc-900 disabled:opacity-40 disabled:cursor-not-allowed hover:shadow-lg hover:shadow-teal-500/20 transition-all"
+                    aria-label="Send message"
+                  >
+                    <svg
+                      width="20"
+                      height="20"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <line x1="22" y1="2" x2="11" y2="13" />
+                      <polygon points="22 2 15 22 11 13 2 9 22 2" />
+                    </svg>
+                  </button>
+                </div>
               </form>
             </motion.div>
-          </>
-        )}
-      </AnimatePresence>
-    </>
+          </div>
+        </>
+      )}
+    </AnimatePresence>
   );
 }

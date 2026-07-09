@@ -22,6 +22,7 @@ export default function App() {
   const [now, setNow] = useState(new Date());
   const [active, setActive] = useState("home");
   const [showAccount, setShowAccount] = useState(false);
+  const [showChat, setShowChat] = useState(false);
 
   const {
     score,
@@ -135,8 +136,30 @@ export default function App() {
         </div>
       </main>
 
-      <ChatWidget />
+      {/* ── Floating Action Button (FAB) untuk buka Chat AI ── */}
+      <button
+        onClick={() => setShowChat(true)}
+        className="fixed bottom-24 right-5 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-teal-400 to-blue-500 text-slate-950 shadow-lg shadow-teal-500/30 transition-transform hover:scale-105 active:scale-95 md:bottom-8 md:right-8 md:h-16 md:w-16"
+        aria-label="Buka Chat AI"
+      >
+        <svg
+          width="26"
+          height="26"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+        </svg>
+      </button>
 
+      {/* ── Modal Chat AI (popup) ── */}
+      <ChatWidget open={showChat} onClose={() => setShowChat(false)} />
+
+      {/* ── Modal Account (Profile) ── */}
       <AccountModal open={showAccount} onClose={() => setShowAccount(false)} />
     </div>
   );
