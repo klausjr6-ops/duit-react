@@ -2,6 +2,7 @@ import { useState } from "react";
 import { motion } from "framer-motion";
 import { useStore, todayStr } from "../lib/store";
 import { useTheme } from "../lib/ThemeContext";
+import { useModalDialog } from "../hooks/useModalDialog";
 
 interface Props {
   onClose: () => void;
@@ -18,6 +19,7 @@ export default function ScheduleModal({ onClose }: Props) {
   const [end, setEnd] = useState("");
   const [recurring, setRecurring] = useState(false);
   const [untilDate, setUntilDate] = useState("");
+  const { dialogRef, onDialogKeyDown } = useModalDialog(true, onClose);
 
   const handleSubmit = () => {
     if (!name.trim()) { alert("Nama jadwal harus diisi!"); return; }
@@ -41,10 +43,21 @@ export default function ScheduleModal({ onClose }: Props) {
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={onClose} className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <motion.div initial={{ scale: 0.95, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.95, y: 20 }} onClick={(e) => e.stopPropagation()} className={panel}>
+      <motion.div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="schedule-dialog-title"
+        onKeyDown={onDialogKeyDown}
+        initial={{ scale: 0.95, y: 20 }}
+        animate={{ scale: 1, y: 0 }}
+        exit={{ scale: 0.95, y: 20 }}
+        onClick={(e) => e.stopPropagation()}
+        className={panel}
+      >
         <div className="flex justify-between items-center mb-6">
-          <h2 className={titleCls}>Tambah Jadwal</h2>
-          <button onClick={onClose} className={closeCls}>×</button>
+          <h2 id="schedule-dialog-title" className={titleCls}>Tambah Jadwal</h2>
+          <button aria-label="Tutup modal tambah jadwal" onClick={onClose} className={closeCls}>×</button>
         </div>
         <div className="space-y-4">
           <div>

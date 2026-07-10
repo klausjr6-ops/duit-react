@@ -3,6 +3,7 @@ import { motion } from "framer-motion";
 import { useStore } from "../lib/store";
 import { formatRupiah } from "../lib/format";
 import { useTheme } from "../lib/ThemeContext";
+import { useModalDialog } from "../hooks/useModalDialog";
 
 interface Props {
   onClose: () => void;
@@ -16,6 +17,7 @@ export default function WalletManager({ onClose }: Props) {
   const [name, setName] = useState("");
   const [icon, setIcon] = useState("💳");
   const [initBalance, setInitBalance] = useState("");
+  const { dialogRef, onDialogKeyDown } = useModalDialog(true, onClose);
 
   const handleAdd = () => {
     if (!name.trim()) { alert("Nama dompet harus diisi!"); return; }
@@ -49,10 +51,21 @@ export default function WalletManager({ onClose }: Props) {
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={onClose} className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <motion.div initial={{ scale: 0.95, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.95, y: 20 }} onClick={(e) => e.stopPropagation()} className={panel}>
+      <motion.div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="wallet-dialog-title"
+        onKeyDown={onDialogKeyDown}
+        initial={{ scale: 0.95, y: 20 }}
+        animate={{ scale: 1, y: 0 }}
+        exit={{ scale: 0.95, y: 20 }}
+        onClick={(e) => e.stopPropagation()}
+        className={panel}
+      >
         <div className="flex justify-between items-center mb-6">
-          <h2 className={titleCls}>Kelola Dompet</h2>
-          <button onClick={onClose} className={closeCls}>×</button>
+          <h2 id="wallet-dialog-title" className={titleCls}>Kelola Dompet</h2>
+          <button aria-label="Tutup kelola dompet" onClick={onClose} className={closeCls}>×</button>
         </div>
 
         <div className="space-y-2 mb-6">

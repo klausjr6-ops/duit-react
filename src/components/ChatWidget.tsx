@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useStore } from "../lib/store";
 import { useTheme } from "../lib/ThemeContext";
+import { useAuth } from "../lib/AuthContext";
+import { useModalDialog } from "../hooks/useModalDialog";
 
 interface Message {
   id: number;
@@ -62,6 +64,9 @@ const FINANCE_KEYWORDS = [
   "berapa", "total", "rekap", "laporan",
 ];
 
+const MAX_INPUT_CHARACTERS = 4000;
+const MAX_API_MESSAGES = 16;
+
 function needsFinanceContext(text: string): boolean {
   const lower = text.toLowerCase();
   return FINANCE_KEYWORDS.some((kw) => lower.includes(kw));
@@ -77,6 +82,7 @@ interface ChatWidgetProps {
 
 export default function ChatWidget({ open, onClose }: ChatWidgetProps) {
   const { buildAIContext, settings, todayMood } = useStore();
+  const { user } = useAuth();
   const { isDark } = useTheme();
 
   const [messages, setMessages] = useState<Message[]>([
@@ -93,6 +99,8 @@ export default function ChatWidget({ open, onClose }: ChatWidgetProps) {
   const [error, setError] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const requestAbortRef = useRef<AbortController | null>(null);
+  const { dialogRef, onDialogKeyDown } = useModalDialog(open, onClose, inputRef);
 
   // Auto scroll ke bawah tiap ada pesan baru
   useEffect(() => {
@@ -102,37 +110,25 @@ export default function ChatWidget({ open, onClose }: ChatWidgetProps) {
     });
   }, [messages, typing]);
 
-  // Lock body scroll saat modal open
+  // Jangan biarkan request lama menambah pesan/error setelah dialog ditutup.
   useEffect(() => {
-    if (open) {
-      document.body.style.overflow = "hidden";
-      setTimeout(() => inputRef.current?.focus(), 100);
-    } else {
-      document.body.style.overflow = "";
-    }
-    return () => {
-      document.body.style.overflow = "";
-    };
+    if (open) return;
+    requestAbortRef.current?.abort();
+    requestAbortRef.current = null;
+    setTyping(false);
   }, [open]);
 
-  // Close on ESC
-  useEffect(() => {
-    if (!open) return;
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
-  }, [open, onClose]);
-
   const send = async (text: string) => {
-    if (!text.trim() || typing) return;
-    const userMsg: Message = { id: Date.now(), role: "user", text };
+    const cleanText = text.trim();
+    if (!cleanText || typing) return;
+
+    const userMsg: Message = { id: Date.now(), role: "user", text: cleanText };
     const nextMessages = [...messages, userMsg];
     setMessages(nextMessages);
     setInput("");
     setTyping(true);
     setError(null);
+    let controller: AbortController | null = null;
 
     try {
       let fullSystem = SYSTEM_PROMPT;
@@ -146,22 +142,34 @@ export default function ChatWidget({ open, onClose }: ChatWidgetProps) {
         }
       }
       const isFinanceTopic =
-        needsFinanceContext(text) ||
-        nextMessages.slice(-3).some((m) => needsFinanceContext(m.text));
+        needsFinanceContext(cleanText) ||
+        nextMessages.slice(-3).some((message) => needsFinanceContext(message.text));
 
       if (isFinanceTopic) {
         const context = buildAIContext();
         fullSystem += `\n\n## Data Keuangan User (untuk referensi):\n${context}`;
       }
 
+      // Keep the conversation natural while preventing an unbounded request
+      // payload after a long chat. The assistant persona stays unchanged.
+      const apiMessages = nextMessages.slice(-MAX_API_MESSAGES);
+      controller = new AbortController();
+      requestAbortRef.current?.abort();
+      requestAbortRef.current = controller;
+
+      const idToken = await user?.getIdToken();
       const res = await fetch("/api/chat", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(idToken ? { Authorization: `Bearer ${idToken}` } : {}),
+        },
+        signal: controller.signal,
         body: JSON.stringify({
           system: fullSystem,
-          messages: nextMessages.map((m) => ({
-            role: m.role,
-            content: m.text,
+          messages: apiMessages.map((message) => ({
+            role: message.role,
+            content: message.text,
           })),
           max_tokens: 1200,
         }),
@@ -173,15 +181,20 @@ export default function ChatWidget({ open, onClose }: ChatWidgetProps) {
         data?.content?.[0]?.text ||
         "Hmm, aku bingung mau jawab apa 😅 Coba tanya lagi ya.";
 
-      setMessages((prev) => [
-        ...prev,
-        { id: Date.now() + 1, role: "assistant", text: aiText },
-      ]);
-    } catch (err: any) {
+      if (!controller.signal.aborted) {
+        setMessages((previous) => [
+          ...previous,
+          { id: Date.now() + 1, role: "assistant", text: aiText },
+        ]);
+      }
+    } catch (err: unknown) {
+      const aborted = controller?.signal.aborted || (err instanceof Error && err.name === "AbortError");
+      if (aborted) return;
+
       console.error("Chat error:", err);
       setError("Yah, koneksi lagi bermasalah. Coba lagi bentar ya 🙏");
-      setMessages((prev) => [
-        ...prev,
+      setMessages((previous) => [
+        ...previous,
         {
           id: Date.now() + 1,
           role: "assistant",
@@ -189,7 +202,10 @@ export default function ChatWidget({ open, onClose }: ChatWidgetProps) {
         },
       ]);
     } finally {
-      setTyping(false);
+      if (requestAbortRef.current === controller) {
+        requestAbortRef.current = null;
+        setTyping(false);
+      }
     }
   };
 
@@ -232,11 +248,16 @@ export default function ChatWidget({ open, onClose }: ChatWidgetProps) {
           />
           <div className="fixed inset-0 z-50 flex items-center justify-center p-0 md:p-6 pointer-events-none">
             <motion.div
+              ref={dialogRef}
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="chat-dialog-title"
+              onKeyDown={onDialogKeyDown}
               initial={{ opacity: 0, scale: 0.95, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
               transition={{ duration: 0.25, ease: "easeOut" }}
-              className={`pointer-events-auto w-full h-full md:w-[700px] md:h-[85vh] md:max-h-[720px] ${modalBg} md:rounded-2xl md:border shadow-2xl flex flex-col overflow-hidden`}
+              className={`pointer-events-auto flex h-full w-full flex-col overflow-hidden pt-[env(safe-area-inset-top)] shadow-2xl md:h-[85vh] md:max-h-[720px] md:w-[700px] md:rounded-2xl md:border md:pt-0 ${modalBg}`}
             >
               <div className={`flex items-center justify-between px-5 py-4 border-b ${headerBorder} shrink-0`}>
                 <div className="flex items-center gap-3">
@@ -244,7 +265,7 @@ export default function ChatWidget({ open, onClose }: ChatWidgetProps) {
                     <span className="text-zinc-900 font-black text-lg">D</span>
                   </div>
                   <div>
-                    <h2 className={`${headerTitle} font-bold text-base leading-tight`}>Tanya DUIT</h2>
+                    <h2 id="chat-dialog-title" className={`${headerTitle} font-bold text-base leading-tight`}>Tanya DUIT</h2>
                     <p className={`${headerSub} text-xs`}>Teman ngobrol serba bisa</p>
                   </div>
                 </div>
@@ -294,11 +315,12 @@ export default function ChatWidget({ open, onClose }: ChatWidgetProps) {
                 {error && (<div className="text-center text-xs text-red-500 py-2">{error}</div>)}
               </div>
 
-              <form onSubmit={handleSubmit} className={`border-t ${inputWrap} px-4 py-3 shrink-0`}>
+              <form onSubmit={handleSubmit} className={`shrink-0 border-t px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 md:py-3 ${inputWrap}`}>
                 <div className="flex items-end gap-2">
                   <textarea
                     ref={inputRef}
                     value={input}
+                    maxLength={MAX_INPUT_CHARACTERS}
                     onChange={(e) => setInput(e.target.value)}
                     onKeyDown={handleKeyDown}
                     placeholder="Ketik sesuatu... (Enter untuk kirim, Shift+Enter untuk baris baru)"

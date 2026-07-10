@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { useStore } from "../lib/store";
 import { useTheme } from "../lib/ThemeContext";
 import type { Goal } from "../lib/store";
+import { useModalDialog } from "../hooks/useModalDialog";
 
 interface Props {
   goal: Goal;
@@ -13,6 +14,8 @@ export default function AddFundModal({ goal, onClose }: Props) {
   const { addToGoal } = useStore();
   const { isDark } = useTheme();
   const [amt, setAmt] = useState("");
+  const inputRef = useRef<HTMLInputElement>(null);
+  const { dialogRef, onDialogKeyDown } = useModalDialog(true, onClose, inputRef);
 
   const formatInputRupiah = (val: string) => {
     const num = val.replace(/\D/g, "");
@@ -36,16 +39,27 @@ export default function AddFundModal({ goal, onClose }: Props) {
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={onClose} className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <motion.div initial={{ scale: 0.95, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.95, y: 20 }} onClick={(e) => e.stopPropagation()} className={panel}>
+      <motion.div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="add-fund-dialog-title"
+        onKeyDown={onDialogKeyDown}
+        initial={{ scale: 0.95, y: 20 }}
+        animate={{ scale: 1, y: 0 }}
+        exit={{ scale: 0.95, y: 20 }}
+        onClick={(e) => e.stopPropagation()}
+        className={panel}
+      >
         <div className="flex justify-between items-center mb-6">
-          <h2 className={titleCls}>Tambah Tabungan</h2>
-          <button onClick={onClose} className={closeCls}>×</button>
+          <h2 id="add-fund-dialog-title" className={titleCls}>Tambah Tabungan</h2>
+          <button aria-label="Tutup modal tambah tabungan" onClick={onClose} className={closeCls}>×</button>
         </div>
         <p className={muted}>Untuk goal <span className={strong}>{goal.name}</span></p>
         <div className="space-y-4">
           <div>
             <label className={labelCls}>Jumlah (Rp)</label>
-            <input type="text" inputMode="numeric" autoFocus value={amt ? `Rp ${formatInputRupiah(amt)}` : ""} onChange={(e) => setAmt(e.target.value.replace(/\D/g, ""))} placeholder="Rp 0" className={inputCls} />
+            <input ref={inputRef} type="text" inputMode="numeric" value={amt ? `Rp ${formatInputRupiah(amt)}` : ""} onChange={(e) => setAmt(e.target.value.replace(/\D/g, ""))} placeholder="Rp 0" className={inputCls} />
           </div>
           <button onClick={handleSubmit} className="w-full bg-gradient-to-br from-teal-400 to-blue-500 text-zinc-900 font-bold py-3 rounded-xl hover:brightness-105 transition-all">
             Tambahkan

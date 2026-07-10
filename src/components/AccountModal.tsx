@@ -3,6 +3,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { useStore } from "../lib/store";
 import { useAuth } from "../lib/AuthContext";
 import { useTheme, type ThemeMode } from "../lib/ThemeContext";
+import { useModalDialog } from "../hooks/useModalDialog";
 
 interface AccountModalProps {
   open: boolean;
@@ -93,6 +94,8 @@ export default function AccountModal({ open, onClose }: AccountModalProps) {
     onClose();
   };
 
+  const { dialogRef, onDialogKeyDown } = useModalDialog(open, handleClose);
+
   const modalBg = isDark
     ? "w-full max-w-sm rounded-3xl border border-white/10 bg-slate-900/95 p-6 shadow-2xl backdrop-blur-xl max-h-[90vh] overflow-y-auto"
     : "w-full max-w-sm rounded-3xl border border-zinc-200 bg-white p-6 shadow-2xl max-h-[90vh] overflow-y-auto";
@@ -125,6 +128,11 @@ export default function AccountModal({ open, onClose }: AccountModalProps) {
           onClick={handleClose}
         >
           <motion.div
+            ref={dialogRef}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="account-dialog-title"
+            onKeyDown={onDialogKeyDown}
             initial={{ opacity: 0, y: 20, scale: 0.95 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 20, scale: 0.95 }}
@@ -137,6 +145,7 @@ export default function AccountModal({ open, onClose }: AccountModalProps) {
                 {subView !== "main" && (
                   <button
                     onClick={() => setSubView("main")}
+                    aria-label="Kembali ke pengaturan akun"
                     className={isDark ? "text-slate-400 hover:text-white -ml-1" : "text-zinc-500 hover:text-zinc-900 -ml-1"}
                   >
                     ←
@@ -144,14 +153,14 @@ export default function AccountModal({ open, onClose }: AccountModalProps) {
                 )}
                 <div>
                   <p className="text-xs font-semibold text-teal-500">AKUN</p>
-                  <p className={`text-sm font-medium ${isDark ? "text-white" : "text-zinc-900"}`}>
+                  <p id="account-dialog-title" className={`text-sm font-medium ${isDark ? "text-white" : "text-zinc-900"}`}>
                     {subView === "main" && "Pengaturan Akun"}
                     {subView === "email" && "Ganti Email"}
                     {subView === "password" && "Ganti Password"}
                   </p>
                 </div>
               </div>
-              <button onClick={handleClose} className={isDark ? "text-slate-400 hover:text-white" : "text-zinc-500 hover:text-zinc-900"}>
+              <button aria-label="Tutup pengaturan akun" onClick={handleClose} className={isDark ? "text-slate-400 hover:text-white" : "text-zinc-500 hover:text-zinc-900"}>
                 ✕
               </button>
             </div>

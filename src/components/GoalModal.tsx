@@ -2,6 +2,7 @@ import { useState } from "react";
 import { motion } from "framer-motion";
 import { useStore } from "../lib/store";
 import { useTheme } from "../lib/ThemeContext";
+import { useModalDialog } from "../hooks/useModalDialog";
 
 interface Props {
   onClose: () => void;
@@ -15,6 +16,7 @@ export default function GoalModal({ onClose }: Props) {
   const [target, setTarget] = useState("");
   const [current, setCurrent] = useState("");
   const [deadline, setDeadline] = useState("");
+  const { dialogRef, onDialogKeyDown } = useModalDialog(true, onClose);
 
   const formatInputRupiah = (val: string) => {
     const num = val.replace(/\D/g, "");
@@ -63,6 +65,11 @@ export default function GoalModal({ onClose }: Props) {
       className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
     >
       <motion.div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="goal-dialog-title"
+        onKeyDown={onDialogKeyDown}
         initial={{ scale: 0.95, y: 20 }}
         animate={{ scale: 1, y: 0 }}
         exit={{ scale: 0.95, y: 20 }}
@@ -70,8 +77,8 @@ export default function GoalModal({ onClose }: Props) {
         className={panel}
       >
         <div className="flex justify-between items-center mb-6">
-          <h2 className={titleCls}>Tambah Goal</h2>
-          <button onClick={onClose} className={closeCls}>×</button>
+          <h2 id="goal-dialog-title" className={titleCls}>Tambah Goal</h2>
+          <button aria-label="Tutup modal tambah goal" onClick={onClose} className={closeCls}>×</button>
         </div>
 
         <div className="space-y-4">

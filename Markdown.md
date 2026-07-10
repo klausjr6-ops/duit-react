@@ -396,7 +396,10 @@ Kalau kamu adalah AI baru yang membaca file ini:
 - Selalu kasih file **lengkap tinggal replace** — user prefer copy-paste total daripada patch parsial
 
 
-UPDATE TERBARU, TEMA LIGHT/DARK MODE SUDAH TERPASANG
+UPDATE TERBARU
+1. TEMA LIGHT/DARK MODE SUDAH TERPASANG
+2. perbaikan stabilisasi data + date handling
+3.
 ---
 
 **End of Context Document**
