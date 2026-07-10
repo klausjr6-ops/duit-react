@@ -395,6 +395,8 @@ Kalau kamu adalah AI baru yang membaca file ini:
 - Framer Motion animation: `initial={{ opacity: 0, scale: 0.95 }}` `animate={{ opacity: 1, scale: 1 }}`
 - Selalu kasih file **lengkap tinggal replace** — user prefer copy-paste total daripada patch parsial
 
+
+UPDATE TERBARU, TEMA LIGHT/DARK MODE SUDAH TERPASANG
 ---
 
 **End of Context Document**

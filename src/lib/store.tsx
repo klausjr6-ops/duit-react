@@ -104,7 +104,7 @@ const DEFAULT_DATA: UserData = {
   scheds: [],
   goals: [],
   moods: {},
-  settings: { name: "Kamu", themeMode: "system" },
+  settings: { name: "Kamu", themeMode: "time" },
   wallets: DEFAULT_WALLETS,
 };
 
@@ -148,7 +148,7 @@ function getLocalStorageData(): UserData | null {
     scheds: readLS<ScheduleItem[]>(OLD_KEYS.scheds, []),
     goals: readLS<Goal[]>(OLD_KEYS.goals, []),
     moods: readLS<Record<string, MoodEntry>>(OLD_KEYS.moods, {}),
-    settings: readLS<Partial<Settings>>(OLD_KEYS.settings, { name: "Kamu", themeMode: "system" }),
+    settings: readLS<Partial<Settings>>(OLD_KEYS.settings, { name: "Kamu", themeMode: "time" }),
     wallets: readLS<Wallet[]>(OLD_KEYS.wallets, DEFAULT_WALLETS),
   };
 }
@@ -190,7 +190,7 @@ function useDuitStoreInternal() {
             scheds: remoteData.scheds || [],
             goals: remoteData.goals || [],
             moods: remoteData.moods || {},
-            settings: { name: "Kamu", themeMode: "system" as ThemeMode, ...(remoteData.settings || {}) },
+            settings: { name: "Kamu", themeMode: "time" as ThemeMode, ...(remoteData.settings || {}) },
             wallets: remoteData.wallets || DEFAULT_WALLETS,
           });
           setLoading(false);
@@ -251,7 +251,7 @@ function useDuitStoreInternal() {
 
   /* ─── Derived: settings dengan default ─────────────────────── */
   const settings: Settings = useMemo(
-    () => ({ name: "Kamu", themeMode: "system" as ThemeMode, ...data.settings }),
+    () => ({ name: "Kamu", themeMode: "time" as ThemeMode, ...data.settings }),
     [data.settings]
   );
 

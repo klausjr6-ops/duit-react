@@ -83,12 +83,15 @@ export default function AccountModal({ open, onClose }: AccountModalProps) {
     ? "flex w-full items-center justify-between rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-left transition-colors hover:bg-white/10"
     : "flex w-full items-center justify-between rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-3 text-left transition-colors hover:bg-zinc-100";
 
-  const themeOptions: { id: ThemeMode; label: string; desc: string; icon: string }[] = [
-    { id: "system", label: "Auto (Sistem)", desc: "Ikuti preferensi perangkat", icon: "🖥️" },
-    { id: "time", label: "Auto (Waktu)", desc: "Terang 06–18, Gelap 18–06", icon: "🕒" },
-    { id: "light", label: "Terang", desc: "Mode terang selalu", icon: "☀️" },
-    { id: "dark", label: "Gelap", desc: "Mode gelap selalu", icon: "🌙" },
+  // 3 opsi saja: Terang / Gelap / Auto (waktu)
+  const themeOptions: { id: ThemeMode; label: string; icon: string }[] = [
+    { id: "light", label: "Terang", icon: "☀️" },
+    { id: "dark", label: "Gelap", icon: "🌙" },
+    { id: "time", label: "Auto", icon: "🌓" },
   ];
+
+  // Normalize: kalau user masih pakai 'system' (legacy), anggap 'time'
+  const effectiveThemeMode = (themeMode === "system" ? "time" : themeMode) as ThemeMode;
 
   return (
     <AnimatePresence>
@@ -179,39 +182,37 @@ export default function AccountModal({ open, onClose }: AccountModalProps) {
                     </div>
                   </div>
 
-                  {/* THEME PICKER */}
+                  {/* THEME PICKER — 3 opsi, tanpa deskripsi */}
                   <div className="mb-4">
                     <label className={`mb-2 block text-xs font-medium ${isDark ? "text-slate-400" : "text-zinc-600"}`}>
                       Tampilan
                     </label>
-                    <div className="grid grid-cols-2 gap-2">
+                    <div className={`grid grid-cols-3 gap-2 p-1 rounded-2xl ${isDark ? "bg-white/5 border border-white/10" : "bg-zinc-100 border border-zinc-200"}`}>
                       {themeOptions.map(opt => {
-                        const active = themeMode === opt.id;
+                        const active = effectiveThemeMode === opt.id;
                         return (
                           <button
                             key={opt.id}
                             onClick={() => setThemeMode(opt.id)}
                             className={
                               active
-                                ? "relative rounded-xl border-2 border-teal-400 bg-teal-400/10 px-3 py-2.5 text-left transition-all"
-                                : isDark
-                                  ? "rounded-xl border border-white/10 bg-white/5 px-3 py-2.5 text-left hover:bg-white/10 transition-all"
-                                  : "rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2.5 text-left hover:bg-zinc-100 transition-all"
+                                ? "flex flex-col items-center justify-center gap-1 rounded-xl bg-white py-3 shadow-sm border border-zinc-200 text-zinc-900 transition-all " +
+                                  (isDark ? "!bg-teal-400/15 !border-teal-400/50 !text-white" : "")
+                                : `flex flex-col items-center justify-center gap-1 rounded-xl py-3 transition-all ${
+                                    isDark
+                                      ? "text-slate-300 hover:bg-white/5"
+                                      : "text-zinc-600 hover:bg-white"
+                                  }`
                             }
+                            title={opt.label}
+                            type="button"
                           >
-                            <div className="text-base mb-0.5">{opt.icon}</div>
-                            <div className={`text-xs font-semibold ${isDark ? "text-white" : "text-zinc-900"}`}>{opt.label}</div>
-                            <div className={`text-[10px] ${isDark ? "text-slate-400" : "text-zinc-500"}`}>{opt.desc}</div>
-                            {active && (
-                              <div className="absolute top-2 right-2 h-1.5 w-1.5 rounded-full bg-teal-400" />
-                            )}
+                            <span className="text-xl leading-none">{opt.icon}</span>
+                            <span className="text-[11px] font-semibold">{opt.label}</span>
                           </button>
                         );
                       })}
                     </div>
-                    <p className={`mt-2 text-[11px] ${isDark ? "text-slate-500" : "text-zinc-500"}`}>
-                      Saat ini: <span className={isDark ? "text-slate-300" : "text-zinc-700"}><b>{resolved === "dark" ? "Gelap" : "Terang"}</b></span> • sinkron ke semua device
-                    </p>
                   </div>
 
                   <div className={`h-px w-full my-4 ${isDark ? "bg-white/10" : "bg-zinc-200"}`} />

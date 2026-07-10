@@ -25,9 +25,11 @@ const LS_KEY = "duit_theme_mode";
 function getInitialMode(): ThemeMode {
   try {
     const ls = localStorage.getItem(LS_KEY) as ThemeMode | null;
-    if (ls && ["system", "time", "light", "dark"].includes(ls)) return ls;
+    if (ls === "system") return "time"; // legacy: system → time
+    if (ls && ["time", "light", "dark"].includes(ls)) return ls as ThemeMode;
+    if (ls === "system") return "time";
   } catch {}
-  return "system";
+  return "time";
 }
 
 function getSystemIsDark(): boolean {
@@ -51,7 +53,8 @@ function resolveIsDark(mode: ThemeMode, now: Date, systemDark: boolean): boolean
       return getTimeIsDark(now);
     case "system":
     default:
-      return systemDark;
+      // legacy "system" → treat as time-based auto
+      return getTimeIsDark(now);
   }
 }
 
