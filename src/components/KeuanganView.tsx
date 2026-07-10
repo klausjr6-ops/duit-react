@@ -80,7 +80,7 @@ export default function KeuanganView() {
           <p className={`text-3xl font-extrabold mt-2 ${isDark ? "text-white" : "text-zinc-900"}`}>{formatRupiah(outMonth)}</p>
         </Card>
         <Card accent="linear-gradient(90deg,#3b82f6,#2563eb)">
-          <p className={`text-xs font-semibold tracking-widest ${isDark ? "text-blue-400" : "text-blue-600"}`}>SALDO BULAN INI</p>
+          <p className={`text-xs font-semibold tracking-widest ${isDark ? "text-blue-400" : "text-blue-600"}`}>TOTAL SALDO</p>
           <p className={`text-3xl font-extrabold mt-2 ${isDark ? "text-white" : "text-zinc-900"}`}>{formatRupiah(balance)}</p>
         </Card>
       </div>

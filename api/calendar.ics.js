@@ -1,135 +1,210 @@
-// Endpoint ini menghasilkan feed kalender (.ics) berisi Jadwal + Alarm milik satu user,
-// dibaca langsung dari Firestore pakai Firebase Admin SDK (akses server-side, bukan dari browser).
-// Calendar.app di Mac/iPhone bisa "subscribe" ke URL ini sekali, lalu otomatis cek update berkala.
+// Private iCalendar feed for DUIT schedules.
+// The URL is a capability: it requires both the Firebase uid and the random
+// calendarToken stored in that user's private Firestore document.
 
-const admin = require('firebase-admin');
+import { cert, getApps, initializeApp } from "firebase-admin/app";
+import { getFirestore } from "firebase-admin/firestore";
+import { timingSafeEqual } from "node:crypto";
 
-if (!admin.apps.length) {
-  const serviceAccount = JSON.parse(
-    Buffer.from(process.env.FIREBASE_SERVICE_ACCOUNT_BASE64, 'base64').toString('utf-8')
-  );
-  admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
+const DAY_TO_ICAL = {
+  Minggu: "SU",
+  Senin: "MO",
+  Selasa: "TU",
+  Rabu: "WE",
+  Kamis: "TH",
+  Jumat: "FR",
+  Sabtu: "SA",
+};
+const DAYS_ORDER = ["Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"];
+
+function getDb() {
+  if (!getApps().length) {
+    const encodedServiceAccount = process.env.FIREBASE_SERVICE_ACCOUNT_BASE64;
+    if (!encodedServiceAccount) {
+      throw new Error("Calendar service account is not configured");
+    }
+
+    const serviceAccount = JSON.parse(
+      Buffer.from(encodedServiceAccount, "base64").toString("utf8")
+    );
+    initializeApp({ credential: cert(serviceAccount) });
+  }
+
+  return getFirestore();
 }
-const db = admin.firestore();
 
-const DAYS_ORDER = ['Minggu','Senin','Selasa','Rabu','Kamis','Jumat','Sabtu'];
-const DAY_TO_ICAL = { Minggu:'SU', Senin:'MO', Selasa:'TU', Rabu:'WE', Kamis:'TH', Jumat:'FR', Sabtu:'SA' };
+function getSingleQueryValue(value) {
+  return Array.isArray(value) ? value[0] : value;
+}
 
-function pad(n){ return n < 10 ? '0' + n : '' + n; }
+function hasValidToken(receivedToken, expectedToken) {
+  if (!receivedToken || !expectedToken) return false;
 
-// Cari tanggal terdekat (hari ini atau setelahnya) yang jatuh pada nama hari tertentu —
-// dipakai sebagai titik awal (DTSTART) untuk event yang berulang tiap minggu
-function nextDateForDay(dayName){
-  const targetIdx = DAYS_ORDER.indexOf(dayName);
+  const received = Buffer.from(receivedToken);
+  const expected = Buffer.from(expectedToken);
+  return received.length === expected.length && timingSafeEqual(received, expected);
+}
+
+function pad(value) {
+  return value < 10 ? `0${value}` : String(value);
+}
+
+function icalStamp() {
   const now = new Date();
-  const diff = (targetIdx - now.getDay() + 7) % 7;
-  const d = new Date(now);
-  d.setDate(now.getDate() + diff);
-  return d;
+  return `${now.getUTCFullYear()}${pad(now.getUTCMonth() + 1)}${pad(now.getUTCDate())}T${pad(now.getUTCHours())}${pad(now.getUTCMinutes())}${pad(now.getUTCSeconds())}Z`;
 }
 
-function icalDateTime(date, timeStr){
-  const [h, m] = (timeStr || '00:00').split(':').map(Number);
-  return `${date.getFullYear()}${pad(date.getMonth()+1)}${pad(date.getDate())}T${pad(h)}${pad(m)}00`;
+function icalDateTime(dateKey, time = "00:00") {
+  const [year, month, day] = dateKey.split("-").map(Number);
+  const [hour, minute] = time.split(":").map(Number);
+  return `${year}${pad(month)}${pad(day)}T${pad(hour || 0)}${pad(minute || 0)}00`;
 }
 
-function icalStamp(){
-  const d = new Date();
-  return `${d.getUTCFullYear()}${pad(d.getUTCMonth()+1)}${pad(d.getUTCDate())}T${pad(d.getUTCHours())}${pad(d.getUTCMinutes())}${pad(d.getUTCSeconds())}Z`;
+function icalUntil(dateKey) {
+  const [year, month, day] = dateKey.split("-").map(Number);
+  // 23:59:59 Asia/Jakarta = 16:59:59 UTC; Jakarta has no DST.
+  return `${year}${pad(month)}${pad(day)}T165959Z`;
 }
 
-function escapeText(s){
-  return String(s || '').replace(/[\,;]/g, m => '\\' + m).replace(/\n/g, '\\n');
+function defaultEndTime(start = "00:00") {
+  const [hour, minute] = start.split(":").map(Number);
+  const totalMinutes = ((hour || 0) * 60 + (minute || 0) + 60) % (24 * 60);
+  return `${pad(Math.floor(totalMinutes / 60))}:${pad(totalMinutes % 60)}`;
 }
 
-module.exports = async function handler(req, res) {
-  const uid = req.query.uid;
-  if (!uid) { res.status(400).send('Parameter uid wajib diisi'); return; }
+function escapeText(value) {
+  return String(value || "")
+    .replace(/[\\,;]/g, (match) => `\\${match}`)
+    .replace(/\r?\n/g, "\\n");
+}
+
+function dayIndexFromDateKey(dateKey) {
+  const [year, month, day] = dateKey.split("-").map(Number);
+  return new Date(Date.UTC(year, month - 1, day)).getUTCDay();
+}
+
+function addDaysToDateKey(dateKey, days) {
+  const [year, month, day] = dateKey.split("-").map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  date.setUTCDate(date.getUTCDate() + days);
+  return date.toISOString().slice(0, 10);
+}
+
+function todayInJakarta() {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "Asia/Jakarta",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(new Date());
+  const get = (type) => parts.find((part) => part.type === type)?.value || "";
+  return `${get("year")}-${get("month")}-${get("day")}`;
+}
+
+function nextDateForDay(dayName) {
+  const targetIndex = DAYS_ORDER.indexOf(dayName);
+  const today = todayInJakarta();
+  if (targetIndex < 0) return today;
+
+  const offset = (targetIndex - dayIndexFromDateKey(today) + 7) % 7;
+  return addDaysToDateKey(today, offset);
+}
+
+function scheduleRule(schedule, startDate) {
+  if (!schedule.recurring && schedule.date) return null;
+
+  const dayName = schedule.date
+    ? DAYS_ORDER[dayIndexFromDateKey(startDate)]
+    : schedule.day;
+  const byDay = DAY_TO_ICAL[dayName];
+  if (!byDay) return null;
+
+  const until = schedule.untilDate ? `;UNTIL=${icalUntil(schedule.untilDate)}` : "";
+  return `RRULE:FREQ=WEEKLY;BYDAY=${byDay}${until}`;
+}
+
+export default async function handler(req, res) {
+  if (req.method !== "GET") {
+    res.status(405).json({ error: "Method not allowed" });
+    return;
+  }
+
+  const uid = getSingleQueryValue(req.query.uid);
+  const token = getSingleQueryValue(req.query.token);
+  if (!uid || !token) {
+    res.status(401).json({ error: "A private calendar feed URL is required" });
+    return;
+  }
 
   try {
-    const snap = await db.collection('appData').doc(uid).get();
-    if (!snap.exists) { res.status(404).send('Data tidak ditemukan untuk user ini'); return; }
-    const data = snap.data();
-    const scheds = data.scheds || [];
-    const alarms = data.alarms || [];
+    const db = getDb();
+    const snapshot = await db.doc(`users/${uid}/data/main`).get();
+    if (!snapshot.exists) {
+      res.status(404).json({ error: "Calendar data not found" });
+      return;
+    }
 
+    const data = snapshot.data() || {};
+    if (!hasValidToken(token, data.settings?.calendarToken)) {
+      // Do not reveal whether a uid exists or whether only the token is wrong.
+      res.status(404).json({ error: "Calendar feed not found" });
+      return;
+    }
+
+    const schedules = Array.isArray(data.scheds) ? data.scheds : [];
     const lines = [
-      'BEGIN:VCALENDAR',
-      'VERSION:2.0',
-      'PRODID:-//DUIT App//Jadwal dan Alarm//ID',
-      'CALSCALE:GREGORIAN',
-      'METHOD:PUBLISH',
-      'X-WR-CALNAME:Jadwal DUIT',
-      'X-WR-TIMEZONE:Asia/Jakarta',
-      'REFRESH-INTERVAL;VALUE=DURATION:PT1H',
-      'X-PUBLISHED-TTL:PT1H'
+      "BEGIN:VCALENDAR",
+      "VERSION:2.0",
+      "PRODID:-//DUIT App//Jadwal//ID",
+      "CALSCALE:GREGORIAN",
+      "METHOD:PUBLISH",
+      "X-WR-CALNAME:Jadwal DUIT",
+      "X-WR-TIMEZONE:Asia/Jakarta",
+      "REFRESH-INTERVAL;VALUE=DURATION:PT1H",
+      "X-PUBLISHED-TTL:PT1H",
     ];
 
-    // ── Jadwal (scheds): item dengan "date" = sekali pakai, tanpa "date" = berulang tiap minggu ──
-    scheds.forEach(s => {
-      if (s.date) {
-        const [y, mo, da] = s.date.split('-').map(Number);
-        const dateObj = new Date(y, mo - 1, da);
-        lines.push(
-          'BEGIN:VEVENT',
-          `UID:sched-${s.id}@duit-app`,
-          `DTSTAMP:${icalStamp()}`,
-          `DTSTART;TZID=Asia/Jakarta:${icalDateTime(dateObj, s.start)}`,
-          `DTEND;TZID=Asia/Jakarta:${icalDateTime(dateObj, s.end || s.start)}`,
-          `SUMMARY:${escapeText(s.name || 'Jadwal')}`,
-          'BEGIN:VALARM','ACTION:DISPLAY','DESCRIPTION:Reminder','TRIGGER:-PT10M','END:VALARM',
-          'END:VEVENT'
-        );
-      } else {
-        const base = nextDateForDay(s.day);
-        const byday = DAY_TO_ICAL[s.day] || 'MO';
-        lines.push(
-          'BEGIN:VEVENT',
-          `UID:sched-${s.id}@duit-app`,
-          `DTSTAMP:${icalStamp()}`,
-          `DTSTART;TZID=Asia/Jakarta:${icalDateTime(base, s.start)}`,
-          `DTEND;TZID=Asia/Jakarta:${icalDateTime(base, s.end || s.start)}`,
-          `RRULE:FREQ=WEEKLY;BYDAY=${byday}`,
-          `SUMMARY:${escapeText(s.name || 'Jadwal')}`,
-          'BEGIN:VALARM','ACTION:DISPLAY','DESCRIPTION:Reminder','TRIGGER:-PT10M','END:VALARM',
-          'END:VEVENT'
-        );
-      }
-    });
+    schedules.forEach((schedule) => {
+      const startDate = schedule.date || nextDateForDay(schedule.day);
+      const endTime = schedule.end || defaultEndTime(schedule.start);
+      const rule = scheduleRule(schedule, startDate);
 
-    // ── Alarm: daily / weekday / weekend / once ──
-    alarms.filter(a => a.active !== false).forEach(a => {
-      const today = new Date();
-      let rrule = null;
-      if (a.repeat === 'daily') rrule = 'RRULE:FREQ=DAILY';
-      else if (a.repeat === 'weekday') rrule = 'RRULE:FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR';
-      else if (a.repeat === 'weekend') rrule = 'RRULE:FREQ=WEEKLY;BYDAY=SA,SU';
-      // 'once' → tanpa RRULE, sekali saja
-
-      const dt = icalDateTime(today, a.time);
-      const lines2 = [
-        'BEGIN:VEVENT',
-        `UID:alarm-${a.id}@duit-app`,
+      lines.push(
+        "BEGIN:VEVENT",
+        `UID:sched-${escapeText(schedule.id)}@duit-app`,
         `DTSTAMP:${icalStamp()}`,
-        `DTSTART;TZID=Asia/Jakarta:${dt}`,
-        `DTEND;TZID=Asia/Jakarta:${dt}`
-      ];
-      if (rrule) lines2.push(rrule);
-      lines2.push(
-        `SUMMARY:⏰ ${escapeText(a.label || 'Alarm')}`,
-        'BEGIN:VALARM','ACTION:DISPLAY','DESCRIPTION:Alarm','TRIGGER:PT0M','END:VALARM',
-        'END:VEVENT'
+        `DTSTART;TZID=Asia/Jakarta:${icalDateTime(startDate, schedule.start)}`,
+        `DTEND;TZID=Asia/Jakarta:${icalDateTime(startDate, endTime)}`,
+        `SUMMARY:${escapeText(schedule.name || "Jadwal")}`
       );
-      lines.push(...lines2);
+
+      if (schedule.desc) lines.push(`DESCRIPTION:${escapeText(schedule.desc)}`);
+      if (rule) lines.push(rule);
+
+      lines.push(
+        "BEGIN:VALARM",
+        "ACTION:DISPLAY",
+        "DESCRIPTION:Reminder",
+        "TRIGGER:-PT10M",
+        "END:VALARM",
+        "END:VEVENT"
+      );
     });
 
-    lines.push('END:VCALENDAR');
+    lines.push("END:VCALENDAR");
 
-    res.setHeader('Content-Type', 'text/calendar; charset=utf-8');
-    res.setHeader('Content-Disposition', 'inline; filename="jadwal-duit.ics"');
-    res.status(200).send(lines.join('\r\n'));
-  } catch (err) {
-    console.error(err);
-    res.status(500).send('Error: ' + err.message);
+    // A calendar URL is private; never let a shared cache retain its contents.
+    res.setHeader("Cache-Control", "private, no-store, max-age=0");
+    res.setHeader("Content-Type", "text/calendar; charset=utf-8");
+    res.setHeader("Content-Disposition", 'inline; filename="jadwal-duit.ics"');
+    res.status(200).send(lines.join("\r\n"));
+  } catch (error) {
+    console.error("Calendar feed error:", error);
+    const notConfigured = error instanceof Error && error.message === "Calendar service account is not configured";
+    res.status(notConfigured ? 503 : 500).json({
+      error: notConfigured
+        ? "Calendar feed is not configured on this deployment"
+        : "Calendar feed is temporarily unavailable",
+    });
   }
-};
+}

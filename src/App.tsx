@@ -36,6 +36,10 @@ export default function App() {
     todaySchedules,
     inMonth,
     savingsPct,
+    loading: storeLoading,
+    loadedUserId,
+    syncing,
+    syncError,
   } = useStore();
 
   useEffect(() => {
@@ -47,8 +51,12 @@ export default function App() {
     window.scrollTo(0, 0);
   }, [active]);
 
-  // ── Loading state saat cek session pertama kali ──
-  if (authLoading) {
+  // Jangan render data default sebelum snapshot Firestore untuk user aktif selesai.
+  // Ini mencegah perubahan awal menimpa data cloud yang belum sempat dimuat.
+  const appLoading = authLoading || Boolean(user && (storeLoading || loadedUserId !== user.uid));
+
+  // ── Loading state saat cek session / data pertama kali ──
+  if (appLoading) {
     return (
       <div className={isDark 
         ? "min-h-screen bg-slate-950 flex items-center justify-center"
@@ -95,6 +103,26 @@ export default function App() {
 
       <main className="relative z-10 min-h-screen px-4 pb-28 pt-6 sm:px-8 sm:pt-8 md:ml-20 md:px-5 md:pb-24 lg:px-10">
         <div className="mx-auto max-w-7xl space-y-6">
+          {(syncError || syncing) && (
+            <div aria-live="polite">
+              {syncError ? (
+                <div
+                  role="alert"
+                  className={isDark
+                    ? "rounded-xl border border-rose-400/30 bg-rose-400/10 px-4 py-3 text-sm text-rose-300"
+                    : "rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700"
+                  }
+                >
+                  ⚠️ {syncError}
+                </div>
+              ) : (
+                <p className={isDark ? "text-right text-xs text-slate-500" : "text-right text-xs text-zinc-500"}>
+                  Menyimpan perubahan…
+                </p>
+              )}
+            </div>
+          )}
+
           {active === "home" && (
             <>
               <Header now={now} score={score} />

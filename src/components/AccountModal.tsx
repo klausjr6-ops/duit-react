@@ -18,16 +18,28 @@ function toBase64(file: File): Promise<string> {
   });
 }
 
+function createCalendarToken(): string {
+  if (typeof crypto === "undefined") {
+    throw new Error("Browser ini belum mendukung token kalender yang aman");
+  }
+  if (typeof crypto.randomUUID === "function") return crypto.randomUUID();
+
+  const bytes = new Uint8Array(24);
+  crypto.getRandomValues(bytes);
+  return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
 type SubView = "main" | "email" | "password";
 
 export default function AccountModal({ open, onClose }: AccountModalProps) {
   const { settings, updateSettings, resetAll } = useStore();
   const { user, logout, changeEmail, changePassword } = useAuth();
-  const { isDark, themeMode, setThemeMode, resolved } = useTheme();
+  const { isDark, themeMode, setThemeMode } = useTheme();
 
   const [name, setName] = useState(settings.name);
   const [confirmLogout, setConfirmLogout] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
+  const [calendarCopied, setCalendarCopied] = useState(false);
   const [subView, setSubView] = useState<SubView>("main");
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -47,6 +59,22 @@ export default function AccountModal({ open, onClose }: AccountModalProps) {
 
   const saveName = () => {
     updateSettings({ name: name.trim() || "Kamu" });
+  };
+
+  const copyCalendarFeedUrl = async () => {
+    if (!user) return;
+
+    const token = settings.calendarToken || createCalendarToken();
+    if (!settings.calendarToken) updateSettings({ calendarToken: token });
+
+    const url = `${window.location.origin}/api/calendar.ics?uid=${encodeURIComponent(user.uid)}&token=${encodeURIComponent(token)}`;
+    try {
+      await navigator.clipboard.writeText(url);
+      setCalendarCopied(true);
+      window.setTimeout(() => setCalendarCopied(false), 2200);
+    } catch {
+      window.prompt("Salin link kalender pribadi ini. Jangan dibagikan.", url);
+    }
   };
 
   const handleLogout = async () => {
@@ -73,25 +101,18 @@ export default function AccountModal({ open, onClose }: AccountModalProps) {
     ? "flex-1 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder:text-slate-500 focus:border-teal-400/50 focus:outline-none"
     : "flex-1 rounded-xl border border-zinc-300 bg-zinc-50 px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-500 focus:border-teal-500 focus:outline-none focus:bg-white";
 
-  const inputFull = isDark
-    ? "w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder:text-slate-500 focus:border-teal-400/50 focus:outline-none"
-    : "w-full rounded-xl border border-zinc-300 bg-zinc-50 px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-500 focus:border-teal-500 focus:outline-none focus:bg-white";
-
   const btnPrimary = "rounded-xl bg-gradient-to-br from-teal-400 to-blue-500 px-3 py-2 text-sm font-semibold text-zinc-900 hover:brightness-105 transition-all";
 
   const cardBtn = isDark
     ? "flex w-full items-center justify-between rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-left transition-colors hover:bg-white/10"
     : "flex w-full items-center justify-between rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-3 text-left transition-colors hover:bg-zinc-100";
 
-  // 3 opsi saja: Terang / Gelap / Auto (waktu)
   const themeOptions: { id: ThemeMode; label: string; icon: string }[] = [
+    { id: "system", label: "Sistem", icon: "🖥️" },
+    { id: "time", label: "Auto Jam", icon: "🌓" },
     { id: "light", label: "Terang", icon: "☀️" },
     { id: "dark", label: "Gelap", icon: "🌙" },
-    { id: "time", label: "Auto", icon: "🌓" },
   ];
-
-  // Normalize: kalau user masih pakai 'system' (legacy), anggap 'time'
-  const effectiveThemeMode = (themeMode === "system" ? "time" : themeMode) as ThemeMode;
 
   return (
     <AnimatePresence>
@@ -182,14 +203,17 @@ export default function AccountModal({ open, onClose }: AccountModalProps) {
                     </div>
                   </div>
 
-                  {/* THEME PICKER — 3 opsi, tanpa deskripsi */}
+                  {/* THEME PICKER — system, waktu, terang, gelap */}
                   <div className="mb-4">
-                    <label className={`mb-2 block text-xs font-medium ${isDark ? "text-slate-400" : "text-zinc-600"}`}>
+                    <label className={`mb-1 block text-xs font-medium ${isDark ? "text-slate-400" : "text-zinc-600"}`}>
                       Tampilan
                     </label>
-                    <div className={`grid grid-cols-3 gap-2 p-1 rounded-2xl ${isDark ? "bg-white/5 border border-white/10" : "bg-zinc-100 border border-zinc-200"}`}>
+                    <p className={`mb-2 text-[11px] ${isDark ? "text-slate-500" : "text-zinc-500"}`}>
+                      Auto Jam: terang 06.00–18.00, gelap setelahnya.
+                    </p>
+                    <div className={`grid grid-cols-2 gap-2 p-1 rounded-2xl ${isDark ? "bg-white/5 border border-white/10" : "bg-zinc-100 border border-zinc-200"}`}>
                       {themeOptions.map(opt => {
-                        const active = effectiveThemeMode === opt.id;
+                        const active = themeMode === opt.id;
                         return (
                           <button
                             key={opt.id}
@@ -213,6 +237,27 @@ export default function AccountModal({ open, onClose }: AccountModalProps) {
                         );
                       })}
                     </div>
+                  </div>
+
+                  <div className={`mt-4 rounded-xl border p-3 ${isDark ? "border-white/10 bg-white/5" : "border-zinc-200 bg-zinc-50"}`}>
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className={`text-sm font-medium ${isDark ? "text-white" : "text-zinc-900"}`}>Kalender</p>
+                        <p className={`mt-0.5 text-xs ${isDark ? "text-slate-500" : "text-zinc-500"}`}>
+                          Salin link pribadi untuk subscribe jadwal di Calendar.
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={copyCalendarFeedUrl}
+                        className={btnPrimary}
+                      >
+                        {calendarCopied ? "✓ Disalin" : "Salin Link"}
+                      </button>
+                    </div>
+                    <p className={`mt-2 text-[10px] leading-relaxed ${isDark ? "text-slate-500" : "text-zinc-500"}`}>
+                      Link ini bersifat rahasia karena memberi akses baca ke jadwal kamu. Jangan dibagikan.
+                    </p>
                   </div>
 
                   <div className={`h-px w-full my-4 ${isDark ? "bg-white/10" : "bg-zinc-200"}`} />
@@ -305,7 +350,7 @@ export default function AccountModal({ open, onClose }: AccountModalProps) {
                   {/* Hapus data */}
                   <button
                     onClick={() => {
-                      if (confirm("Yakin mau hapus semua data lokal?")) {
+                      if (confirm("Yakin mau hapus semua data akun? Transaksi, jadwal, goal, mood, dan dompet di cloud akan direset.")) {
                         resetAll();
                         handleClose();
                       }
