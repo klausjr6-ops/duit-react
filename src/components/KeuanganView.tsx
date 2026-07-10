@@ -86,20 +86,31 @@ export default function KeuanganView() {
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
-        {wallets.map((w) => (
-          <div
+        {wallets.map((w, i) => (
+          <motion.div
             key={w.id}
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.4, delay: i * 0.05, ease: [0.22, 1, 0.36, 1] }}
+            whileHover={{ y: -4 }}
             className={isDark
-              ? "bg-gradient-to-br from-emerald-500/10 to-emerald-500/5 border border-emerald-500/30 rounded-2xl p-4 hover:border-emerald-400 transition-all"
-              : "bg-gradient-to-br from-emerald-50 to-teal-50/60 border border-emerald-200 rounded-2xl p-4 hover:border-emerald-400 transition-all shadow-sm"
+              ? "bg-gradient-to-br from-emerald-500/10 to-emerald-500/5 border border-emerald-500/30 rounded-2xl p-4 hover:border-emerald-400 transition-shadow duration-300 shadow-lg shadow-black/5 cursor-pointer"
+              : "bg-gradient-to-br from-emerald-50 to-teal-50/60 border border-emerald-200 rounded-2xl p-4 hover:border-emerald-400 transition-shadow duration-300 shadow-sm hover:shadow-md cursor-pointer"
             }
           >
             <div className="text-2xl mb-2">{w.icon}</div>
             <p className={`text-xs font-bold uppercase tracking-wider ${isDark ? "text-slate-300" : "text-zinc-600"}`}>{w.name}</p>
             <p className="text-lg font-extrabold text-emerald-600 mt-1">{formatRupiah(w.balance)}</p>
-          </div>
+          </motion.div>
         ))}
-        <button
+        <motion.button
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.4, delay: wallets.length * 0.05 }}
+          whileHover={{ y: -4, scale: 1.02 }}
+          whileTap={{ scale: 0.98 }}
           onClick={() => setShowWalletManager(true)}
           className={isDark
             ? "border-2 border-dashed border-white/20 rounded-2xl p-4 flex flex-col items-center justify-center hover:border-emerald-400 hover:bg-emerald-500/5 transition-all group min-h-[110px]"
@@ -108,7 +119,7 @@ export default function KeuanganView() {
         >
           <div className="text-2xl mb-1 group-hover:scale-110 transition-transform">👛</div>
           <p className={`text-xs font-semibold ${isDark ? "text-slate-400 group-hover:text-emerald-400" : "text-zinc-500 group-hover:text-emerald-600"}`}>Kelola Dompet</p>
-        </button>
+        </motion.button>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
