@@ -1,5 +1,6 @@
 import { motion } from "framer-motion";
 import { formatDayDate, getGreeting } from "../lib/format";
+import { useTheme } from "../lib/ThemeContext";
 
 interface HeaderProps {
   now: Date;
@@ -17,11 +18,12 @@ export default function Header({ now, score }: HeaderProps) {
   const greeting = getGreeting(now);
   const { day, full } = formatDayDate(now);
   const badge = scoreLabel(score);
+  const { isDark } = useTheme();
 
   return (
     <div className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
       <motion.div initial={{ opacity: 0, y: -12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
-        <h1 className="flex items-center gap-2 text-3xl font-bold text-white sm:text-4xl">
+        <h1 className={`flex items-center gap-2 text-3xl font-bold sm:text-4xl ${isDark ? "text-white" : "text-zinc-900"}`}>
           {greeting.text}
           <motion.span
             animate={{ rotate: [0, 15, -10, 15, 0] }}
@@ -31,7 +33,7 @@ export default function Header({ now, score }: HeaderProps) {
             {greeting.icon}
           </motion.span>
         </h1>
-        <p className="mt-1 text-slate-400">
+        <p className={isDark ? "mt-1 text-slate-400" : "mt-1 text-zinc-500"}>
           {day}, {full}
         </p>
       </motion.div>
@@ -40,9 +42,13 @@ export default function Header({ now, score }: HeaderProps) {
         initial={{ opacity: 0, x: 20 }}
         animate={{ opacity: 1, x: 0 }}
         transition={{ duration: 0.5, delay: 0.15 }}
-        className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 backdrop-blur-xl"
+        className={
+          isDark
+            ? "flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 backdrop-blur-xl"
+            : "flex items-center gap-3 rounded-2xl border border-zinc-200 bg-white px-4 py-3 shadow-sm"
+        }
       >
-        <span className="text-sm text-slate-400">Skor keuangan</span>
+        <span className={isDark ? "text-sm text-slate-400" : "text-sm text-zinc-500"}>Skor keuangan</span>
         <span
           className={`flex items-center gap-2 rounded-full bg-gradient-to-r ${badge.color} px-4 py-1.5 text-sm font-bold text-slate-900 shadow-lg`}
         >

@@ -1,7 +1,8 @@
-import { useRef, useState } from "react";
+import { useRef, useState, useEffect } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { useStore } from "../lib/store";
 import { useAuth } from "../lib/AuthContext";
+import { useTheme, type ThemeMode } from "../lib/ThemeContext";
 
 interface AccountModalProps {
   open: boolean;
@@ -22,6 +23,7 @@ type SubView = "main" | "email" | "password";
 export default function AccountModal({ open, onClose }: AccountModalProps) {
   const { settings, updateSettings, resetAll } = useStore();
   const { user, logout, changeEmail, changePassword } = useAuth();
+  const { isDark, themeMode, setThemeMode, resolved } = useTheme();
 
   const [name, setName] = useState(settings.name);
   const [confirmLogout, setConfirmLogout] = useState(false);
@@ -31,6 +33,10 @@ export default function AccountModal({ open, onClose }: AccountModalProps) {
 
   // Cek apakah user login pakai Google (gak bisa ganti email/pass)
   const isGoogleUser = user?.providerData[0]?.providerId === "google.com";
+
+  useEffect(() => {
+    if (open) setName(settings.name);
+  }, [open, settings.name]);
 
   const handleAvatarPick = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -59,6 +65,31 @@ export default function AccountModal({ open, onClose }: AccountModalProps) {
     onClose();
   };
 
+  const modalBg = isDark
+    ? "w-full max-w-sm rounded-3xl border border-white/10 bg-slate-900/95 p-6 shadow-2xl backdrop-blur-xl max-h-[90vh] overflow-y-auto"
+    : "w-full max-w-sm rounded-3xl border border-zinc-200 bg-white p-6 shadow-2xl max-h-[90vh] overflow-y-auto";
+
+  const inputClass = isDark
+    ? "flex-1 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder:text-slate-500 focus:border-teal-400/50 focus:outline-none"
+    : "flex-1 rounded-xl border border-zinc-300 bg-zinc-50 px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-500 focus:border-teal-500 focus:outline-none focus:bg-white";
+
+  const inputFull = isDark
+    ? "w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder:text-slate-500 focus:border-teal-400/50 focus:outline-none"
+    : "w-full rounded-xl border border-zinc-300 bg-zinc-50 px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-500 focus:border-teal-500 focus:outline-none focus:bg-white";
+
+  const btnPrimary = "rounded-xl bg-gradient-to-br from-teal-400 to-blue-500 px-3 py-2 text-sm font-semibold text-zinc-900 hover:brightness-105 transition-all";
+
+  const cardBtn = isDark
+    ? "flex w-full items-center justify-between rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-left transition-colors hover:bg-white/10"
+    : "flex w-full items-center justify-between rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-3 text-left transition-colors hover:bg-zinc-100";
+
+  const themeOptions: { id: ThemeMode; label: string; desc: string; icon: string }[] = [
+    { id: "system", label: "Auto (Sistem)", desc: "Ikuti preferensi perangkat", icon: "🖥️" },
+    { id: "time", label: "Auto (Waktu)", desc: "Terang 06–18, Gelap 18–06", icon: "🕒" },
+    { id: "light", label: "Terang", desc: "Mode terang selalu", icon: "☀️" },
+    { id: "dark", label: "Gelap", desc: "Mode gelap selalu", icon: "🌙" },
+  ];
+
   return (
     <AnimatePresence>
       {open && (
@@ -66,37 +97,37 @@ export default function AccountModal({ open, onClose }: AccountModalProps) {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
           onClick={handleClose}
         >
           <motion.div
-            initial={{ opacity: 0, y: 20, scale: 0.96 }}
+            initial={{ opacity: 0, y: 20, scale: 0.95 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 20, scale: 0.96 }}
+            exit={{ opacity: 0, y: 20, scale: 0.95 }}
             onClick={(e) => e.stopPropagation()}
-            className="w-full max-w-sm rounded-3xl border border-white/10 bg-slate-900/95 p-6 shadow-2xl backdrop-blur-xl max-h-[90vh] overflow-y-auto"
+            className={modalBg}
           >
             {/* Header */}
-            <div className="mb-4 flex items-center justify-between border-b border-white/10 pb-3">
+            <div className={`mb-4 flex items-center justify-between border-b pb-3 ${isDark ? "border-white/10" : "border-zinc-200"}`}>
               <div className="flex items-center gap-2">
                 {subView !== "main" && (
                   <button
                     onClick={() => setSubView("main")}
-                    className="text-slate-400 hover:text-white -ml-1"
+                    className={isDark ? "text-slate-400 hover:text-white -ml-1" : "text-zinc-500 hover:text-zinc-900 -ml-1"}
                   >
                     ←
                   </button>
                 )}
                 <div>
-                  <p className="text-xs font-semibold text-emerald-400">AKUN</p>
-                  <p className="text-sm font-medium text-white">
+                  <p className="text-xs font-semibold text-teal-500">AKUN</p>
+                  <p className={`text-sm font-medium ${isDark ? "text-white" : "text-zinc-900"}`}>
                     {subView === "main" && "Pengaturan Akun"}
                     {subView === "email" && "Ganti Email"}
                     {subView === "password" && "Ganti Password"}
                   </p>
                 </div>
               </div>
-              <button onClick={handleClose} className="text-slate-400 hover:text-white">
+              <button onClick={handleClose} className={isDark ? "text-slate-400 hover:text-white" : "text-zinc-500 hover:text-zinc-900"}>
                 ✕
               </button>
             </div>
@@ -115,7 +146,7 @@ export default function AccountModal({ open, onClose }: AccountModalProps) {
                   <div className="mb-5 flex flex-col items-center">
                     <button
                       onClick={() => fileRef.current?.click()}
-                      className="group relative h-20 w-20 overflow-hidden rounded-full ring-2 ring-emerald-400/40"
+                      className="group relative h-20 w-20 overflow-hidden rounded-full ring-2 ring-teal-400/40"
                     >
                       {settings.avatar ? (
                         <img src={settings.avatar} alt="Avatar" className="h-full w-full object-cover" />
@@ -129,75 +160,109 @@ export default function AccountModal({ open, onClose }: AccountModalProps) {
                       </div>
                     </button>
                     <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleAvatarPick} />
-                    <p className="mt-2 text-xs text-slate-500">Klik foto untuk ganti avatar</p>
+                    <p className={`mt-2 text-xs ${isDark ? "text-slate-500" : "text-zinc-500"}`}>Klik foto untuk ganti avatar</p>
                   </div>
 
                   {/* Nama */}
                   <div className="mb-4">
-                    <label className="mb-1 block text-xs font-medium text-slate-400">Nama</label>
+                    <label className={`mb-1 block text-xs font-medium ${isDark ? "text-slate-400" : "text-zinc-600"}`}>Nama</label>
                     <div className="flex gap-2">
                       <input
                         value={name}
                         onChange={(e) => setName(e.target.value)}
-                        className="flex-1 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder:text-slate-500 focus:border-emerald-400/50 focus:outline-none"
+                        className={inputClass}
                         placeholder="Nama kamu"
                       />
-                      <button
-                        onClick={saveName}
-                        className="rounded-xl bg-emerald-400 px-3 py-2 text-sm font-semibold text-slate-900 hover:brightness-105"
-                      >
+                      <button onClick={saveName} className={btnPrimary}>
                         Simpan
                       </button>
                     </div>
                   </div>
+
+                  {/* THEME PICKER */}
+                  <div className="mb-4">
+                    <label className={`mb-2 block text-xs font-medium ${isDark ? "text-slate-400" : "text-zinc-600"}`}>
+                      Tampilan
+                    </label>
+                    <div className="grid grid-cols-2 gap-2">
+                      {themeOptions.map(opt => {
+                        const active = themeMode === opt.id;
+                        return (
+                          <button
+                            key={opt.id}
+                            onClick={() => setThemeMode(opt.id)}
+                            className={
+                              active
+                                ? "relative rounded-xl border-2 border-teal-400 bg-teal-400/10 px-3 py-2.5 text-left transition-all"
+                                : isDark
+                                  ? "rounded-xl border border-white/10 bg-white/5 px-3 py-2.5 text-left hover:bg-white/10 transition-all"
+                                  : "rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2.5 text-left hover:bg-zinc-100 transition-all"
+                            }
+                          >
+                            <div className="text-base mb-0.5">{opt.icon}</div>
+                            <div className={`text-xs font-semibold ${isDark ? "text-white" : "text-zinc-900"}`}>{opt.label}</div>
+                            <div className={`text-[10px] ${isDark ? "text-slate-400" : "text-zinc-500"}`}>{opt.desc}</div>
+                            {active && (
+                              <div className="absolute top-2 right-2 h-1.5 w-1.5 rounded-full bg-teal-400" />
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <p className={`mt-2 text-[11px] ${isDark ? "text-slate-500" : "text-zinc-500"}`}>
+                      Saat ini: <span className={isDark ? "text-slate-300" : "text-zinc-700"}><b>{resolved === "dark" ? "Gelap" : "Terang"}</b></span> • sinkron ke semua device
+                    </p>
+                  </div>
+
+                  <div className={`h-px w-full my-4 ${isDark ? "bg-white/10" : "bg-zinc-200"}`} />
 
                   {/* Ganti Email & Password (hanya untuk user email/password) */}
                   {!isGoogleUser && (
                     <div className="mb-4 space-y-2">
                       <button
                         onClick={() => setSubView("email")}
-                        className="flex w-full items-center justify-between rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-left transition-colors hover:bg-white/10"
+                        className={cardBtn}
                       >
                         <div>
-                          <p className="text-sm font-medium text-white">Ganti Email</p>
-                          <p className="text-xs text-slate-500 truncate max-w-[220px]">
+                          <p className={`text-sm font-medium ${isDark ? "text-white" : "text-zinc-900"}`}>Ganti Email</p>
+                          <p className={`text-xs truncate max-w-[220px] ${isDark ? "text-slate-500" : "text-zinc-500"}`}>
                             {user?.email}
                           </p>
                         </div>
-                        <span className="text-slate-500">›</span>
+                        <span className={isDark ? "text-slate-500" : "text-zinc-400"}>›</span>
                       </button>
 
                       <button
                         onClick={() => setSubView("password")}
-                        className="flex w-full items-center justify-between rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-left transition-colors hover:bg-white/10"
+                        className={cardBtn}
                       >
                         <div>
-                          <p className="text-sm font-medium text-white">Ganti Password</p>
-                          <p className="text-xs text-slate-500">Ubah kata sandi akun</p>
+                          <p className={`text-sm font-medium ${isDark ? "text-white" : "text-zinc-900"}`}>Ganti Password</p>
+                          <p className={`text-xs ${isDark ? "text-slate-500" : "text-zinc-500"}`}>Ubah kata sandi akun</p>
                         </div>
-                        <span className="text-slate-500">›</span>
+                        <span className={isDark ? "text-slate-500" : "text-zinc-400"}>›</span>
                       </button>
                     </div>
                   )}
 
                   {/* Info untuk Google user */}
                   {isGoogleUser && (
-                    <div className="mb-4 rounded-xl border border-white/10 bg-white/5 px-4 py-3">
-                      <p className="text-xs text-slate-400">
-                        Kamu login dengan <span className="font-semibold text-white">Google</span>.
+                    <div className={`mb-4 rounded-xl border px-4 py-3 ${isDark ? "border-white/10 bg-white/5" : "border-zinc-200 bg-zinc-50"}`}>
+                      <p className={`text-xs ${isDark ? "text-slate-400" : "text-zinc-600"}`}>
+                        Kamu login dengan <span className={`font-semibold ${isDark ? "text-white" : "text-zinc-900"}`}>Google</span>.
                         Ganti email/password dilakukan lewat akun Google kamu.
                       </p>
                     </div>
                   )}
 
-                  <div className="h-px w-full bg-white/10" />
+                  <div className={`h-px w-full ${isDark ? "bg-white/10" : "bg-zinc-200"}`} />
 
                   {/* Logout */}
                   <div className="mt-4">
                     {!confirmLogout ? (
                       <button
                         onClick={() => setConfirmLogout(true)}
-                        className="flex w-full items-center justify-center gap-2 rounded-xl border border-amber-400/30 bg-amber-400/10 py-2.5 text-sm font-semibold text-amber-400 hover:bg-amber-400/20 transition-colors"
+                        className="flex w-full items-center justify-center gap-2 rounded-xl border border-amber-400/30 bg-amber-400/10 py-2.5 text-sm font-semibold text-amber-600 hover:bg-amber-400/20 transition-colors"
                       >
                         <LogoutIcon />
                         <span>Keluar dari Akun</span>
@@ -208,23 +273,23 @@ export default function AccountModal({ open, onClose }: AccountModalProps) {
                         animate={{ opacity: 1, y: 0 }}
                         className="rounded-xl border border-amber-400/30 bg-amber-400/10 p-3"
                       >
-                        <p className="mb-3 text-center text-sm text-white">Yakin ingin keluar?</p>
+                        <p className={`mb-3 text-center text-sm ${isDark ? "text-white" : "text-zinc-900"}`}>Yakin ingin keluar?</p>
                         <div className="flex gap-2">
                           <button
                             onClick={() => setConfirmLogout(false)}
                             disabled={loggingOut}
-                            className="flex-1 rounded-lg bg-white/10 py-2 text-xs font-semibold text-white hover:bg-white/20 disabled:opacity-50"
+                            className={isDark ? "flex-1 rounded-lg bg-white/10 py-2 text-xs font-semibold text-white hover:bg-white/20 disabled:opacity-50" : "flex-1 rounded-lg bg-zinc-200 py-2 text-xs font-semibold text-zinc-900 hover:bg-zinc-300 disabled:opacity-50"}
                           >
                             Batal
                           </button>
                           <button
                             onClick={handleLogout}
                             disabled={loggingOut}
-                            className="flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-amber-500 py-2 text-xs font-semibold text-slate-900 hover:bg-amber-400 disabled:opacity-50"
+                            className="flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-amber-500 py-2 text-xs font-semibold text-zinc-900 hover:bg-amber-400 disabled:opacity-50"
                           >
                             {loggingOut ? (
                               <>
-                                <div className="h-3 w-3 animate-spin rounded-full border-2 border-slate-900/30 border-t-slate-900" />
+                                <div className="h-3 w-3 animate-spin rounded-full border-2 border-zinc-900/30 border-t-zinc-900" />
                                 <span>Keluar...</span>
                               </>
                             ) : (
@@ -244,7 +309,7 @@ export default function AccountModal({ open, onClose }: AccountModalProps) {
                         handleClose();
                       }
                     }}
-                    className="mt-3 w-full rounded-xl border border-rose-400/30 bg-rose-400/10 py-2.5 text-sm font-semibold text-rose-400 hover:bg-rose-400/20"
+                    className="mt-3 w-full rounded-xl border border-rose-400/30 bg-rose-400/10 py-2.5 text-sm font-semibold text-rose-500 hover:bg-rose-400/20"
                   >
                     🗑️ Hapus Semua Data
                   </button>
@@ -257,6 +322,7 @@ export default function AccountModal({ open, onClose }: AccountModalProps) {
                   currentEmail={user?.email || ""}
                   onSubmit={changeEmail}
                   onDone={() => setSubView("main")}
+                  isDark={isDark}
                 />
               )}
 
@@ -265,6 +331,7 @@ export default function AccountModal({ open, onClose }: AccountModalProps) {
                 <ChangePasswordForm
                   onSubmit={changePassword}
                   onDone={() => setSubView("main")}
+                  isDark={isDark}
                 />
               )}
             </AnimatePresence>
@@ -282,16 +349,26 @@ function ChangeEmailForm({
   currentEmail,
   onSubmit,
   onDone,
+  isDark,
 }: {
   currentEmail: string;
   onSubmit: (pw: string, newEmail: string) => Promise<void>;
   onDone: () => void;
+  isDark: boolean;
 }) {
   const [password, setPassword] = useState("");
   const [newEmail, setNewEmail] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+
+  const inputClass = isDark
+    ? "w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder:text-slate-500 focus:border-teal-400/50 focus:outline-none"
+    : "w-full rounded-xl border border-zinc-300 bg-zinc-50 px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-500 focus:border-teal-500 focus:outline-none focus:bg-white";
+
+  const labelClass = isDark ? "mb-1 block text-xs font-medium text-slate-400" : "mb-1 block text-xs font-medium text-zinc-600";
+  const textClass = isDark ? "text-white" : "text-zinc-900";
+  const mutedClass = isDark ? "text-slate-400" : "text-zinc-500";
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -321,8 +398,8 @@ function ChangeEmailForm({
         <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-emerald-400/20 text-2xl">
           ✓
         </div>
-        <p className="text-sm font-medium text-white">Email berhasil diubah!</p>
-        <p className="mt-1 text-xs text-slate-400">Cek inbox untuk verifikasi</p>
+        <p className={`text-sm font-medium ${textClass}`}>Email berhasil diubah!</p>
+        <p className={`mt-1 text-xs ${mutedClass}`}>Cek inbox untuk verifikasi</p>
       </motion.div>
     );
   }
@@ -338,19 +415,19 @@ function ChangeEmailForm({
       className="space-y-3"
     >
       <div>
-        <label className="mb-1 block text-xs font-medium text-slate-400">
+        <label className={labelClass}>
           Email Saat Ini
         </label>
         <input
           type="email"
           value={currentEmail}
           disabled
-          className="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-500"
+          className={inputClass + " opacity-60"}
         />
       </div>
 
       <div>
-        <label className="mb-1 block text-xs font-medium text-slate-400">
+        <label className={labelClass}>
           Email Baru
         </label>
         <input
@@ -358,12 +435,12 @@ function ChangeEmailForm({
           value={newEmail}
           onChange={(e) => setNewEmail(e.target.value)}
           placeholder="email-baru@domain.com"
-          className="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder:text-slate-500 focus:border-emerald-400/50 focus:outline-none"
+          className={inputClass}
         />
       </div>
 
       <div>
-        <label className="mb-1 block text-xs font-medium text-slate-400">
+        <label className={labelClass}>
           Password Saat Ini
         </label>
         <input
@@ -371,12 +448,12 @@ function ChangeEmailForm({
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           placeholder="Untuk verifikasi identitas"
-          className="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder:text-slate-500 focus:border-emerald-400/50 focus:outline-none"
+          className={inputClass}
         />
       </div>
 
       {error && (
-        <div className="rounded-lg border border-rose-400/30 bg-rose-400/10 px-3 py-2 text-xs text-rose-400">
+        <div className="rounded-lg border border-rose-400/30 bg-rose-400/10 px-3 py-2 text-xs text-rose-500">
           {error}
         </div>
       )}
@@ -384,7 +461,7 @@ function ChangeEmailForm({
       <button
         type="submit"
         disabled={loading}
-        className="w-full rounded-xl bg-emerald-400 py-2.5 text-sm font-semibold text-slate-900 hover:brightness-105 disabled:opacity-50"
+        className="w-full rounded-xl bg-gradient-to-br from-teal-400 to-blue-500 py-2.5 text-sm font-semibold text-zinc-900 hover:brightness-105 disabled:opacity-50"
       >
         {loading ? "Memproses..." : "Ganti Email"}
       </button>
@@ -398,9 +475,11 @@ function ChangeEmailForm({
 function ChangePasswordForm({
   onSubmit,
   onDone,
+  isDark,
 }: {
   onSubmit: (currentPw: string, newPw: string) => Promise<void>;
   onDone: () => void;
+  isDark: boolean;
 }) {
   const [currentPw, setCurrentPw] = useState("");
   const [newPw, setNewPw] = useState("");
@@ -408,6 +487,13 @@ function ChangePasswordForm({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+
+  const inputClass = isDark
+    ? "w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder:text-slate-500 focus:border-teal-400/50 focus:outline-none"
+    : "w-full rounded-xl border border-zinc-300 bg-zinc-50 px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-500 focus:border-teal-500 focus:outline-none focus:bg-white";
+
+  const labelClass = isDark ? "mb-1 block text-xs font-medium text-slate-400" : "mb-1 block text-xs font-medium text-zinc-600";
+  const textClass = isDark ? "text-white" : "text-zinc-900";
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -439,7 +525,7 @@ function ChangePasswordForm({
         <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-emerald-400/20 text-2xl">
           ✓
         </div>
-        <p className="text-sm font-medium text-white">Password berhasil diubah!</p>
+        <p className={`text-sm font-medium ${textClass}`}>Password berhasil diubah!</p>
       </motion.div>
     );
   }
@@ -455,7 +541,7 @@ function ChangePasswordForm({
       className="space-y-3"
     >
       <div>
-        <label className="mb-1 block text-xs font-medium text-slate-400">
+        <label className={labelClass}>
           Password Saat Ini
         </label>
         <input
@@ -463,12 +549,12 @@ function ChangePasswordForm({
           value={currentPw}
           onChange={(e) => setCurrentPw(e.target.value)}
           placeholder="••••••••"
-          className="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder:text-slate-500 focus:border-emerald-400/50 focus:outline-none"
+          className={inputClass}
         />
       </div>
 
       <div>
-        <label className="mb-1 block text-xs font-medium text-slate-400">
+        <label className={labelClass}>
           Password Baru
         </label>
         <input
@@ -476,12 +562,12 @@ function ChangePasswordForm({
           value={newPw}
           onChange={(e) => setNewPw(e.target.value)}
           placeholder="Minimal 6 karakter"
-          className="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder:text-slate-500 focus:border-emerald-400/50 focus:outline-none"
+          className={inputClass}
         />
       </div>
 
       <div>
-        <label className="mb-1 block text-xs font-medium text-slate-400">
+        <label className={labelClass}>
           Konfirmasi Password Baru
         </label>
         <input
@@ -489,12 +575,12 @@ function ChangePasswordForm({
           value={confirmPw}
           onChange={(e) => setConfirmPw(e.target.value)}
           placeholder="Ulangi password baru"
-          className="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder:text-slate-500 focus:border-emerald-400/50 focus:outline-none"
+          className={inputClass}
         />
       </div>
 
       {error && (
-        <div className="rounded-lg border border-rose-400/30 bg-rose-400/10 px-3 py-2 text-xs text-rose-400">
+        <div className="rounded-lg border border-rose-400/30 bg-rose-400/10 px-3 py-2 text-xs text-rose-500">
           {error}
         </div>
       )}
@@ -502,7 +588,7 @@ function ChangePasswordForm({
       <button
         type="submit"
         disabled={loading}
-        className="w-full rounded-xl bg-emerald-400 py-2.5 text-sm font-semibold text-slate-900 hover:brightness-105 disabled:opacity-50"
+        className="w-full rounded-xl bg-gradient-to-br from-teal-400 to-blue-500 py-2.5 text-sm font-semibold text-zinc-900 hover:brightness-105 disabled:opacity-50"
       >
         {loading ? "Memproses..." : "Ganti Password"}
       </button>

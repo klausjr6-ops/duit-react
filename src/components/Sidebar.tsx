@@ -1,5 +1,6 @@
 import { motion } from "framer-motion";
 import { useStore } from "../lib/store";
+import { useTheme } from "../lib/ThemeContext";
 
 interface SidebarProps {
   active: string;
@@ -24,14 +25,23 @@ function initials(name?: string) {
 
 export default function Sidebar({ active, setActive, onAvatarClick }: SidebarProps) {
   const { settings } = useStore();
+  const { isDark } = useTheme();
+
+  const asideClass = isDark
+    ? "fixed left-0 top-0 z-30 hidden h-full w-20 flex-col items-center justify-between border-r border-white/5 bg-slate-950/70 py-6 backdrop-blur-xl md:flex"
+    : "fixed left-0 top-0 z-30 hidden h-full w-20 flex-col items-center justify-between border-r border-zinc-200 bg-white/85 py-6 backdrop-blur-xl md:flex shadow-sm";
+
+  const navClass = isDark
+    ? "fixed bottom-0 left-0 right-0 z-30 flex items-center justify-around border-t border-white/10 bg-slate-950/90 px-2 pb-[env(safe-area-inset-bottom)] pt-2 backdrop-blur-xl md:hidden"
+    : "fixed bottom-0 left-0 right-0 z-30 flex items-center justify-around border-t border-zinc-200 bg-white/95 px-2 pb-[env(safe-area-inset-bottom)] pt-2 backdrop-blur-xl md:hidden shadow-[0_-4px_20px_rgba(0,0,0,0.04)]";
 
   return (
     <>
       {/* ═══════════════════ DESKTOP: Sidebar Kiri ═══════════════════ */}
-      <aside className="fixed left-0 top-0 z-30 hidden h-full w-20 flex-col items-center justify-between border-r border-white/5 bg-slate-950/70 py-6 backdrop-blur-xl md:flex">
+      <aside className={asideClass}>
         <div className="flex flex-col items-center gap-4">
           <motion.div
-            className="mb-4 flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-400 to-cyan-500 text-lg font-bold text-slate-950 shadow-lg shadow-emerald-500/30"
+            className="mb-4 flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-teal-400 to-blue-500 text-lg font-bold text-zinc-900 shadow-lg shadow-teal-500/20"
             whileHover={{ rotate: 12, scale: 1.08 }}
           >
             D
@@ -45,14 +55,18 @@ export default function Sidebar({ active, setActive, onAvatarClick }: SidebarPro
               title={item.label}
               className={`relative flex h-12 w-12 items-center justify-center rounded-2xl text-xl transition-colors ${
                 active === item.key
-                  ? "bg-white/10 text-white shadow-inner shadow-emerald-400/20"
-                  : "text-slate-400 hover:bg-white/5 hover:text-white"
+                  ? isDark
+                    ? "bg-white/10 text-white shadow-inner shadow-teal-400/20"
+                    : "bg-zinc-900 text-white shadow-md"
+                  : isDark
+                  ? "text-slate-400 hover:bg-white/5 hover:text-white"
+                  : "text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900"
               }`}
             >
               {active === item.key && (
                 <motion.span
                   layoutId="active-pill-desktop"
-                  className="absolute -left-2 h-6 w-1 rounded-full bg-emerald-400"
+                  className="absolute -left-2 h-6 w-1 rounded-full bg-teal-400"
                 />
               )}
               <span>{item.icon}</span>
@@ -63,7 +77,7 @@ export default function Sidebar({ active, setActive, onAvatarClick }: SidebarPro
           onClick={onAvatarClick}
           whileHover={{ scale: 1.08 }}
           title="Akun"
-          className="h-11 w-11 overflow-hidden rounded-full ring-2 ring-emerald-400/50"
+          className="h-11 w-11 overflow-hidden rounded-full ring-2 ring-teal-400/50"
         >
           {settings.avatar ? (
             <img src={settings.avatar} alt="Avatar" className="h-full w-full object-cover" />
@@ -76,7 +90,7 @@ export default function Sidebar({ active, setActive, onAvatarClick }: SidebarPro
       </aside>
 
       {/* ═══════════════════ MOBILE: Bottom Navigation ═══════════════════ */}
-      <nav className="fixed bottom-0 left-0 right-0 z-30 flex items-center justify-around border-t border-white/10 bg-slate-950/90 px-2 pb-[env(safe-area-inset-bottom)] pt-2 backdrop-blur-xl md:hidden">
+      <nav className={navClass}>
         {items.map((item) => (
           <motion.button
             key={item.key}
@@ -87,7 +101,7 @@ export default function Sidebar({ active, setActive, onAvatarClick }: SidebarPro
             {active === item.key && (
               <motion.span
                 layoutId="active-pill-mobile"
-                className="absolute -top-2 h-1 w-8 rounded-full bg-emerald-400"
+                className="absolute -top-2 h-1 w-8 rounded-full bg-teal-400"
               />
             )}
             <span
@@ -99,7 +113,9 @@ export default function Sidebar({ active, setActive, onAvatarClick }: SidebarPro
             </span>
             <span
               className={`text-[10px] font-semibold ${
-                active === item.key ? "text-emerald-400" : "text-slate-500"
+                active === item.key
+                  ? isDark ? "text-teal-400" : "text-zinc-900"
+                  : isDark ? "text-slate-500" : "text-zinc-500"
               }`}
             >
               {item.label}
@@ -111,7 +127,7 @@ export default function Sidebar({ active, setActive, onAvatarClick }: SidebarPro
           whileTap={{ scale: 0.9 }}
           className="flex flex-1 flex-col items-center gap-1 py-2"
         >
-          <div className="h-7 w-7 overflow-hidden rounded-full ring-2 ring-emerald-400/50">
+          <div className="h-7 w-7 overflow-hidden rounded-full ring-2 ring-teal-400/50">
             {settings.avatar ? (
               <img src={settings.avatar} alt="Avatar" className="h-full w-full object-cover" />
             ) : (
@@ -120,7 +136,7 @@ export default function Sidebar({ active, setActive, onAvatarClick }: SidebarPro
               </div>
             )}
           </div>
-          <span className="text-[10px] font-semibold text-slate-500">Akun</span>
+          <span className={`text-[10px] font-semibold ${isDark ? "text-slate-500" : "text-zinc-500"}`}>Akun</span>
         </motion.button>
       </nav>
     </>

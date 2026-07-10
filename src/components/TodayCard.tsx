@@ -1,6 +1,7 @@
 import { motion } from "framer-motion";
 import Card from "./Card";
 import { formatRupiah } from "../lib/format";
+import { useTheme } from "../lib/ThemeContext";
 
 interface TodayCardProps {
   income: number;
@@ -9,34 +10,35 @@ interface TodayCardProps {
 }
 
 export default function TodayCard({ income, expense, scheduleCount }: TodayCardProps) {
+  const { isDark } = useTheme();
   const rows = [
     {
       icon: "⬇️",
-      iconBg: "bg-blue-500/15 text-blue-400",
+      iconBg: isDark ? "bg-blue-500/15 text-blue-400" : "bg-blue-50 text-blue-600",
       label: "Masuk Hari Ini",
       value: formatRupiah(income),
-      valueColor: "text-emerald-400",
+      valueColor: isDark ? "text-emerald-400" : "text-emerald-600",
     },
     {
       icon: "⬆️",
-      iconBg: "bg-rose-500/15 text-rose-400",
+      iconBg: isDark ? "bg-rose-500/15 text-rose-400" : "bg-rose-50 text-rose-600",
       label: "Keluar Hari Ini",
       value: formatRupiah(expense),
-      valueColor: "text-rose-400",
+      valueColor: isDark ? "text-rose-400" : "text-rose-600",
     },
     {
       icon: "📅",
-      iconBg: "bg-indigo-500/15 text-indigo-400",
+      iconBg: isDark ? "bg-indigo-500/15 text-indigo-400" : "bg-indigo-50 text-indigo-600",
       label: "Jadwal Aktif",
       value: `${scheduleCount} kegiatan`,
-      valueColor: "text-slate-200",
+      valueColor: isDark ? "text-slate-200" : "text-zinc-800",
     },
   ];
 
   return (
-    <Card accent="linear-gradient(90deg,#818cf8,#6366f1)" delay={0.1}>
-      <p className="mb-4 text-xs font-semibold tracking-widest text-slate-400">HARI INI</p>
-      <div className="flex flex-col divide-y divide-white/5">
+    <Card accent="linear-gradient(90deg,#22d3ee,#3b82f6)" delay={0.1}>
+      <p className={`mb-4 text-xs font-semibold tracking-widest ${isDark ? "text-slate-400" : "text-zinc-500"}`}>HARI INI</p>
+      <div className={`flex flex-col divide-y ${isDark ? "divide-white/5" : "divide-zinc-100"}`}>
         {rows.map((row, i) => (
           <motion.div
             key={row.label}
@@ -50,7 +52,7 @@ export default function TodayCard({ income, expense, scheduleCount }: TodayCardP
               <span className={`flex h-10 w-10 items-center justify-center rounded-xl text-lg ${row.iconBg}`}>
                 {row.icon}
               </span>
-              <span className="text-sm text-slate-300">{row.label}</span>
+              <span className={`text-sm ${isDark ? "text-slate-300" : "text-zinc-700"}`}>{row.label}</span>
             </div>
             <span className={`font-bold ${row.valueColor}`}>{row.value}</span>
           </motion.div>

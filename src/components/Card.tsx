@@ -1,5 +1,6 @@
 import { motion } from "framer-motion";
 import type { ReactNode } from "react";
+import { useTheme } from "../lib/ThemeContext";
 
 interface CardProps {
   children: ReactNode;
@@ -9,6 +10,12 @@ interface CardProps {
 }
 
 export default function Card({ children, className = "", accent, delay = 0 }: CardProps) {
+  const { isDark } = useTheme();
+
+  const baseClasses = isDark
+    ? "group relative overflow-hidden rounded-3xl border border-white/10 bg-slate-900/60 p-6 shadow-xl shadow-black/20 backdrop-blur-xl transition-all hover:shadow-2xl hover:shadow-emerald-500/5"
+    : "group relative overflow-hidden rounded-3xl border border-zinc-200/80 bg-white p-6 shadow-sm shadow-zinc-200/60 backdrop-blur-xl transition-all hover:shadow-lg hover:shadow-zinc-200/80";
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 24 }}
@@ -16,7 +23,7 @@ export default function Card({ children, className = "", accent, delay = 0 }: Ca
       viewport={{ once: true, margin: "-40px" }}
       transition={{ duration: 0.5, delay }}
       whileHover={{ y: -4 }}
-      className={`group relative overflow-hidden rounded-3xl border border-white/10 bg-slate-900/60 p-6 shadow-xl shadow-black/20 backdrop-blur-xl transition-shadow hover:shadow-2xl hover:shadow-emerald-500/5 ${className}`}
+      className={`${baseClasses} ${className}`}
     >
       {accent && (
         <span
@@ -25,7 +32,7 @@ export default function Card({ children, className = "", accent, delay = 0 }: Ca
         />
       )}
       <div
-        className="pointer-events-none absolute -right-16 -top-16 h-40 w-40 rounded-full opacity-0 blur-3xl transition-opacity duration-500 group-hover:opacity-20"
+        className={`pointer-events-none absolute -right-16 -top-16 h-40 w-40 rounded-full opacity-0 blur-3xl transition-opacity duration-500 group-hover:opacity-${isDark ? "20" : "10"}`}
         style={{ background: accent || "#2dd4bf" }}
       />
       {children}

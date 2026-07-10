@@ -52,9 +52,12 @@ export interface MoodEntry {
   note: string;
 }
 
+export type ThemeMode = "system" | "time" | "light" | "dark";
+
 export interface Settings {
   name: string;
   avatar?: string;
+  themeMode?: ThemeMode;
 }
 
 export interface Wallet {
@@ -101,7 +104,7 @@ const DEFAULT_DATA: UserData = {
   scheds: [],
   goals: [],
   moods: {},
-  settings: { name: "Kamu" },
+  settings: { name: "Kamu", themeMode: "system" },
   wallets: DEFAULT_WALLETS,
 };
 
@@ -145,7 +148,7 @@ function getLocalStorageData(): UserData | null {
     scheds: readLS<ScheduleItem[]>(OLD_KEYS.scheds, []),
     goals: readLS<Goal[]>(OLD_KEYS.goals, []),
     moods: readLS<Record<string, MoodEntry>>(OLD_KEYS.moods, {}),
-    settings: readLS<Partial<Settings>>(OLD_KEYS.settings, { name: "Kamu" }),
+    settings: readLS<Partial<Settings>>(OLD_KEYS.settings, { name: "Kamu", themeMode: "system" }),
     wallets: readLS<Wallet[]>(OLD_KEYS.wallets, DEFAULT_WALLETS),
   };
 }
@@ -187,7 +190,7 @@ function useDuitStoreInternal() {
             scheds: remoteData.scheds || [],
             goals: remoteData.goals || [],
             moods: remoteData.moods || {},
-            settings: remoteData.settings || { name: "Kamu" },
+            settings: { name: "Kamu", themeMode: "system" as ThemeMode, ...(remoteData.settings || {}) },
             wallets: remoteData.wallets || DEFAULT_WALLETS,
           });
           setLoading(false);
@@ -248,7 +251,7 @@ function useDuitStoreInternal() {
 
   /* ─── Derived: settings dengan default ─────────────────────── */
   const settings: Settings = useMemo(
-    () => ({ name: "Kamu", ...data.settings }),
+    () => ({ name: "Kamu", themeMode: "system" as ThemeMode, ...data.settings }),
     [data.settings]
   );
 

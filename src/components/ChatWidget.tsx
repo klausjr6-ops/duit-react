@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useStore } from "../lib/store";
+import { useTheme } from "../lib/ThemeContext";
 
 interface Message {
   id: number;
@@ -76,6 +77,7 @@ interface ChatWidgetProps {
 
 export default function ChatWidget({ open, onClose }: ChatWidgetProps) {
   const { buildAIContext, settings, todayMood } = useStore();
+  const { isDark } = useTheme();
 
   const [messages, setMessages] = useState<Message[]>([
     {
@@ -104,7 +106,6 @@ export default function ChatWidget({ open, onClose }: ChatWidgetProps) {
   useEffect(() => {
     if (open) {
       document.body.style.overflow = "hidden";
-      // Auto focus input
       setTimeout(() => inputRef.current?.focus(), 100);
     } else {
       document.body.style.overflow = "";
@@ -134,23 +135,16 @@ export default function ChatWidget({ open, onClose }: ChatWidgetProps) {
     setError(null);
 
     try {
-      // ═══ Build system prompt dengan context conditional ═══
       let fullSystem = SYSTEM_PROMPT;
-
-      // Info nama user
       if (settings.name && settings.name !== "Kamu") {
         fullSystem += `\n\n## Info User:\nNama: ${settings.name}`;
       }
-
-      // Mood hari ini (kalau ada) — biar AI bisa adjust tone
       if (todayMood) {
         fullSystem += `\nMood hari ini: ${todayMood.mood} ${todayMood.label}`;
         if (todayMood.note) {
           fullSystem += `\nCatatan mood: "${todayMood.note}"`;
         }
       }
-
-      // Data keuangan — cuma dikirim kalau pesan user relate ke finansial
       const isFinanceTopic =
         needsFinanceContext(text) ||
         nextMessages.slice(-3).some((m) => needsFinanceContext(m.text));
@@ -174,7 +168,6 @@ export default function ChatWidget({ open, onClose }: ChatWidgetProps) {
       });
 
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-
       const data = await res.json();
       const aiText =
         data?.content?.[0]?.text ||
@@ -212,11 +205,23 @@ export default function ChatWidget({ open, onClose }: ChatWidgetProps) {
     }
   };
 
+  const modalBg = isDark ? "bg-[#1a1a1a] md:border-zinc-800" : "bg-white md:border-zinc-200";
+  const headerBorder = isDark ? "border-zinc-800" : "border-zinc-200";
+  const headerTitle = isDark ? "text-white" : "text-zinc-900";
+  const headerSub = isDark ? "text-zinc-400" : "text-zinc-500";
+  const closeBtn = isDark ? "text-zinc-400 hover:text-white hover:bg-zinc-800" : "text-zinc-500 hover:text-zinc-900 hover:bg-zinc-100";
+  const msgAssistant = isDark ? "bg-zinc-800 text-zinc-100" : "bg-zinc-100 text-zinc-900";
+  const typingBg = isDark ? "bg-zinc-800" : "bg-zinc-100";
+  const typingDot = isDark ? "bg-zinc-400" : "bg-zinc-500";
+  const inputWrap = isDark ? "border-zinc-800 bg-[#1a1a1a]" : "border-zinc-200 bg-white";
+  const inputClass = isDark
+    ? "flex-1 resize-none bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-3 text-sm text-white placeholder:text-zinc-500 focus:outline-none focus:border-teal-400/50 focus:ring-1 focus:ring-teal-400/30 transition-all max-h-32"
+    : "flex-1 resize-none bg-zinc-50 border border-zinc-300 rounded-xl px-4 py-3 text-sm text-zinc-900 placeholder:text-zinc-500 focus:outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500/30 transition-all max-h-32 focus:bg-white";
+
   return (
     <AnimatePresence>
       {open && (
         <>
-          {/* Backdrop */}
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -225,72 +230,50 @@ export default function ChatWidget({ open, onClose }: ChatWidgetProps) {
             onClick={onClose}
             className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm"
           />
-
-          {/* Modal container */}
           <div className="fixed inset-0 z-50 flex items-center justify-center p-0 md:p-6 pointer-events-none">
             <motion.div
               initial={{ opacity: 0, scale: 0.95, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
               transition={{ duration: 0.25, ease: "easeOut" }}
-              className="pointer-events-auto w-full h-full md:w-[700px] md:h-[85vh] md:max-h-[720px] bg-[#1a1a1a] md:rounded-2xl md:border md:border-zinc-800 shadow-2xl flex flex-col overflow-hidden"
+              className={`pointer-events-auto w-full h-full md:w-[700px] md:h-[85vh] md:max-h-[720px] ${modalBg} md:rounded-2xl md:border shadow-2xl flex flex-col overflow-hidden`}
             >
-              {/* Header */}
-              <div className="flex items-center justify-between px-5 py-4 border-b border-zinc-800 shrink-0">
+              <div className={`flex items-center justify-between px-5 py-4 border-b ${headerBorder} shrink-0`}>
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-teal-400 to-blue-500 flex items-center justify-center shadow-lg">
                     <span className="text-zinc-900 font-black text-lg">D</span>
                   </div>
                   <div>
-                    <h2 className="text-white font-bold text-base leading-tight">
-                      Tanya DUIT
-                    </h2>
-                    <p className="text-zinc-400 text-xs">
-                      Teman ngobrol serba bisa
-                    </p>
+                    <h2 className={`${headerTitle} font-bold text-base leading-tight`}>Tanya DUIT</h2>
+                    <p className={`${headerSub} text-xs`}>Teman ngobrol serba bisa</p>
                   </div>
                 </div>
                 <button
                   onClick={onClose}
-                  className="w-9 h-9 rounded-full flex items-center justify-center text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors"
+                  className={`w-9 h-9 rounded-full flex items-center justify-center transition-colors ${closeBtn}`}
                   aria-label="Close chat"
                 >
-                  <svg
-                    width="20"
-                    height="20"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <line x1="18" y1="6" x2="6" y2="18" />
                     <line x1="6" y1="6" x2="18" y2="18" />
                   </svg>
                 </button>
               </div>
 
-              {/* Messages */}
-              <div
-                ref={scrollRef}
-                className="flex-1 overflow-y-auto px-5 py-4 space-y-4"
-              >
+              <div ref={scrollRef} className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
                 {messages.map((msg) => (
                   <motion.div
                     key={msg.id}
                     initial={{ opacity: 0, y: 8 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.2 }}
-                    className={`flex ${
-                      msg.role === "user" ? "justify-end" : "justify-start"
-                    }`}
+                    className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
                   >
                     <div
                       className={`max-w-[85%] px-4 py-3 rounded-2xl text-sm leading-relaxed whitespace-pre-wrap break-words ${
                         msg.role === "user"
                           ? "bg-gradient-to-br from-teal-400 to-blue-500 text-zinc-900 font-medium rounded-br-sm"
-                          : "bg-zinc-800 text-zinc-100 rounded-bl-sm"
+                          : `${msgAssistant} rounded-bl-sm`
                       }`}
                     >
                       {msg.text}
@@ -298,57 +281,20 @@ export default function ChatWidget({ open, onClose }: ChatWidgetProps) {
                   </motion.div>
                 ))}
 
-                {/* Typing indicator */}
                 {typing && (
-                  <motion.div
-                    initial={{ opacity: 0, y: 8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="flex justify-start"
-                  >
-                    <div className="bg-zinc-800 rounded-2xl rounded-bl-sm px-4 py-3 flex items-center gap-1.5">
-                      <motion.span
-                        animate={{ opacity: [0.3, 1, 0.3] }}
-                        transition={{
-                          duration: 1.2,
-                          repeat: Infinity,
-                          delay: 0,
-                        }}
-                        className="w-2 h-2 rounded-full bg-zinc-400"
-                      />
-                      <motion.span
-                        animate={{ opacity: [0.3, 1, 0.3] }}
-                        transition={{
-                          duration: 1.2,
-                          repeat: Infinity,
-                          delay: 0.2,
-                        }}
-                        className="w-2 h-2 rounded-full bg-zinc-400"
-                      />
-                      <motion.span
-                        animate={{ opacity: [0.3, 1, 0.3] }}
-                        transition={{
-                          duration: 1.2,
-                          repeat: Infinity,
-                          delay: 0.4,
-                        }}
-                        className="w-2 h-2 rounded-full bg-zinc-400"
-                      />
+                  <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="flex justify-start">
+                    <div className={`${typingBg} rounded-2xl rounded-bl-sm px-4 py-3 flex items-center gap-1.5`}>
+                      <motion.span animate={{ opacity: [0.3, 1, 0.3] }} transition={{ duration: 1.2, repeat: Infinity, delay: 0 }} className={`w-2 h-2 rounded-full ${typingDot}`} />
+                      <motion.span animate={{ opacity: [0.3, 1, 0.3] }} transition={{ duration: 1.2, repeat: Infinity, delay: 0.2 }} className={`w-2 h-2 rounded-full ${typingDot}`} />
+                      <motion.span animate={{ opacity: [0.3, 1, 0.3] }} transition={{ duration: 1.2, repeat: Infinity, delay: 0.4 }} className={`w-2 h-2 rounded-full ${typingDot}`} />
                     </div>
                   </motion.div>
                 )}
 
-                {error && (
-                  <div className="text-center text-xs text-red-400 py-2">
-                    {error}
-                  </div>
-                )}
+                {error && (<div className="text-center text-xs text-red-500 py-2">{error}</div>)}
               </div>
 
-              {/* Input area */}
-              <form
-                onSubmit={handleSubmit}
-                className="border-t border-zinc-800 px-4 py-3 shrink-0 bg-[#1a1a1a]"
-              >
+              <form onSubmit={handleSubmit} className={`border-t ${inputWrap} px-4 py-3 shrink-0`}>
                 <div className="flex items-end gap-2">
                   <textarea
                     ref={inputRef}
@@ -357,15 +303,12 @@ export default function ChatWidget({ open, onClose }: ChatWidgetProps) {
                     onKeyDown={handleKeyDown}
                     placeholder="Ketik sesuatu... (Enter untuk kirim, Shift+Enter untuk baris baru)"
                     rows={1}
-                    className="flex-1 resize-none bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-3 text-sm text-white placeholder:text-zinc-500 focus:outline-none focus:border-teal-400/50 focus:ring-1 focus:ring-teal-400/30 transition-all max-h-32"
-                    style={{
-                      minHeight: "44px",
-                    }}
+                    className={inputClass}
+                    style={{ minHeight: "44px" }}
                     onInput={(e) => {
                       const target = e.currentTarget;
                       target.style.height = "auto";
-                      target.style.height =
-                        Math.min(target.scrollHeight, 128) + "px";
+                      target.style.height = Math.min(target.scrollHeight, 128) + "px";
                     }}
                     disabled={typing}
                   />
@@ -375,16 +318,7 @@ export default function ChatWidget({ open, onClose }: ChatWidgetProps) {
                     className="shrink-0 w-11 h-11 rounded-xl bg-gradient-to-br from-teal-400 to-blue-500 flex items-center justify-center text-zinc-900 disabled:opacity-40 disabled:cursor-not-allowed hover:shadow-lg hover:shadow-teal-500/20 transition-all"
                     aria-label="Send message"
                   >
-                    <svg
-                      width="20"
-                      height="20"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2.5"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    >
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                       <line x1="22" y1="2" x2="11" y2="13" />
                       <polygon points="22 2 15 22 11 13 2 9 22 2" />
                     </svg>

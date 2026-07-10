@@ -16,9 +16,11 @@ import JadwalView from "./views/JadwalView";
 import GoalsView from "./views/GoalsView";
 import { useStore } from "./lib/store";
 import { useAuth } from "./lib/AuthContext";
+import { useTheme } from "./lib/ThemeContext";
 
 export default function App() {
   const { user, loading: authLoading } = useAuth();
+  const { isDark } = useTheme();
   const [now, setNow] = useState(new Date());
   const [active, setActive] = useState("home");
   const [showAccount, setShowAccount] = useState(false);
@@ -48,12 +50,15 @@ export default function App() {
   // ── Loading state saat cek session pertama kali ──
   if (authLoading) {
     return (
-      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
+      <div className={isDark 
+        ? "min-h-screen bg-slate-950 flex items-center justify-center"
+        : "min-h-screen bg-[#f5f5f7] flex items-center justify-center"
+      }>
         <div className="flex flex-col items-center gap-4">
-          <div className="h-12 w-12 rounded-2xl bg-gradient-to-br from-emerald-400 to-cyan-500 flex items-center justify-center text-xl font-bold text-slate-950 animate-pulse">
+          <div className="h-12 w-12 rounded-2xl bg-gradient-to-br from-teal-400 to-blue-500 flex items-center justify-center text-xl font-bold text-zinc-900 animate-pulse shadow-lg">
             D
           </div>
-          <p className="text-slate-400 text-sm">Memuat...</p>
+          <p className={isDark ? "text-slate-400 text-sm" : "text-slate-500 text-sm"}>Memuat...</p>
         </div>
       </div>
     );
@@ -66,9 +71,20 @@ export default function App() {
 
   // ── Sudah login → tampilkan app utama ──
   return (
-    <div className="relative min-h-screen overflow-x-hidden bg-slate-950 text-slate-100">
+    <div className={
+      isDark
+        ? "relative min-h-screen overflow-x-hidden bg-slate-950 text-slate-100 transition-colors duration-300"
+        : "relative min-h-screen overflow-x-hidden bg-[#f5f5f7] text-slate-900 transition-colors duration-300"
+    }>
       <div className="pointer-events-none fixed inset-0 overflow-hidden">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(0,229,196,0.08),transparent_45%),radial-gradient(circle_at_80%_0%,rgba(74,158,255,0.1),transparent_40%),radial-gradient(circle_at_50%_100%,rgba(155,111,255,0.06),transparent_40%)]" />
+        {isDark ? (
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(0,229,196,0.08),transparent_45%),radial-gradient(circle_at_80%_0%,rgba(74,158,255,0.1),transparent_40%),radial-gradient(circle_at_50%_100%,rgba(155,111,255,0.06),transparent_40%)]" />
+        ) : (
+          <div className="absolute inset-0 opacity-[0.035]" style={{
+            backgroundImage: `radial-gradient(#0f172a 1px, transparent 1px)`,
+            backgroundSize: "24px 24px"
+          }} />
+        )}
       </div>
 
       <Sidebar
@@ -97,20 +113,20 @@ export default function App() {
                 <StatCard
                   label="TOTAL SALDO"
                   value={balance}
-                  color="text-emerald-400"
+                  color={isDark ? "text-emerald-400" : "text-emerald-600"}
                   accent="linear-gradient(90deg,#00E5C4,#10b981)"
                 />
                 <StatCard
                   label="PENGELUARAN BULAN INI"
                   value={outMonth}
-                  color="text-amber-400"
+                  color={isDark ? "text-amber-400" : "text-amber-600"}
                   accent="linear-gradient(90deg,#F5A623,#f59e0b)"
                   delay={0.05}
                 />
                 <StatCard
                   label="TABUNGAN TERKUMPUL"
                   value={totalSaved}
-                  color="text-blue-400"
+                  color={isDark ? "text-blue-400" : "text-blue-600"}
                   accent="linear-gradient(90deg,#4A9EFF,#3b82f6)"
                   suffix="dari seluruh goals"
                   delay={0.1}
@@ -139,7 +155,7 @@ export default function App() {
       {/* ── Floating Action Button (FAB) untuk buka Chat AI ── */}
       <button
         onClick={() => setShowChat(true)}
-        className="fixed bottom-24 right-5 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-teal-400 to-blue-500 text-slate-950 shadow-lg shadow-teal-500/30 transition-transform hover:scale-105 active:scale-95 md:bottom-8 md:right-8 md:h-16 md:w-16"
+        className="fixed bottom-24 right-5 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-teal-400 to-blue-500 text-zinc-900 shadow-lg shadow-teal-500/25 transition-transform hover:scale-105 active:scale-95 md:bottom-8 md:right-8 md:h-16 md:w-16"
         aria-label="Buka Chat AI"
       >
         <svg

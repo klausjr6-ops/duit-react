@@ -1,6 +1,7 @@
 import Card from "./Card";
 import { useCountUp } from "../hooks/useCountUp";
 import { formatRupiah } from "../lib/format";
+import { useTheme } from "../lib/ThemeContext";
 
 interface StatCardProps {
   label: string;
@@ -13,12 +14,14 @@ interface StatCardProps {
 
 export default function StatCard({ label, value, color, accent, suffix, delay = 0 }: StatCardProps) {
   const animated = useCountUp(value, 1400, [value]);
+  const { isDark } = useTheme();
+  const muted = isDark ? "text-slate-400" : "text-zinc-500";
 
   return (
     <Card accent={accent} delay={delay}>
-      <p className="mb-3 text-xs font-semibold tracking-widest text-slate-400">{label}</p>
+      <p className={`mb-3 text-xs font-semibold tracking-widest ${muted}`}>{label}</p>
       <p className={`text-3xl font-extrabold sm:text-4xl ${color}`}>{formatRupiah(animated)}</p>
-      {suffix && <p className="mt-2 text-sm text-slate-400">{suffix}</p>}
+      {suffix && <p className={`mt-2 text-sm ${muted}`}>{suffix}</p>}
     </Card>
   );
 }
