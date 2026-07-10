@@ -399,7 +399,7 @@ Kalau kamu adalah AI baru yang membaca file ini:
 UPDATE TERBARU
 1. TEMA LIGHT/DARK MODE SUDAH TERPASANG
 2. perbaikan stabilisasi data + date handling
-3.
+3. Perbaikan membuat DUIT lebih aman, konsisten, dan nyaman dipakai, tanpa mengubah karakter AI DUIT.
 ---
 
 **End of Context Document**

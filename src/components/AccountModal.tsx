@@ -111,11 +111,13 @@ export default function AccountModal({ open, onClose }: AccountModalProps) {
     : "flex w-full items-center justify-between rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-3 text-left transition-colors hover:bg-zinc-100";
 
   const themeOptions: { id: ThemeMode; label: string; icon: string }[] = [
-    { id: "system", label: "Sistem", icon: "🖥️" },
-    { id: "time", label: "Auto Jam", icon: "🌓" },
-    { id: "light", label: "Terang", icon: "☀️" },
-    { id: "dark", label: "Gelap", icon: "🌙" },
+    { id: "light", label: "Pagi", icon: "🌤️" },
+    { id: "time", label: "Auto", icon: "🌓" },
+    { id: "dark", label: "Malam", icon: "🌙" },
   ];
+
+  // Keep old users with the legacy system choice visually aligned with Auto.
+  const displayedThemeMode = themeMode === "system" ? "time" : themeMode;
 
   return (
     <AnimatePresence>
@@ -212,17 +214,14 @@ export default function AccountModal({ open, onClose }: AccountModalProps) {
                     </div>
                   </div>
 
-                  {/* THEME PICKER — system, waktu, terang, gelap */}
+                  {/* THEME PICKER — pagi, auto, malam */}
                   <div className="mb-4">
-                    <label className={`mb-1 block text-xs font-medium ${isDark ? "text-slate-400" : "text-zinc-600"}`}>
+                    <label className={`mb-2 block text-xs font-medium ${isDark ? "text-slate-400" : "text-zinc-600"}`}>
                       Tampilan
                     </label>
-                    <p className={`mb-2 text-[11px] ${isDark ? "text-slate-500" : "text-zinc-500"}`}>
-                      Auto Jam: terang 06.00–18.00, gelap setelahnya.
-                    </p>
-                    <div className={`grid grid-cols-2 gap-2 p-1 rounded-2xl ${isDark ? "bg-white/5 border border-white/10" : "bg-zinc-100 border border-zinc-200"}`}>
+                    <div className={`grid grid-cols-3 gap-2 p-1 rounded-2xl ${isDark ? "bg-white/5 border border-white/10" : "bg-zinc-100 border border-zinc-200"}`}>
                       {themeOptions.map(opt => {
-                        const active = themeMode === opt.id;
+                        const active = displayedThemeMode === opt.id;
                         return (
                           <button
                             key={opt.id}
