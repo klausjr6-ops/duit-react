@@ -1,6 +1,7 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { formatRupiah } from "../lib/format";
 import { useStore } from "../lib/store";
+import { useTheme } from "../lib/ThemeContext";
 
 interface Props {
   filterWallet?: string;
@@ -8,6 +9,7 @@ interface Props {
 
 export default function TransactionList({ filterWallet = "all" }: Props) {
   const { txs, wallets, delTx } = useStore();
+  const { isDark } = useTheme();
 
   const filtered =
     filterWallet === "all" ? txs : txs.filter((t) => t.walletId === parseInt(filterWallet));
@@ -26,13 +28,20 @@ export default function TransactionList({ filterWallet = "all" }: Props) {
     });
   };
 
+  const panel = isDark
+    ? "bg-slate-900/60 p-6 rounded-3xl border border-white/10"
+    : "bg-white p-6 rounded-3xl border border-zinc-200 shadow-sm";
+  const heading = isDark ? "text-sm font-bold text-slate-400 uppercase tracking-widest mb-4" : "text-sm font-bold text-zinc-500 uppercase tracking-widest mb-4";
+  const emptyText = isDark ? "text-center text-slate-500 py-8 text-sm" : "text-center text-zinc-500 py-8 text-sm";
+  const rowBase = isDark ? "flex justify-between items-center p-3 bg-white/5 rounded-xl hover:bg-white/10 transition-colors" : "flex justify-between items-center p-3 bg-zinc-50 rounded-xl hover:bg-zinc-100 transition-colors border border-zinc-100";
+  const titleText = isDark ? "text-white font-semibold text-sm truncate" : "text-zinc-900 font-semibold text-sm truncate";
+  const subText = isDark ? "text-xs text-slate-400 truncate" : "text-xs text-zinc-500 truncate";
+
   return (
-    <div className="bg-slate-900/60 p-6 rounded-3xl border border-white/10">
-      <h3 className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-4">
-        Transaksi Terbaru
-      </h3>
+    <div className={panel}>
+      <h3 className={heading}>Transaksi Terbaru</h3>
       {sorted.length === 0 ? (
-        <p className="text-center text-slate-500 py-8 text-sm">Belum ada transaksi</p>
+        <p className={emptyText}>Belum ada transaksi</p>
       ) : (
         <div className="space-y-3">
           <AnimatePresence>
@@ -43,21 +52,21 @@ export default function TransactionList({ filterWallet = "all" }: Props) {
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, x: -20 }}
-                className="flex justify-between items-center p-3 bg-white/5 rounded-xl hover:bg-white/10 transition-colors"
+                className={rowBase}
               >
                 <div className="flex items-center gap-3 min-w-0 flex-1">
                   <div
                     className={`w-10 h-10 rounded-xl flex items-center justify-center text-lg shrink-0 ${
                       t.type === "in"
-                        ? "bg-emerald-500/20 text-emerald-400"
-                        : "bg-rose-500/20 text-rose-400"
+                        ? isDark ? "bg-emerald-500/20 text-emerald-400" : "bg-emerald-50 text-emerald-600"
+                        : isDark ? "bg-rose-500/20 text-rose-400" : "bg-rose-50 text-rose-600"
                     }`}
                   >
                     {t.type === "in" ? "⬆️" : "⬇️"}
                   </div>
                   <div className="min-w-0 flex-1">
-                    <p className="text-white font-semibold text-sm truncate">{t.desc}</p>
-                    <p className="text-xs text-slate-400 truncate">
+                    <p className={titleText}>{t.desc}</p>
+                    <p className={subText}>
                       {formatDate(t.date)} · {t.cat} · {getWalletIcon(t.walletId)}{" "}
                       {getWalletName(t.walletId)}
                     </p>
@@ -66,17 +75,17 @@ export default function TransactionList({ filterWallet = "all" }: Props) {
                 <div className="flex items-center gap-3 shrink-0">
                   <span
                     className={`font-bold text-sm ${
-                      t.type === "in" ? "text-emerald-400" : "text-rose-400"
+                      t.type === "in"
+                        ? isDark ? "text-emerald-400" : "text-emerald-600"
+                        : isDark ? "text-rose-400" : "text-rose-600"
                     }`}
                   >
                     {t.type === "in" ? "+" : "-"}
                     {formatRupiah(t.amt)}
                   </span>
                   <button
-                    onClick={() => {
-                      if (confirm("Hapus transaksi ini?")) delTx(t.id);
-                    }}
-                    className="text-slate-500 hover:text-rose-400 transition-colors p-1"
+                    onClick={() => { if (confirm("Hapus transaksi ini?")) delTx(t.id); }}
+                    className={isDark ? "text-slate-500 hover:text-rose-400 transition-colors p-1" : "text-zinc-400 hover:text-rose-500 transition-colors p-1"}
                     title="Hapus"
                   >
                     🗑️

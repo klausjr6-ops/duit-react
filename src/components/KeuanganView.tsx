@@ -6,6 +6,7 @@ import WeeklyChart from "./WeeklyChart";
 import WalletManager from "./WalletManager";
 import { formatRupiah } from "../lib/format";
 import { useStore, todayStr } from "../lib/store";
+import { useTheme } from "../lib/ThemeContext";
 
 const CATEGORIES: Record<"in" | "out", string[]> = {
   in: ["Gaji", "Bonus", "Hadiah", "Investasi", "Lainnya"],
@@ -14,6 +15,7 @@ const CATEGORIES: Record<"in" | "out", string[]> = {
 
 export default function KeuanganView() {
   const { wallets, addTx, inMonth, outMonth, balance } = useStore();
+  const { isDark } = useTheme();
 
   const [type, setType] = useState<"" | "in" | "out">("");
   const [cat, setCat] = useState("");
@@ -43,12 +45,7 @@ export default function KeuanganView() {
       date,
       walletId: parseInt(walletId),
     });
-    setType("");
-    setCat("");
-    setWalletId("");
-    setAmt("");
-    setDesc("");
-    setDate(todayStr());
+    setType(""); setCat(""); setWalletId(""); setAmt(""); setDesc(""); setDate(todayStr());
   };
 
   const formatInputRupiah = (val: string) => {
@@ -56,27 +53,35 @@ export default function KeuanganView() {
     return num ? parseInt(num).toLocaleString("id-ID") : "";
   };
 
+  const inputCls = isDark
+    ? "w-full mt-1 bg-slate-950 border border-white/10 rounded-lg p-3 text-sm text-white focus:outline-none focus:border-teal-400"
+    : "w-full mt-1 bg-white border border-zinc-300 rounded-lg p-3 text-sm text-zinc-900 focus:outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500/20";
+  const labelCls = isDark ? "text-[11px] font-bold text-slate-500 uppercase tracking-wider" : "text-[11px] font-bold text-zinc-500 uppercase tracking-wider";
+  const titleCls = isDark ? "text-3xl font-bold text-white" : "text-3xl font-bold text-zinc-900";
+  const subCls = isDark ? "text-slate-400 text-sm" : "text-zinc-500 text-sm";
+  const mutedSmall = isDark ? "text-[10px] text-slate-500 mt-1" : "text-[10px] text-zinc-500 mt-1";
+
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-white">Keuangan</h1>
-          <p className="text-slate-400 text-sm">Lacak setiap rupiah</p>
+          <h1 className={titleCls}>Keuangan</h1>
+          <p className={subCls}>Lacak setiap rupiah</p>
         </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <Card accent="linear-gradient(90deg,#10b981,#059669)">
-          <p className="text-xs font-semibold tracking-widest text-emerald-400">PEMASUKAN</p>
-          <p className="text-3xl font-extrabold text-white mt-2">{formatRupiah(inMonth)}</p>
+          <p className={`text-xs font-semibold tracking-widest ${isDark ? "text-emerald-400" : "text-emerald-600"}`}>PEMASUKAN</p>
+          <p className={`text-3xl font-extrabold mt-2 ${isDark ? "text-white" : "text-zinc-900"}`}>{formatRupiah(inMonth)}</p>
         </Card>
         <Card accent="linear-gradient(90deg,#f43f5e,#e11d48)">
-          <p className="text-xs font-semibold tracking-widest text-rose-400">PENGELUARAN</p>
-          <p className="text-3xl font-extrabold text-white mt-2">{formatRupiah(outMonth)}</p>
+          <p className={`text-xs font-semibold tracking-widest ${isDark ? "text-rose-400" : "text-rose-600"}`}>PENGELUARAN</p>
+          <p className={`text-3xl font-extrabold mt-2 ${isDark ? "text-white" : "text-zinc-900"}`}>{formatRupiah(outMonth)}</p>
         </Card>
         <Card accent="linear-gradient(90deg,#3b82f6,#2563eb)">
-          <p className="text-xs font-semibold tracking-widest text-blue-400">SALDO BULAN INI</p>
-          <p className="text-3xl font-extrabold text-white mt-2">{formatRupiah(balance)}</p>
+          <p className={`text-xs font-semibold tracking-widest ${isDark ? "text-blue-400" : "text-blue-600"}`}>SALDO BULAN INI</p>
+          <p className={`text-3xl font-extrabold mt-2 ${isDark ? "text-white" : "text-zinc-900"}`}>{formatRupiah(balance)}</p>
         </Card>
       </div>
 
@@ -84,36 +89,39 @@ export default function KeuanganView() {
         {wallets.map((w) => (
           <div
             key={w.id}
-            className="bg-gradient-to-br from-emerald-500/10 to-emerald-500/5 border border-emerald-500/30 rounded-2xl p-4 hover:border-emerald-400 transition-all"
+            className={isDark
+              ? "bg-gradient-to-br from-emerald-500/10 to-emerald-500/5 border border-emerald-500/30 rounded-2xl p-4 hover:border-emerald-400 transition-all"
+              : "bg-gradient-to-br from-emerald-50 to-teal-50/60 border border-emerald-200 rounded-2xl p-4 hover:border-emerald-400 transition-all shadow-sm"
+            }
           >
             <div className="text-2xl mb-2">{w.icon}</div>
-            <p className="text-xs font-bold text-slate-300 uppercase tracking-wider">{w.name}</p>
-            <p className="text-lg font-extrabold text-emerald-400 mt-1">{formatRupiah(w.balance)}</p>
+            <p className={`text-xs font-bold uppercase tracking-wider ${isDark ? "text-slate-300" : "text-zinc-600"}`}>{w.name}</p>
+            <p className="text-lg font-extrabold text-emerald-600 mt-1">{formatRupiah(w.balance)}</p>
           </div>
         ))}
         <button
           onClick={() => setShowWalletManager(true)}
-          className="border-2 border-dashed border-white/20 rounded-2xl p-4 flex flex-col items-center justify-center hover:border-emerald-400 hover:bg-emerald-500/5 transition-all group min-h-[110px]"
+          className={isDark
+            ? "border-2 border-dashed border-white/20 rounded-2xl p-4 flex flex-col items-center justify-center hover:border-emerald-400 hover:bg-emerald-500/5 transition-all group min-h-[110px]"
+            : "border-2 border-dashed border-zinc-300 rounded-2xl p-4 flex flex-col items-center justify-center hover:border-emerald-400 hover:bg-emerald-50 transition-all group min-h-[110px] bg-white"
+          }
         >
           <div className="text-2xl mb-1 group-hover:scale-110 transition-transform">👛</div>
-          <p className="text-xs font-semibold text-slate-400 group-hover:text-emerald-400">Kelola Dompet</p>
+          <p className={`text-xs font-semibold ${isDark ? "text-slate-400 group-hover:text-emerald-400" : "text-zinc-500 group-hover:text-emerald-600"}`}>Kelola Dompet</p>
         </button>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card>
-          <p className="text-xs font-semibold text-slate-400 mb-6 uppercase tracking-wider">Tambah Transaksi</p>
+          <p className={`text-xs font-semibold mb-6 uppercase tracking-widest ${isDark ? "text-slate-400" : "text-zinc-500"}`}>Tambah Transaksi</p>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Tipe</label>
+                <label className={labelCls}>Tipe</label>
                 <select
                   value={type}
-                  onChange={(e) => {
-                    setType(e.target.value as "in" | "out");
-                    setCat("");
-                  }}
-                  className="w-full mt-1 bg-slate-950 border border-white/10 rounded-lg p-3 text-sm text-white focus:outline-none focus:border-emerald-400"
+                  onChange={(e) => { setType(e.target.value as "in" | "out"); setCat(""); }}
+                  className={inputCls}
                 >
                   <option value="">-- Pilih Tipe --</option>
                   <option value="in">Pemasukan</option>
@@ -121,77 +129,59 @@ export default function KeuanganView() {
                 </select>
               </div>
               <div>
-                <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Kategori</label>
+                <label className={labelCls}>Kategori</label>
                 <select
                   value={cat}
                   onChange={(e) => setCat(e.target.value)}
                   disabled={!type}
-                  className="w-full mt-1 bg-slate-950 border border-white/10 rounded-lg p-3 text-sm text-white focus:outline-none focus:border-emerald-400 disabled:opacity-40"
+                  className={inputCls + " disabled:opacity-50"}
                 >
                   <option value="">-- Pilih --</option>
-                  {type &&
-                    CATEGORIES[type].map((c) => (
-                      <option key={c} value={c}>
-                        {c}
-                      </option>
-                    ))}
+                  {type && CATEGORIES[type].map((c) => (<option key={c} value={c}>{c}</option>))}
                 </select>
               </div>
             </div>
 
             <div>
-              <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Dompet / Rekening</label>
-              <select
-                value={walletId}
-                onChange={(e) => setWalletId(e.target.value)}
-                className="w-full mt-1 bg-slate-950 border border-white/10 rounded-lg p-3 text-sm text-white focus:outline-none focus:border-emerald-400"
-              >
+              <label className={labelCls}>Dompet / Rekening</label>
+              <select value={walletId} onChange={(e) => setWalletId(e.target.value)} className={inputCls}>
                 <option value="">-- Pilih Dompet --</option>
-                {wallets.map((w) => (
-                  <option key={w.id} value={w.id}>
-                    {w.icon} {w.name}
-                  </option>
-                ))}
+                {wallets.map((w) => (<option key={w.id} value={w.id}>{w.icon} {w.name}</option>))}
               </select>
             </div>
 
             <div>
-              <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Jumlah (Rp)</label>
+              <label className={labelCls}>Jumlah (Rp)</label>
               <input
                 type="text"
                 inputMode="numeric"
                 value={amt ? `Rp ${formatInputRupiah(amt)}` : ""}
                 onChange={(e) => setAmt(e.target.value.replace(/\D/g, ""))}
                 placeholder="Rp 0"
-                className="w-full mt-1 bg-slate-950 border border-white/10 rounded-lg p-3 text-sm text-white focus:outline-none focus:border-emerald-400"
+                className={inputCls}
               />
-              <p className="text-[10px] text-slate-500 mt-1">Contoh: 1.250.000 (titik = ribuan)</p>
+              <p className={mutedSmall}>Contoh: 1.250.000 (titik = ribuan)</p>
             </div>
 
             <div>
-              <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Keterangan</label>
+              <label className={labelCls}>Keterangan</label>
               <input
                 type="text"
                 value={desc}
                 onChange={(e) => setDesc(e.target.value)}
                 placeholder="Misal: makan siang di warteg"
-                className="w-full mt-1 bg-slate-950 border border-white/10 rounded-lg p-3 text-sm text-white focus:outline-none focus:border-emerald-400"
+                className={inputCls}
               />
             </div>
 
             <div>
-              <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Tanggal</label>
-              <input
-                type="date"
-                value={date}
-                onChange={(e) => setDate(e.target.value)}
-                className="w-full mt-1 bg-slate-950 border border-white/10 rounded-lg p-3 text-sm text-white focus:outline-none focus:border-emerald-400"
-              />
+              <label className={labelCls}>Tanggal</label>
+              <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className={inputCls} />
             </div>
 
             <button
               type="submit"
-              className="w-full bg-emerald-400 text-slate-900 font-bold py-3 rounded-xl hover:bg-emerald-500 transition-colors"
+              className="w-full bg-gradient-to-br from-teal-400 to-blue-500 text-zinc-900 font-bold py-3 rounded-xl hover:brightness-105 transition-all shadow-lg shadow-teal-500/10"
             >
               Simpan Transaksi
             </button>
@@ -199,26 +189,20 @@ export default function KeuanganView() {
         </Card>
 
         <Card>
-          <p className="text-xs font-semibold text-slate-400 mb-6 uppercase tracking-wider">7 Hari Terakhir</p>
+          <p className={`text-xs font-semibold mb-6 uppercase tracking-widest ${isDark ? "text-slate-400" : "text-zinc-500"}`}>7 Hari Terakhir</p>
           <WeeklyChart />
         </Card>
       </div>
 
       <Card>
-        <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-          Filter Transaksi per Dompet
-        </label>
+        <label className={labelCls}>Filter Transaksi per Dompet</label>
         <select
           value={filterWallet}
           onChange={(e) => setFilterWallet(e.target.value)}
-          className="w-full mt-2 bg-slate-950 border border-white/10 rounded-lg p-3 text-sm text-white focus:outline-none focus:border-emerald-400"
+          className={inputCls.replace(" mt-1", " mt-2")}
         >
           <option value="all">💼 Semua Dompet</option>
-          {wallets.map((w) => (
-            <option key={w.id} value={w.id}>
-              {w.icon} {w.name}
-            </option>
-          ))}
+          {wallets.map((w) => (<option key={w.id} value={w.id}>{w.icon} {w.name}</option>))}
         </select>
       </Card>
 
