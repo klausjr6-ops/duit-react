@@ -401,5 +401,70 @@ UPDATE TERBARU
 2. perbaikan stabilisasi data + date handling
 3. Perbaikan membuat DUIT lebih aman, konsisten, dan nyaman dipakai, tanpa mengubah karakter AI DUIT.
 ---
+# DUIT — Batch 2: Reliability, Chat Security, and Accessibility
+
+## Guarantee untuk AI DUIT
+
+**Tidak ada perubahan pada persona AI.** `SYSTEM_PROMPT`, gaya bahasa casual, topik yang bisa dibahas, conditional finance context, model Gemini/Groq, serta fallback response tetap sama seperti implementasi sebelumnya.
+
+Batch ini hanya memperbaiki transport, keamanan endpoint, batas payload, dan UI modal.
+
+## Perubahan batch 2
+
+### Chat (tanpa mengubah sifat AI)
+
+- Riwayat yang dikirim ke API dibatasi pada 16 pesan terbaru agar request tidak makin besar tanpa batas saat chat panjang.
+- Input dibatasi hingga 4.000 karakter dan server memvalidasi bentuk/ukuran request.
+- Request dibatalkan saat modal ditutup, sehingga respons lama tidak muncul setelah chat ditutup/dibuka lagi.
+- Server memasang rate limit dasar: 12 request per menit per IP pada warm instance.
+- Setelah `FIREBASE_SERVICE_ACCOUNT_BASE64` dipasang untuk Calendar, chat juga otomatis meminta Firebase ID token dari user yang login. Ini membatasi pemakaian endpoint oleh pihak luar.
+- Dukungan format image block pada backend tetap dipertahankan dengan batas payload.
+
+> Rate limit in-memory adalah lapisan dasar. Untuk proteksi kuota tingkat production yang benar-benar global lintas instance, gunakan Vercel Firewall/WAF atau Redis/KV pada tahap berikutnya.
+
+### Aksesibilitas dan mobile UI
+
+- Menambahkan `src/hooks/useModalDialog.ts` untuk semua modal utama: Chat, Akun, Goal, Tambah Tabungan, Jadwal, dan Kelola Dompet.
+- Modal kini mendukung: `Escape` untuk menutup, focus trap tombol Tab, pengembalian fokus ke elemen pemicu, lock body scroll, `role="dialog"`, `aria-modal`, judul dialog, dan label tombol close.
+- Chat modal diberi safe-area padding untuk iPhone/notch/home indicator.
+- Tambah global `prefers-reduced-motion` agar pengguna yang memilih pengurangan animasi di perangkat tidak mendapat animasi berlebihan.
+
+### Quality gate
+
+- Menambahkan script `npm run typecheck`.
+- `npm run build` sekarang otomatis menjalankan typecheck lebih dulu, sehingga type error tidak lolos build/deploy.
+
+## File tambahan/berubah pada batch 2
+
+- `api/chat.js`
+- `package.json`
+- `src/index.css`
+- `src/hooks/useModalDialog.ts`
+- `src/components/ChatWidget.tsx`
+- `src/components/AccountModal.tsx`
+- `src/components/AddFundModal.tsx`
+- `src/components/GoalModal.tsx`
+- `src/components/ScheduleModal.tsx`
+- `src/components/WalletManager.tsx`
+
+Selain itu ZIP batch 2 juga menyertakan seluruh file P0 sebelumnya agar dapat dipakai sebagai satu overwrite package lengkap.
+
+## Verifikasi yang sudah lolos
+
+```bash
+npm run typecheck
+npm run build
+git diff --check
+```
+
+Chat API smoke test juga dijalankan untuk memastikan payload invalid mendapat HTTP 400 dan payload valid memberi struktur respons yang benar.
+
+## Belum diubah karena perlu keputusan produk / scope berikutnya
+
+1. **+ Nabung Goal:** pilih apakah tracker manual atau transfer nyata dari wallet.
+2. **Avatar:** idealnya dipindah/di-kompres ke Firebase Storage agar tidak mendekati limit dokumen Firestore.
+3. **Native alert/confirm:** masih perlu diganti dengan toast/confirmation dialog sesuai design system.
+4. **Code splitting:** build masih single-file sesuai setting sekarang.
+
 
 **End of Context Document**

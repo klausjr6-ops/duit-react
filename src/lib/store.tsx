@@ -23,6 +23,8 @@ export interface Transaction {
   desc: string;
   date: string;
   walletId?: number;
+  /** Present when this outgoing transaction is a transfer into a savings goal. */
+  goalId?: number;
 }
 
 export interface ScheduleItem {
@@ -212,6 +214,23 @@ function createId(): number {
   return Date.now() * 1000 + Math.floor(Math.random() * 1000);
 }
 
+function getWalletBalance(data: UserData, walletId: number): number | null {
+  const wallet = data.wallets.find((item) => item.id === walletId);
+  if (!wallet) return null;
+
+  const walletTransactions = data.txs.filter((transaction) => transaction.walletId === walletId);
+  const income = walletTransactions
+    .filter((transaction) => transaction.type === "in")
+    .reduce((amount, transaction) => amount + transaction.amt, 0);
+  const expense = walletTransactions
+    .filter((transaction) => transaction.type === "out")
+    .reduce((amount, transaction) => amount + transaction.amt, 0);
+
+  return wallet.balance + income - expense;
+}
+
+class GoalFundingError extends Error {}
+
 /* ══════════════════════════════════════════════════════════════
    LOCALSTORAGE MIGRATION (one-time)
    ══════════════════════════════════════════════════════════════ */
@@ -358,8 +377,8 @@ function useDuitStoreInternal() {
 
   /* ─── Serialized, transactional Firestore updates ───────── */
   const enqueueFirestoreUpdate = useCallback(
-    (updater: DataUpdater) => {
-      if (!uid) return;
+    (updater: DataUpdater): Promise<void> => {
+      if (!uid) return Promise.reject(new Error("User belum login"));
 
       const mutationUid = uid;
       pendingWriteCountRef.current += 1;
@@ -386,12 +405,16 @@ function useDuitStoreInternal() {
       void task
         .catch((error) => {
           console.error("Firestore write error:", error);
-          setSyncError("Perubahan belum tersimpan ke cloud. Coba lagi saat koneksi stabil.");
+          if (!(error instanceof GoalFundingError)) {
+            setSyncError("Perubahan belum tersimpan ke cloud. Coba lagi saat koneksi stabil.");
+          }
         })
         .finally(() => {
           pendingWriteCountRef.current -= 1;
           if (pendingWriteCountRef.current === 0) setSyncing(false);
         });
+
+      return task;
     },
     [uid]
   );
@@ -479,19 +502,79 @@ function useDuitStoreInternal() {
       updateData((previous) => ({
         ...previous,
         goals: previous.goals.filter((goal) => goal.id !== id),
+        // Removing the goal also reverses its internal transfers, restoring
+        // the derived balance of the original source wallet(s).
+        txs: previous.txs.filter((transaction) => transaction.goalId !== id),
       })),
     [updateData]
   );
 
-  const addToGoal = useCallback(
-    (id: number, amount: number) =>
-      updateData((previous) => ({
-        ...previous,
-        goals: previous.goals.map((goal) =>
-          goal.id === id ? { ...goal, current: goal.current + amount } : goal
-        ),
-      })),
-    [updateData]
+  const fundGoal = useCallback(
+    async (goalId: number, walletId: number, amount: number) => {
+      if (!uid || loadedUserId !== uid) {
+        return { ok: false as const, message: "Data akun masih dimuat. Coba lagi sebentar." };
+      }
+      if (!Number.isFinite(amount) || amount <= 0) {
+        return { ok: false as const, message: "Jumlah tabungan tidak valid." };
+      }
+
+      const date = todayStr();
+      const savingTransaction: Transaction = {
+        id: createId(),
+        type: "out",
+        amt: amount,
+        cat: "Tabungan",
+        desc: "",
+        date,
+        walletId,
+        goalId,
+      };
+
+      try {
+        await enqueueFirestoreUpdate((current) => {
+          const goal = current.goals.find((item) => item.id === goalId);
+          if (!goal) throw new GoalFundingError("Goal ini sudah tidak tersedia.");
+
+          const remaining = goal.target - goal.current;
+          if (remaining <= 0) throw new GoalFundingError("Goal ini sudah tercapai.");
+          if (amount > remaining) {
+            throw new GoalFundingError(`Maksimal tabungan untuk goal ini adalah Rp${remaining.toLocaleString("id-ID")}.`);
+          }
+
+          const sourceBalance = getWalletBalance(current, walletId);
+          if (sourceBalance === null) throw new GoalFundingError("Dompet sumber tidak ditemukan.");
+          if (sourceBalance < amount) {
+            throw new GoalFundingError("Saldo dompet tidak mencukupi untuk nominal tersebut.");
+          }
+
+          const transaction: Transaction = {
+            ...savingTransaction,
+            desc: `Tabungan Goal: ${goal.name}`,
+          };
+
+          return {
+            ...current,
+            goals: current.goals.map((item) =>
+              item.id === goalId ? { ...item, current: item.current + amount } : item
+            ),
+            txs: [transaction, ...current.txs],
+          };
+        });
+
+        return { ok: true as const };
+      } catch (error) {
+        if (error instanceof GoalFundingError) {
+          return { ok: false as const, message: error.message };
+        }
+
+        console.error("Goal funding error:", error);
+        return {
+          ok: false as const,
+          message: "Tabungan belum berhasil dipindahkan. Coba lagi saat koneksi stabil.",
+        };
+      }
+    },
+    [enqueueFirestoreUpdate, loadedUserId, uid]
   );
 
   /* ══════════════════════════════════════════════════════════
@@ -595,15 +678,20 @@ function useDuitStoreInternal() {
   const totalIn = txs
     .filter((transaction) => transaction.type === "in")
     .reduce((amount, transaction) => amount + transaction.amt, 0);
-  const totalOut = txs
+  const totalWalletOut = txs
     .filter((transaction) => transaction.type === "out")
     .reduce((amount, transaction) => amount + transaction.amt, 0);
+  // A goal funding transaction moves money from a wallet into earmarked
+  // savings. It lowers wallet balance, but is not displayed as spending.
+  const totalOut = txs
+    .filter((transaction) => transaction.type === "out" && !transaction.goalId)
+    .reduce((amount, transaction) => amount + transaction.amt, 0);
   const initialWalletBalance = wallets.reduce((amount, wallet) => amount + wallet.balance, 0);
-  const balance = initialWalletBalance + totalIn - totalOut;
+  const balance = initialWalletBalance + totalIn - totalWalletOut;
 
   const thisMonth = todayStr().slice(0, 7);
   const outMonth = txs
-    .filter((transaction) => transaction.type === "out" && transaction.date?.startsWith(thisMonth))
+    .filter((transaction) => transaction.type === "out" && !transaction.goalId && transaction.date?.startsWith(thisMonth))
     .reduce((amount, transaction) => amount + transaction.amt, 0);
   const inMonth = txs
     .filter((transaction) => transaction.type === "in" && transaction.date?.startsWith(thisMonth))
@@ -616,7 +704,7 @@ function useDuitStoreInternal() {
     .filter((transaction) => transaction.type === "in" && transaction.date === today)
     .reduce((amount, transaction) => amount + transaction.amt, 0);
   const todayExpense = txs
-    .filter((transaction) => transaction.type === "out" && transaction.date === today)
+    .filter((transaction) => transaction.type === "out" && !transaction.goalId && transaction.date === today)
     .reduce((amount, transaction) => amount + transaction.amt, 0);
 
   const todaySchedules = scheds
@@ -634,7 +722,7 @@ function useDuitStoreInternal() {
   );
 
   const categories = txs
-    .filter((transaction) => transaction.type === "out")
+    .filter((transaction) => transaction.type === "out" && !transaction.goalId)
     .reduce<Record<string, number>>((result, transaction) => {
       const category = transaction.cat || "Lainnya";
       result[category] = (result[category] || 0) + transaction.amt;
@@ -705,7 +793,7 @@ function useDuitStoreInternal() {
     delSched,
     addGoal,
     delGoal,
-    addToGoal,
+    fundGoal,
     addWallet,
     delWallet,
     updateWallet,

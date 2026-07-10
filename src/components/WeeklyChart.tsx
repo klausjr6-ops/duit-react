@@ -25,7 +25,7 @@ export default function WeeklyChart() {
         .filter((transaction) => transaction.type === "in")
         .reduce((amount, transaction) => amount + transaction.amt, 0);
       const expense = dayTransactions
-        .filter((transaction) => transaction.type === "out")
+        .filter((transaction) => transaction.type === "out" && !transaction.goalId)
         .reduce((amount, transaction) => amount + transaction.amt, 0);
       days.push({ label: weekdayLabel(date), date, in: income, out: expense });
     }

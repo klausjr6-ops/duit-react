@@ -63,7 +63,7 @@ export default function GoalsView() {
                         <p className={`font-bold truncate ${mainText}`}>{g.name}</p>
                         {g.deadline && (<p className={`text-xs mt-1 ${muted2}`}>🗓️ {formatDeadline(g.deadline)}</p>)}
                       </div>
-                      <button onClick={() => { if (confirm(`Hapus goal "${g.name}"?`)) delGoal(g.id); }} className={`${isDark ? "text-slate-500 hover:text-rose-400" : "text-zinc-400 hover:text-rose-500"} transition-colors p-1 shrink-0`}>🗑️</button>
+                      <button onClick={() => { if (confirm(`Hapus goal "${g.name}"? Transfer tabungan terkait akan dibatalkan dan saldo dompet sumber dikembalikan.`)) delGoal(g.id); }} className={`${isDark ? "text-slate-500 hover:text-rose-400" : "text-zinc-400 hover:text-rose-500"} transition-colors p-1 shrink-0`}>🗑️</button>
                     </div>
 
                     <div className="flex items-end justify-between mb-2">

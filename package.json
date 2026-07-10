@@ -4,12 +4,11 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-  "dev": "vite",
-  "typecheck": "tsc --noEmit",
-  "build": "npm run typecheck && vite build",
-  "preview": "vite preview"
+    "dev": "vite",
+    "typecheck": "tsc --noEmit",
+    "build": "npm run typecheck && vite build",
+    "preview": "vite preview"
   },
-
   "dependencies": {
     "clsx": "2.1.1",
     "firebase": "^12.15.0",

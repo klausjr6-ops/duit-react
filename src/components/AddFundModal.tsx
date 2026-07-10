@@ -2,6 +2,7 @@ import { useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { useStore } from "../lib/store";
 import { useTheme } from "../lib/ThemeContext";
+import { formatRupiah } from "../lib/format";
 import type { Goal } from "../lib/store";
 import { useModalDialog } from "../hooks/useModalDialog";
 
@@ -11,34 +12,74 @@ interface Props {
 }
 
 export default function AddFundModal({ goal, onClose }: Props) {
-  const { addToGoal } = useStore();
+  const { wallets, fundGoal } = useStore();
   const { isDark } = useTheme();
-  const [amt, setAmt] = useState("");
+  const [walletId, setWalletId] = useState("");
+  const [amount, setAmount] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const { dialogRef, onDialogKeyDown } = useModalDialog(true, onClose, inputRef);
 
-  const formatInputRupiah = (val: string) => {
-    const num = val.replace(/\D/g, "");
-    return num ? parseInt(num).toLocaleString("id-ID") : "";
+  const remaining = Math.max(goal.target - goal.current, 0);
+
+  const formatInputRupiah = (value: string) => {
+    const number = value.replace(/\D/g, "");
+    return number ? parseInt(number, 10).toLocaleString("id-ID") : "";
   };
 
-  const handleSubmit = () => {
-    const num = parseInt(amt.replace(/\D/g, ""));
-    if (isNaN(num) || num <= 0) { alert("Jumlah tidak valid!"); return; }
-    addToGoal(goal.id, num);
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setError(null);
+
+    const parsedAmount = parseInt(amount.replace(/\D/g, ""), 10);
+    if (!walletId) {
+      setError("Pilih dompet sumber terlebih dahulu.");
+      return;
+    }
+    if (Number.isNaN(parsedAmount) || parsedAmount <= 0) {
+      setError("Jumlah tabungan tidak valid.");
+      return;
+    }
+
+    setSaving(true);
+    const result = await fundGoal(goal.id, parseInt(walletId, 10), parsedAmount);
+    setSaving(false);
+
+    if (!result.ok) {
+      setError(result.message);
+      return;
+    }
+
     onClose();
   };
 
-  const panel = isDark ? "bg-slate-900 border border-white/10 rounded-3xl p-6 max-w-sm w-full" : "bg-white border border-zinc-200 rounded-3xl p-6 max-w-sm w-full shadow-xl";
-  const titleCls = isDark ? "text-lg font-bold text-white" : "text-lg font-bold text-zinc-900";
-  const closeCls = isDark ? "text-slate-400 hover:text-white text-3xl leading-none w-8 h-8 flex items-center justify-center" : "text-zinc-500 hover:text-zinc-900 text-3xl leading-none w-8 h-8 flex items-center justify-center";
-  const labelCls = isDark ? "text-[11px] font-bold text-slate-500 uppercase tracking-wider" : "text-[11px] font-bold text-zinc-500 uppercase tracking-wider";
-  const inputCls = isDark ? "w-full mt-1 bg-slate-950 border border-white/10 rounded-lg p-3 text-sm text-white focus:outline-none focus:border-teal-400" : "w-full mt-1 bg-zinc-50 border border-zinc-300 rounded-lg p-3 text-sm text-zinc-900 focus:outline-none focus:border-teal-500 focus:bg-white";
-  const muted = isDark ? "text-sm text-slate-400 mb-4" : "text-sm text-zinc-500 mb-4";
-  const strong = isDark ? "text-white font-semibold" : "text-zinc-900 font-semibold";
+  const panelClass = isDark
+    ? "w-full max-w-sm rounded-3xl border border-white/10 bg-slate-900 p-6 shadow-xl"
+    : "w-full max-w-sm rounded-3xl border border-zinc-200 bg-white p-6 shadow-xl";
+  const titleClass = isDark ? "text-lg font-bold text-white" : "text-lg font-bold text-zinc-900";
+  const closeClass = isDark
+    ? "flex h-8 w-8 items-center justify-center text-3xl leading-none text-slate-400 hover:text-white disabled:opacity-40"
+    : "flex h-8 w-8 items-center justify-center text-3xl leading-none text-zinc-500 hover:text-zinc-900 disabled:opacity-40";
+  const labelClass = isDark
+    ? "text-[11px] font-bold uppercase tracking-wider text-slate-500"
+    : "text-[11px] font-bold uppercase tracking-wider text-zinc-500";
+  const inputClass = isDark
+    ? "mt-1 w-full rounded-lg border border-white/10 bg-slate-950 p-3 text-sm text-white focus:border-teal-400 focus:outline-none"
+    : "mt-1 w-full rounded-lg border border-zinc-300 bg-zinc-50 p-3 text-sm text-zinc-900 focus:border-teal-500 focus:bg-white focus:outline-none";
+  const mutedClass = isDark ? "text-sm text-slate-400" : "text-sm text-zinc-500";
+  const infoClass = isDark
+    ? "rounded-xl border border-teal-400/20 bg-teal-400/10 p-3 text-xs text-slate-300"
+    : "rounded-xl border border-teal-200 bg-teal-50 p-3 text-xs text-zinc-600";
 
   return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={onClose} className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      onClick={onClose}
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
+    >
       <motion.div
         ref={dialogRef}
         role="dialog"
@@ -48,23 +89,93 @@ export default function AddFundModal({ goal, onClose }: Props) {
         initial={{ scale: 0.95, y: 20 }}
         animate={{ scale: 1, y: 0 }}
         exit={{ scale: 0.95, y: 20 }}
-        onClick={(e) => e.stopPropagation()}
-        className={panel}
+        onClick={(event) => event.stopPropagation()}
+        className={panelClass}
       >
-        <div className="flex justify-between items-center mb-6">
-          <h2 id="add-fund-dialog-title" className={titleCls}>Tambah Tabungan</h2>
-          <button aria-label="Tutup modal tambah tabungan" onClick={onClose} className={closeCls}>×</button>
-        </div>
-        <p className={muted}>Untuk goal <span className={strong}>{goal.name}</span></p>
-        <div className="space-y-4">
+        <div className="mb-5 flex items-center justify-between">
           <div>
-            <label className={labelCls}>Jumlah (Rp)</label>
-            <input ref={inputRef} type="text" inputMode="numeric" value={amt ? `Rp ${formatInputRupiah(amt)}` : ""} onChange={(e) => setAmt(e.target.value.replace(/\D/g, ""))} placeholder="Rp 0" className={inputCls} />
+            <p className="text-xs font-semibold text-teal-500">TABUNGAN GOAL</p>
+            <h2 id="add-fund-dialog-title" className={titleClass}>Nabung ke Goal</h2>
           </div>
-          <button onClick={handleSubmit} className="w-full bg-gradient-to-br from-teal-400 to-blue-500 text-zinc-900 font-bold py-3 rounded-xl hover:brightness-105 transition-all">
-            Tambahkan
+          <button
+            type="button"
+            aria-label="Tutup modal nabung ke goal"
+            onClick={onClose}
+            disabled={saving}
+            className={closeClass}
+          >
+            ×
           </button>
         </div>
+
+        <div className={infoClass}>
+          <p className="font-semibold">🎯 {goal.name}</p>
+          <p className="mt-1">
+            Progress saat ini {formatRupiah(goal.current)} · sisa {formatRupiah(remaining)}
+          </p>
+        </div>
+
+        <p className={`mb-4 mt-4 ${mutedClass}`}>
+          Dana akan dipindahkan dari dompet pilihanmu. Saldo dompet berkurang dan transaksi tabungan dicatat otomatis.
+        </p>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label htmlFor="goal-wallet" className={labelClass}>Dompet Sumber</label>
+            <select
+              id="goal-wallet"
+              value={walletId}
+              onChange={(event) => setWalletId(event.target.value)}
+              disabled={saving}
+              className={inputClass}
+            >
+              <option value="">-- Pilih Dompet --</option>
+              {wallets.map((wallet) => (
+                <option key={wallet.id} value={wallet.id}>
+                  {wallet.icon} {wallet.name} · {formatRupiah(wallet.balance)}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label htmlFor="goal-amount" className={labelClass}>Jumlah Tabungan</label>
+            <input
+              ref={inputRef}
+              id="goal-amount"
+              type="text"
+              inputMode="numeric"
+              value={amount ? `Rp ${formatInputRupiah(amount)}` : ""}
+              onChange={(event) => setAmount(event.target.value.replace(/\D/g, ""))}
+              placeholder="Rp 0"
+              disabled={saving || remaining <= 0}
+              className={inputClass}
+            />
+          </div>
+
+          {error && (
+            <p role="alert" className="rounded-lg border border-rose-400/30 bg-rose-400/10 px-3 py-2 text-xs text-rose-500">
+              {error}
+            </p>
+          )}
+
+          <button
+            type="submit"
+            disabled={saving || remaining <= 0 || wallets.length === 0}
+            className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-br from-teal-400 to-blue-500 py-3 font-bold text-zinc-900 transition-all hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {saving ? (
+              <>
+                <span className="h-4 w-4 animate-spin rounded-full border-2 border-zinc-900/30 border-t-zinc-900" />
+                Memindahkan Dana...
+              </>
+            ) : remaining <= 0 ? (
+              "Goal Sudah Tercapai"
+            ) : (
+              "Pindahkan ke Tabungan"
+            )}
+          </button>
+        </form>
       </motion.div>
     </motion.div>
   );
