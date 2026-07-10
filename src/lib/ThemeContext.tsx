@@ -1,5 +1,6 @@
 import {
   createContext,
+  useCallback,
   useContext,
   useEffect,
   useMemo,
@@ -55,7 +56,7 @@ function resolveIsDark(mode: ThemeMode, now: Date, systemDark: boolean): boolean
 }
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  // settings may be undefined during early load – useStore is safe inside StoreProvider
+  // Pull themeMode from Firestore if available
   let storeSettingsMode: ThemeMode | undefined;
   let updateSettings: ((patch: any) => void) | undefined;
   try {
@@ -63,25 +64,26 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     storeSettingsMode = store.settings?.themeMode as ThemeMode | undefined;
     updateSettings = store.updateSettings;
   } catch {
-    // useStore outside provider – fallback to local only
+    // outside StoreProvider – SSR safe fallback
   }
 
   const [themeMode, setThemeModeState] = useState<ThemeMode>(getInitialMode);
   const [now, setNow] = useState(() => new Date());
   const [systemDark, setSystemDark] = useState(() => getSystemIsDark());
+  const [hydrated, setHydrated] = useState(false);
 
-  // Sync from Firestore -> local once settings load
+  // Sync from Firestore ONCE
   useEffect(() => {
-    if (storeSettingsMode && storeSettingsMode !== themeMode) {
+    if (!hydrated && storeSettingsMode && storeSettingsMode !== themeMode) {
       setThemeModeState(storeSettingsMode);
-      try {
-        localStorage.setItem(LS_KEY, storeSettingsMode);
-      } catch {}
+      try { localStorage.setItem(LS_KEY, storeSettingsMode); } catch {}
+      setHydrated(true);
     }
+    if (storeSettingsMode) setHydrated(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [storeSettingsMode]);
 
-  // Listen system preference
+  // system preference listener – only when mode === system
   useEffect(() => {
     if (themeMode !== "system") return;
     const mq = window.matchMedia("(prefers-color-scheme: dark)");
@@ -91,55 +93,46 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     return () => mq.removeEventListener?.("change", handler);
   }, [themeMode]);
 
-  // Tick for time-based mode (check every 30s)
+  // time-based ticking – ONLY when mode === time
   useEffect(() => {
     if (themeMode !== "time") return;
+    // tick immediately to avoid 1min drift
+    setNow(new Date());
     const id = setInterval(() => setNow(new Date()), 30000);
     return () => clearInterval(id);
   }, [themeMode]);
-
-  // Also update `now` at least every minute globally so time-mode stays accurate
-  useEffect(() => {
-    const id = setInterval(() => setNow(new Date()), 60000);
-    return () => clearInterval(id);
-  }, []);
 
   const isDark = useMemo(
     () => resolveIsDark(themeMode, now, systemDark),
     [themeMode, now, systemDark]
   );
 
-  const resolved = isDark ? "dark" : "light";
+  const resolved = useMemo(() => (isDark ? "dark" as const : "light" as const), [isDark]);
 
-  // Apply to <html> for any global CSS that needs it
+  // Apply to <html> – no layout thrash
   useEffect(() => {
     const root = document.documentElement;
-    root.dataset.theme = resolved;
+    if (root.dataset.theme !== resolved) root.dataset.theme = resolved;
     root.style.colorScheme = resolved;
-    // Tailwind v4 compatible: toggle .dark class if people want it
     root.classList.toggle("dark", isDark);
     root.classList.toggle("light", !isDark);
   }, [resolved, isDark]);
 
-  const setThemeMode = (mode: ThemeMode) => {
+  const setThemeMode = useCallback((mode: ThemeMode) => {
     setThemeModeState(mode);
-    try {
-      localStorage.setItem(LS_KEY, mode);
-    } catch {}
-    // Sync to Firestore if store is ready
-    if (updateSettings) {
-      updateSettings({ themeMode: mode });
-    }
-    // Update `now` immediately so time mode resolves instantly
-    setNow(new Date());
-  };
+    try { localStorage.setItem(LS_KEY, mode); } catch {}
+    if (updateSettings) updateSettings({ themeMode: mode });
+    // if switching to time mode, refresh now immediately
+    if (mode === "time") setNow(new Date());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [updateSettings]);
 
-  const value: ThemeContextValue = {
+  const value = useMemo(() => ({
     themeMode,
     isDark,
     resolved,
     setThemeMode,
-  };
+  }), [themeMode, isDark, resolved, setThemeMode]);
 
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
 }
@@ -150,7 +143,6 @@ export function useTheme() {
   return ctx;
 }
 
-// Optional helper: pick classNames
 export function th(isDark: boolean, dark: string, light: string) {
   return isDark ? dark : light;
 }

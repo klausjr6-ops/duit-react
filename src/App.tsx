@@ -73,9 +73,9 @@ export default function App() {
   return (
     <div className={
       isDark
-        ? "relative min-h-screen overflow-x-hidden bg-slate-950 text-slate-100 transition-colors duration-300"
-        : "relative min-h-screen overflow-x-hidden bg-[#f5f5f7] text-slate-900 transition-colors duration-300"
-    }>
+        ? "relative min-h-screen overflow-x-hidden bg-slate-950 text-slate-100"
+        : "relative min-h-screen overflow-x-hidden bg-[#f5f5f7] text-slate-900"
+    } style={{ transition: "background-color 180ms ease" }}>
       <div className="pointer-events-none fixed inset-0 overflow-hidden">
         {isDark ? (
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(0,229,196,0.08),transparent_45%),radial-gradient(circle_at_80%_0%,rgba(74,158,255,0.1),transparent_40%),radial-gradient(circle_at_50%_100%,rgba(155,111,255,0.06),transparent_40%)]" />
