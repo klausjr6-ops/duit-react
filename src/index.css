@@ -19,6 +19,22 @@ body {
   margin: 0;
 }
 
+/* Prevent iOS Safari auto-zoom on input focus.
+   iOS zooms if input font-size < 16px. Keep 16px on mobile,
+   allow smaller text on desktop (>=768px). */
+@media (max-width: 767px) {
+  input[type="text"],
+  input[type="email"],
+  input[type="password"],
+  input[type="number"],
+  input[type="date"],
+  input[type="time"],
+  textarea,
+  select {
+    font-size: 16px !important;
+  }
+}
+
 /* Respect device accessibility preferences, including Framer Motion output. */
 @media (prefers-reduced-motion: reduce) {
   *,

@@ -231,8 +231,8 @@ export default function ChatWidget({ open, onClose }: ChatWidgetProps) {
   const typingDot = isDark ? "bg-zinc-400" : "bg-zinc-500";
   const inputWrap = isDark ? "border-zinc-800 bg-[#1a1a1a]" : "border-zinc-200 bg-white";
   const inputClass = isDark
-    ? "flex-1 resize-none bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-3 text-sm text-white placeholder:text-zinc-500 focus:outline-none focus:border-teal-400/50 focus:ring-1 focus:ring-teal-400/30 transition-all max-h-32"
-    : "flex-1 resize-none bg-zinc-50 border border-zinc-300 rounded-xl px-4 py-3 text-sm text-zinc-900 placeholder:text-zinc-500 focus:outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500/30 transition-all max-h-32 focus:bg-white";
+    ? "flex-1 resize-none bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-3 text-[16px] md:text-sm text-white placeholder:text-zinc-500 focus:outline-none focus:border-teal-400/50 focus:ring-1 focus:ring-teal-400/30 transition-all max-h-32"
+    : "flex-1 resize-none bg-zinc-50 border border-zinc-300 rounded-xl px-4 py-3 text-[16px] md:text-sm text-zinc-900 placeholder:text-zinc-500 focus:outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500/30 transition-all max-h-32 focus:bg-white";
 
   return (
     <AnimatePresence>
@@ -323,7 +323,7 @@ export default function ChatWidget({ open, onClose }: ChatWidgetProps) {
                     maxLength={MAX_INPUT_CHARACTERS}
                     onChange={(e) => setInput(e.target.value)}
                     onKeyDown={handleKeyDown}
-                    placeholder="Ketik sesuatu... (Enter untuk kirim, Shift+Enter untuk baris baru)"
+                    placeholder="Ketik di sini…"
                     rows={1}
                     className={inputClass}
                     style={{ minHeight: "44px" }}
