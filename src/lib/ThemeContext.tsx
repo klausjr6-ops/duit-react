@@ -112,7 +112,10 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const root = document.documentElement;
     root.dataset.theme = resolved;
-    root.style.colorScheme = resolved;
+    // Do not force the browser UI (Safari tab / address bar) to follow
+    // the in-app DUIT theme. Let the browser chrome follow the OS-level
+    // appearance instead, so Pagi/Auto/Malam only affects the app content.
+    root.style.removeProperty("color-scheme");
     root.classList.toggle("dark", isDark);
     root.classList.toggle("light", !isDark);
   }, [isDark, resolved]);

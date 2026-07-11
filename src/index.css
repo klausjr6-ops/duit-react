@@ -5,14 +5,16 @@
   --font-mono: 'JetBrains Mono', monospace;
 }
 
+/* Let the initial paint follow the OS color scheme, so Safari's
+   browser chrome (tab bar / address bar) is not forced dark by DUIT.
+   The React ThemeProvider will then apply the in-app Pagi/Auto/Malam theme. */
 :root {
-  --bg: #0B1120;
-  --text: #E8EDF5;
+  color-scheme: light dark;
 }
 
 body {
-  background-color: var(--bg);
-  color: var(--text);
+  background-color: Canvas;
+  color: CanvasText;
   min-height: 100vh;
   margin: 0;
 }
