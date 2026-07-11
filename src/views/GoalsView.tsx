@@ -4,6 +4,7 @@ import Card from "../components/Card";
 import GoalModal from "../components/GoalModal";
 import AddFundModal from "../components/AddFundModal";
 import WithdrawFundModal from "../components/WithdrawFundModal";
+import EditGoalModal from "../components/EditGoalModal";
 import { useStore } from "../lib/store";
 import { formatRupiah } from "../lib/format";
 import type { Goal } from "../lib/store";
@@ -16,6 +17,7 @@ export default function GoalsView() {
   const [showModal, setShowModal] = useState(false);
   const [fundGoal, setFundGoal] = useState<Goal | null>(null);
   const [withdrawGoalState, setWithdrawGoalState] = useState<Goal | null>(null);
+  const [goalToEdit, setGoalToEdit] = useState<Goal | null>(null);
   const [goalToDelete, setGoalToDelete] = useState<Goal | null>(null);
 
   const formatDeadline = (d: string) => {
@@ -67,14 +69,24 @@ export default function GoalsView() {
                         <p className={`font-bold truncate ${mainText}`}>{g.name}</p>
                         {g.deadline && (<p className={`text-xs mt-1 ${muted2}`}>🗓️ {formatDeadline(g.deadline)}</p>)}
                       </div>
+                      <div className="flex items-center gap-1 shrink-0">
+                      <button
+                        type="button"
+                        aria-label={`Edit goal ${g.name}`}
+                        onClick={() => setGoalToEdit(g)}
+                        className={`${isDark ? "text-slate-500 hover:text-teal-400" : "text-zinc-400 hover:text-teal-600"} p-1 transition-colors`}
+                      >
+                        ✏️
+                      </button>
                       <button
                         type="button"
                         aria-label={`Hapus goal ${g.name}`}
                         onClick={() => setGoalToDelete(g)}
-                        className={`${isDark ? "text-slate-500 hover:text-rose-400" : "text-zinc-400 hover:text-rose-500"} shrink-0 p-1 transition-colors`}
+                        className={`${isDark ? "text-slate-500 hover:text-rose-400" : "text-zinc-400 hover:text-rose-500"} p-1 transition-colors`}
                       >
                         🗑️
                       </button>
+                      </div>
                     </div>
 
                     <div className="flex items-end justify-between mb-2">
@@ -120,6 +132,7 @@ export default function GoalsView() {
       <AnimatePresence>{showModal && <GoalModal onClose={() => setShowModal(false)} />}</AnimatePresence>
       <AnimatePresence>{fundGoal && <AddFundModal goal={fundGoal} onClose={() => setFundGoal(null)} />}</AnimatePresence>
       <AnimatePresence>{withdrawGoalState && <WithdrawFundModal goal={withdrawGoalState} onClose={() => setWithdrawGoalState(null)} />}</AnimatePresence>
+      <AnimatePresence>{goalToEdit && <EditGoalModal goal={goalToEdit} onClose={() => setGoalToEdit(null)} />}</AnimatePresence>
       <ConfirmDialog
         open={Boolean(goalToDelete)}
         title="Hapus Goal?"

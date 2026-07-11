@@ -4,6 +4,7 @@ import { formatRupiah } from "../lib/format";
 import { useStore, type Transaction } from "../lib/store";
 import { useTheme } from "../lib/ThemeContext";
 import ConfirmDialog from "./ConfirmDialog";
+import EditTransactionModal from "./EditTransactionModal";
 
 interface Props {
   filterWallet?: string;
@@ -13,6 +14,7 @@ export default function TransactionList({ filterWallet = "all" }: Props) {
   const { txs, wallets, delTx } = useStore();
   const { isDark } = useTheme();
   const [transactionToDelete, setTransactionToDelete] = useState<Transaction | null>(null);
+  const [transactionToEdit, setTransactionToEdit] = useState<Transaction | null>(null);
 
   const filtered =
     filterWallet === "all" ? txs : txs.filter((t) => t.walletId === parseInt(filterWallet));
@@ -96,6 +98,16 @@ export default function TransactionList({ filterWallet = "all" }: Props) {
                   </span>
                   <button
                     type="button"
+                    onClick={() => setTransactionToEdit(t)}
+                    disabled={isGoal}
+                    className={isDark ? "text-slate-500 hover:text-teal-400 transition-colors p-1 disabled:opacity-30 disabled:cursor-not-allowed" : "text-zinc-400 hover:text-teal-600 transition-colors p-1 disabled:opacity-30 disabled:cursor-not-allowed"}
+                    aria-label={`Edit transaksi ${t.desc}`}
+                    title={isGoal ? "Transaksi Goal tidak bisa diedit" : "Edit"}
+                  >
+                    ✏️
+                  </button>
+                  <button
+                    type="button"
                     onClick={() => setTransactionToDelete(t)}
                     className={isDark ? "text-slate-500 hover:text-rose-400 transition-colors p-1" : "text-zinc-400 hover:text-rose-500 transition-colors p-1"}
                     aria-label={`Hapus transaksi ${t.desc}`}
@@ -111,6 +123,7 @@ export default function TransactionList({ filterWallet = "all" }: Props) {
         </div>
       )}
       </div>
+      <AnimatePresence>{transactionToEdit && <EditTransactionModal tx={transactionToEdit} onClose={()=>setTransactionToEdit(null)} />}</AnimatePresence>
       <ConfirmDialog
         open={Boolean(transactionToDelete)}
         title="Hapus Transaksi?"

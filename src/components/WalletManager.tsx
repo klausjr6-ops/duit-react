@@ -5,6 +5,7 @@ import { formatRupiah } from "../lib/format";
 import { useTheme } from "../lib/ThemeContext";
 import { useModalDialog } from "../hooks/useModalDialog";
 import ConfirmDialog from "./ConfirmDialog";
+import EditWalletModal from "./EditWalletModal";
 
 interface Props {
   onClose: () => void;
@@ -20,6 +21,7 @@ export default function WalletManager({ onClose }: Props) {
   const [initBalance, setInitBalance] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [walletToDelete, setWalletToDelete] = useState<Wallet | null>(null);
+  const [walletToEdit, setWalletToEdit] = useState<Wallet | null>(null);
   const { dialogRef, onDialogKeyDown } = useModalDialog(true, onClose);
 
   const handleAdd = () => {
@@ -93,12 +95,20 @@ export default function WalletManager({ onClose }: Props) {
                     <p className="text-xs text-emerald-600 font-semibold">{formatRupiah(w.balance)}</p>
                   </div>
                 </div>
+                <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  aria-label={`Edit dompet ${w.name}`}
+                  onClick={() => setWalletToEdit(w)}
+                  className={`${isDark ? "text-slate-500 hover:text-teal-400" : "text-zinc-400 hover:text-teal-600"} p-2`}
+                >✏️</button>
                 <button
                   type="button"
                   aria-label={`Hapus dompet ${w.name}`}
                   onClick={() => setWalletToDelete(w)}
                   className={`${isDark ? "text-slate-500 hover:text-rose-400" : "text-zinc-400 hover:text-rose-500"} p-2`}
                 >🗑️</button>
+                </div>
               </div>
             ))
           )}
@@ -131,6 +141,7 @@ export default function WalletManager({ onClose }: Props) {
         </div>
       </motion.div>
       </motion.div>
+      {walletToEdit && <EditWalletModal wallet={walletToEdit} onClose={()=>setWalletToEdit(null)} />}
       <ConfirmDialog
         open={Boolean(walletToDelete)}
         title="Hapus Dompet?"

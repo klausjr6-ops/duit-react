@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import Card from "../components/Card";
 import ScheduleModal from "../components/ScheduleModal";
+import EditScheduleModal from "../components/EditScheduleModal";
 import { getNextScheduleOccurrence, todayStr, useStore } from "../lib/store";
 import { useTheme } from "../lib/ThemeContext";
 import ConfirmDialog from "../components/ConfirmDialog";
@@ -46,6 +47,7 @@ export default function JadwalView() {
   const { isDark } = useTheme();
   const [showModal, setShowModal] = useState(false);
   const [scheduleToDelete, setScheduleToDelete] = useState<ScheduleItem | null>(null);
+  const [scheduleToEdit, setScheduleToEdit] = useState<ScheduleItem | null>(null);
   const today = todayStr();
 
   const enriched = useMemo(
@@ -163,13 +165,22 @@ export default function JadwalView() {
                       {schedule.desc && <p className={`mt-1.5 truncate text-sm ${mutedClass}`}>{schedule.desc}</p>}
                     </div>
 
+                    <div className="flex items-center gap-2 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => setScheduleToEdit(schedule)}
+                      className={isDark ? "rounded-lg bg-white/5 px-3 py-2 text-sm font-semibold text-slate-200 hover:bg-white/10" : "rounded-lg bg-zinc-100 px-3 py-2 text-sm font-semibold text-zinc-700 hover:bg-zinc-200"}
+                    >
+                      Edit
+                    </button>
                     <button
                       type="button"
                       onClick={() => setScheduleToDelete(schedule)}
-                      className={isDark ? "shrink-0 rounded-lg bg-rose-500/10 px-4 py-2 text-sm font-semibold text-rose-400 transition-colors hover:bg-rose-500/20" : "shrink-0 rounded-lg bg-rose-50 px-4 py-2 text-sm font-semibold text-rose-600 transition-colors hover:bg-rose-100"}
+                      className={isDark ? "rounded-lg bg-rose-500/10 px-4 py-2 text-sm font-semibold text-rose-400 transition-colors hover:bg-rose-500/20" : "rounded-lg bg-rose-50 px-4 py-2 text-sm font-semibold text-rose-600 transition-colors hover:bg-rose-100"}
                     >
                       Hapus
                     </button>
+                    </div>
                   </motion.div>
                 );
               })}
@@ -180,6 +191,9 @@ export default function JadwalView() {
 
       <AnimatePresence>
         {showModal && <ScheduleModal onClose={() => setShowModal(false)} />}
+      </AnimatePresence>
+      <AnimatePresence>
+        {scheduleToEdit && <EditScheduleModal sched={scheduleToEdit} onClose={() => setScheduleToEdit(null)} />}
       </AnimatePresence>
       <ConfirmDialog
         open={Boolean(scheduleToDelete)}

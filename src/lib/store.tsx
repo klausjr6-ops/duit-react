@@ -460,6 +460,15 @@ function useDuitStoreInternal() {
     [updateData]
   );
 
+  const updateTx = useCallback(
+    (id: number, patch: Partial<Omit<Transaction, "id" | "goalId">>) =>
+      updateData((previous) => ({
+        ...previous,
+        txs: previous.txs.map((t) => (t.id === id ? { ...t, ...patch } : t)),
+      })),
+    [updateData]
+  );
+
   /* ══════════════════════════════════════════════════════════
      SCHEDULES
      ══════════════════════════════════════════════════════════ */
@@ -479,6 +488,15 @@ function useDuitStoreInternal() {
       updateData((previous) => ({
         ...previous,
         scheds: previous.scheds.filter((schedule) => schedule.id !== id),
+      })),
+    [updateData]
+  );
+
+  const updateSched = useCallback(
+    (id: number, patch: Partial<Omit<ScheduleItem, "id">>) =>
+      updateData((previous) => ({
+        ...previous,
+        scheds: previous.scheds.map((s) => (s.id === id ? { ...s, ...patch } : s)),
       })),
     [updateData]
   );
@@ -505,6 +523,15 @@ function useDuitStoreInternal() {
         // Removing the goal also reverses its internal transfers, restoring
         // the derived balance of the original source wallet(s).
         txs: previous.txs.filter((transaction) => transaction.goalId !== id),
+      })),
+    [updateData]
+  );
+
+  const updateGoal = useCallback(
+    (id: number, patch: Partial<Omit<Goal, "id" | "current">>) =>
+      updateData((previous) => ({
+        ...previous,
+        goals: previous.goals.map((g) => (g.id === id ? { ...g, ...patch } : g)),
       })),
     [updateData]
   );
@@ -859,10 +886,13 @@ function useDuitStoreInternal() {
     syncError,
     // Mutators
     addTx,
+    updateTx,
     delTx,
     addSched,
+    updateSched,
     delSched,
     addGoal,
+    updateGoal,
     delGoal,
     fundGoal,
     withdrawGoal,
