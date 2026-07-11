@@ -11,6 +11,7 @@ import {
   reauthenticateWithCredential,
   EmailAuthProvider,
   sendEmailVerification,
+  sendPasswordResetEmail,
   type User,
 } from "firebase/auth";
 import { auth, googleProvider } from "./firebase";
@@ -24,6 +25,7 @@ interface AuthContextType {
   logout: () => Promise<void>;
   changeEmail: (currentPassword: string, newEmail: string) => Promise<void>;
   changePassword: (currentPassword: string, newPassword: string) => Promise<void>;
+  resetPassword: (email: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -53,6 +55,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const loginGoogle = async () => {
     await signInWithPopup(auth, googleProvider);
+  };
+
+  const resetPassword = async (email: string) => {
+    const cleanEmail = email.trim();
+    if (!cleanEmail) {
+      throw new Error("Email wajib diisi");
+    }
+
+    await sendPasswordResetEmail(auth, cleanEmail);
   };
 
   const logout = async () => {
@@ -112,6 +123,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         loginEmail,
         registerEmail,
         loginGoogle,
+        resetPassword,
         logout,
         changeEmail,
         changePassword,

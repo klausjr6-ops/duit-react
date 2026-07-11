@@ -20,10 +20,36 @@ export default defineConfig({
     cssCodeSplit: true,
     rollupOptions: {
       output: {
-        manualChunks: {
-          "react-vendor": ["react", "react-dom"],
-          "firebase-vendor": ["firebase/app", "firebase/auth", "firebase/firestore"],
-          "motion": ["framer-motion"],
+        manualChunks(id) {
+          if (!id.includes("node_modules")) return undefined;
+
+          if (id.includes("/react/") || id.includes("/react-dom/")) {
+            return "react-vendor";
+          }
+
+          if (id.includes("/framer-motion/") || id.includes("/motion-dom/") || id.includes("/motion-utils/")) {
+            return "motion";
+          }
+
+          if (id.includes("/@firebase/firestore") || id.includes("/firebase/firestore")) {
+            return "firebase-firestore";
+          }
+
+          if (id.includes("/@firebase/auth") || id.includes("/firebase/auth")) {
+            return "firebase-auth";
+          }
+
+          if (
+            id.includes("/@firebase/app") ||
+            id.includes("/firebase/app") ||
+            id.includes("/@firebase/component") ||
+            id.includes("/@firebase/logger") ||
+            id.includes("/@firebase/util")
+          ) {
+            return "firebase-core";
+          }
+
+          return undefined;
         },
       },
     },

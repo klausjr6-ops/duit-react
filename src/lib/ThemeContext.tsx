@@ -7,10 +7,8 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { useAuth } from "./AuthContext";
-import { useStore, type Settings, type ThemeMode } from "./store";
 
-export type { ThemeMode } from "./store";
+export type ThemeMode = "system" | "time" | "light" | "dark";
 
 interface ThemeContextValue {
   themeMode: ThemeMode;
@@ -23,7 +21,7 @@ const ThemeContext = createContext<ThemeContextValue | null>(null);
 const LS_KEY = "duit_theme_mode";
 const THEME_MODES: ThemeMode[] = ["system", "time", "light", "dark"];
 
-function isThemeMode(value: string | null | undefined): value is ThemeMode {
+export function isThemeMode(value: string | null | undefined): value is ThemeMode {
   return Boolean(value && THEME_MODES.includes(value as ThemeMode));
 }
 
@@ -61,28 +59,9 @@ function resolveIsDark(mode: ThemeMode, now: Date, systemDark: boolean): boolean
 }
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  const { user } = useAuth();
-  const { settings, updateSettings, loading: storeLoading, loadedUserId } = useStore();
   const [themeMode, setThemeModeState] = useState<ThemeMode>(getInitialMode);
   const [now, setNow] = useState(() => new Date());
   const [systemDark, setSystemDark] = useState(getSystemIsDark);
-
-  const remoteSettingsReady = Boolean(
-    user && !storeLoading && loadedUserId === user.uid
-  );
-
-  // localStorage gives a fast first paint. Once the signed-in user's Firestore
-  // document has loaded, it becomes the source of truth across devices.
-  useEffect(() => {
-    if (!remoteSettingsReady || !isThemeMode(settings.themeMode)) return;
-    if (settings.themeMode !== themeMode) setThemeModeState(settings.themeMode);
-
-    try {
-      localStorage.setItem(LS_KEY, settings.themeMode);
-    } catch {
-      // localStorage is only a cache; Firestore remains the source of truth.
-    }
-  }, [remoteSettingsReady, settings.themeMode, themeMode]);
 
   useEffect(() => {
     if (themeMode !== "system") return;
@@ -120,22 +99,17 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     root.classList.toggle("light", !isDark);
   }, [isDark, resolved]);
 
-  const setThemeMode = useCallback(
-    (mode: ThemeMode) => {
-      setThemeModeState(mode);
+  const setThemeMode = useCallback((mode: ThemeMode) => {
+    setThemeModeState(mode);
 
-      try {
-        localStorage.setItem(LS_KEY, mode);
-      } catch {
-        // localStorage is only a cache; Firestore remains the source of truth.
-      }
+    try {
+      localStorage.setItem(LS_KEY, mode);
+    } catch {
+      // localStorage is only a cache; Firestore remains the signed-in source of truth.
+    }
 
-      const patch: Partial<Settings> = { themeMode: mode };
-      updateSettings(patch);
-      if (mode === "time") setNow(new Date());
-    },
-    [updateSettings]
-  );
+    if (mode === "time") setNow(new Date());
+  }, []);
 
   const value = useMemo(
     () => ({ themeMode, isDark, resolved, setThemeMode }),

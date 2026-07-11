@@ -1,6 +1,6 @@
 import { useRef, useState, useEffect } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { useStore } from "../lib/store";
+import { sanitizeImportedUserData, useStore, type UserData } from "../lib/store";
 import { useAuth } from "../lib/AuthContext";
 import { useTheme, type ThemeMode } from "../lib/ThemeContext";
 import { useModalDialog } from "../hooks/useModalDialog";
@@ -108,19 +108,24 @@ function createCalendarToken(): string {
 type SubView = "main" | "email" | "password";
 
 export default function AccountModal({ open, onClose }: AccountModalProps) {
-  const { settings, updateSettings, resetAll } = useStore();
+  const { settings, backupData, updateSettings, resetAll, replaceAll } = useStore();
   const { user, logout, changeEmail, changePassword } = useAuth();
   const { isDark, themeMode, setThemeMode } = useTheme();
 
   const [name, setName] = useState(settings.name);
   const [confirmLogout, setConfirmLogout] = useState(false);
   const [confirmReset, setConfirmReset] = useState(false);
+  const [confirmImport, setConfirmImport] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
   const [calendarCopied, setCalendarCopied] = useState(false);
   const [avatarSaving, setAvatarSaving] = useState(false);
   const [avatarError, setAvatarError] = useState<string | null>(null);
+  const [backupNotice, setBackupNotice] = useState<string | null>(null);
+  const [backupError, setBackupError] = useState<string | null>(null);
+  const [pendingImport, setPendingImport] = useState<{ data: UserData; summary: string } | null>(null);
   const [subView, setSubView] = useState<SubView>("main");
   const fileRef = useRef<HTMLInputElement>(null);
+  const backupInputRef = useRef<HTMLInputElement>(null);
 
   // Cek apakah user login pakai Google (gak bisa ganti email/pass)
   const isGoogleUser = user?.providerData[0]?.providerId === "google.com";
@@ -167,6 +172,89 @@ export default function AccountModal({ open, onClose }: AccountModalProps) {
     }
   };
 
+  const showBackupNotice = (message: string) => {
+    setBackupNotice(message);
+    setBackupError(null);
+    window.setTimeout(() => setBackupNotice(null), 2600);
+  };
+
+  const exportBackupJson = () => {
+    const backup = {
+      app: "DUIT",
+      type: "full-backup",
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      data: backupData,
+    };
+
+    downloadTextFile(
+      `duit-backup-${safeTimestamp()}.json`,
+      JSON.stringify(backup, null, 2),
+      "application/json;charset=utf-8"
+    );
+    showBackupNotice("Backup JSON berhasil diunduh.");
+  };
+
+  const exportTransactionsCsv = () => {
+    const walletNames = new Map(backupData.wallets.map((wallet) => [wallet.id, wallet.name]));
+    const header = ["Tanggal", "Jenis", "Nominal", "Kategori", "Deskripsi", "Dompet", "Goal ID", "Transaction ID"];
+    const rows = backupData.txs.map((transaction) => [
+      transaction.date,
+      transaction.type === "in" ? "Pemasukan" : transaction.goalId ? "Transfer Goal" : "Pengeluaran",
+      String(transaction.amt),
+      transaction.cat,
+      transaction.desc,
+      transaction.walletId ? walletNames.get(transaction.walletId) || String(transaction.walletId) : "",
+      transaction.goalId ? String(transaction.goalId) : "",
+      String(transaction.id),
+    ]);
+
+    downloadTextFile(
+      `duit-transaksi-${safeTimestamp()}.csv`,
+      "\ufeff" + [header, ...rows].map(toCsvRow).join("\n"),
+      "text/csv;charset=utf-8"
+    );
+    showBackupNotice("CSV transaksi berhasil diunduh.");
+  };
+
+  const handleImportBackup = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+
+    setBackupNotice(null);
+    setBackupError(null);
+
+    if (!file.name.toLowerCase().endsWith(".json") && file.type && file.type !== "application/json") {
+      setBackupError("File backup harus berformat JSON.");
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      setBackupError("File backup terlalu besar. Maksimum 5 MB.");
+      return;
+    }
+
+    try {
+      const importedData = parseBackupJson(await file.text());
+      setPendingImport({
+        data: importedData,
+        summary: summarizeBackup(importedData),
+      });
+      setConfirmImport(true);
+    } catch (error) {
+      setBackupError(error instanceof Error ? error.message : "Backup JSON tidak bisa dibaca.");
+    }
+  };
+
+  const confirmImportBackup = () => {
+    if (!pendingImport) return;
+    replaceAll(pendingImport.data);
+    setConfirmImport(false);
+    setPendingImport(null);
+    showBackupNotice("Backup berhasil diimport. Data sedang disinkronkan ke cloud.");
+  };
+
   const handleLogout = async () => {
     setLoggingOut(true);
     try {
@@ -181,6 +269,10 @@ export default function AccountModal({ open, onClose }: AccountModalProps) {
     setSubView("main");
     setConfirmLogout(false);
     setConfirmReset(false);
+    setConfirmImport(false);
+    setPendingImport(null);
+    setBackupError(null);
+    setBackupNotice(null);
     onClose();
   };
 
@@ -195,6 +287,9 @@ export default function AccountModal({ open, onClose }: AccountModalProps) {
     : "flex-1 rounded-xl border border-zinc-300 bg-zinc-50 px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-500 focus:border-teal-500 focus:outline-none focus:bg-white";
 
   const btnPrimary = "rounded-xl bg-gradient-to-br from-teal-400 to-blue-500 px-3 py-2 text-sm font-semibold text-zinc-900 hover:brightness-105 transition-all";
+  const btnSecondary = isDark
+    ? "rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm font-semibold text-white hover:bg-white/10 transition-all"
+    : "rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm font-semibold text-zinc-800 hover:bg-zinc-50 transition-all";
 
   const cardBtn = isDark
     ? "flex w-full items-center justify-between rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-left transition-colors hover:bg-white/10"
@@ -324,7 +419,7 @@ export default function AccountModal({ open, onClose }: AccountModalProps) {
                         return (
                           <button
                             key={opt.id}
-                            onClick={() => setThemeMode(opt.id)}
+                            onClick={() => { setThemeMode(opt.id); updateSettings({ themeMode: opt.id }); }}
                             className={
                               active
                                 ? "flex flex-col items-center justify-center gap-1 rounded-xl bg-white py-3 shadow-sm border border-zinc-200 text-zinc-900 transition-all " +
@@ -364,6 +459,44 @@ export default function AccountModal({ open, onClose }: AccountModalProps) {
                     </div>
                     <p className={`mt-2 text-[10px] leading-relaxed ${isDark ? "text-slate-500" : "text-zinc-500"}`}>
                       Link ini bersifat rahasia karena memberi akses baca ke jadwal kamu. Jangan dibagikan.
+                    </p>
+                  </div>
+
+                  <div className={`mt-4 rounded-xl border p-3 ${isDark ? "border-white/10 bg-white/5" : "border-zinc-200 bg-zinc-50"}`}>
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className={`text-sm font-medium ${isDark ? "text-white" : "text-zinc-900"}`}>Backup Data</p>
+                        <p className={`mt-0.5 text-xs ${isDark ? "text-slate-500" : "text-zinc-500"}`}>
+                          Export backup atau restore data dari file JSON DUIT.
+                        </p>
+                      </div>
+                    </div>
+                    <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-3">
+                      <button type="button" onClick={exportBackupJson} className={btnPrimary}>
+                        Export JSON
+                      </button>
+                      <button type="button" onClick={exportTransactionsCsv} className={btnSecondary}>
+                        Export CSV
+                      </button>
+                      <button type="button" onClick={() => backupInputRef.current?.click()} className={btnSecondary}>
+                        Import JSON
+                      </button>
+                    </div>
+                    <input
+                      ref={backupInputRef}
+                      type="file"
+                      accept="application/json,.json"
+                      className="hidden"
+                      onChange={handleImportBackup}
+                    />
+                    {backupNotice && (
+                      <p role="status" className="mt-2 text-xs text-emerald-500">{backupNotice}</p>
+                    )}
+                    {backupError && (
+                      <p role="alert" className="mt-2 text-xs text-rose-500">{backupError}</p>
+                    )}
+                    <p className={`mt-2 text-[10px] leading-relaxed ${isDark ? "text-slate-500" : "text-zinc-500"}`}>
+                      Import JSON akan mengganti data akun saat ini setelah kamu konfirmasi. Simpan export JSON terbaru sebelum restore.
                     </p>
                   </div>
 
@@ -489,6 +622,19 @@ export default function AccountModal({ open, onClose }: AccountModalProps) {
       )}
       </AnimatePresence>
       <ConfirmDialog
+        open={open && confirmImport}
+        title="Import Backup JSON?"
+        message={pendingImport ? `Data akun saat ini akan diganti dengan isi backup: ${pendingImport.summary}. Tindakan ini tidak bisa dibatalkan otomatis.` : "Data akun saat ini akan diganti dengan isi backup."}
+        confirmLabel="Ya, Import"
+        tone="danger"
+        onClose={() => {
+          setConfirmImport(false);
+          setPendingImport(null);
+        }}
+        onConfirm={confirmImportBackup}
+        isDark={isDark}
+      />
+      <ConfirmDialog
         open={open && confirmReset}
         title="Reset Semua Data?"
         message="Semua transaksi, jadwal, goal, mood, dan dompet di akun cloud akan direset. Tindakan ini tidak dapat dibatalkan."
@@ -503,6 +649,42 @@ export default function AccountModal({ open, onClose }: AccountModalProps) {
       />
     </>
   );
+}
+
+function safeTimestamp(): string {
+  return new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
+}
+
+function downloadTextFile(filename: string, content: string, type: string) {
+  const blob = new Blob([content], { type });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = filename;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  URL.revokeObjectURL(url);
+}
+
+function toCsvRow(values: string[]): string {
+  return values
+    .map((value) => `"${String(value ?? "").replace(/"/g, '""')}"`)
+    .join(",");
+}
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return Boolean(value && typeof value === "object" && !Array.isArray(value));
+}
+
+function parseBackupJson(raw: string): UserData {
+  const parsed = JSON.parse(raw) as unknown;
+  const candidate = isPlainObject(parsed) && "data" in parsed ? parsed.data : parsed;
+  return sanitizeImportedUserData(candidate);
+}
+
+function summarizeBackup(data: UserData): string {
+  return `${data.txs.length} transaksi, ${data.wallets.length} dompet, ${data.goals.length} goal, ${data.scheds.length} jadwal, ${Object.keys(data.moods).length} mood`;
 }
 
 /* ══════════════════════════════════════════════════════════════

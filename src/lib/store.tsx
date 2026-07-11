@@ -9,7 +9,7 @@ import {
   type ReactNode,
 } from "react";
 import { doc, onSnapshot, runTransaction } from "firebase/firestore";
-import { db } from "./firebase";
+import { db } from "./firebaseDb";
 import { useAuth } from "./AuthContext";
 
 /* ══════════════════════════════════════════════════════════════
@@ -169,7 +169,7 @@ const DEFAULT_WALLETS: Wallet[] = [
 /* ══════════════════════════════════════════════════════════════
    FIRESTORE DATA SHAPE
    ══════════════════════════════════════════════════════════════ */
-interface UserData {
+export interface UserData {
   txs: Transaction[];
   scheds: ScheduleItem[];
   goals: Goal[];
@@ -188,6 +188,172 @@ function createDefaultData(): UserData {
     moods: {},
     settings: { name: "Kamu", themeMode: "time" },
     wallets: DEFAULT_WALLETS.map((wallet) => ({ ...wallet })),
+  };
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value && typeof value === "object" && !Array.isArray(value));
+}
+
+function toFiniteNumber(value: unknown, fallback = 0): number {
+  const parsed = typeof value === "number" ? value : Number(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function toPositiveNumber(value: unknown, fallback = 0): number {
+  return Math.max(0, toFiniteNumber(value, fallback));
+}
+
+function toStringValue(value: unknown, fallback = ""): string {
+  return typeof value === "string" ? value : fallback;
+}
+
+function toDateKey(value: unknown, fallback = todayStr()): string {
+  const raw = toStringValue(value, fallback);
+  return /^\d{4}-\d{2}-\d{2}$/.test(raw) ? raw : fallback;
+}
+
+function toTimeValue(value: unknown, fallback = "09:00"): string {
+  const raw = toStringValue(value, fallback);
+  return /^\d{2}:\d{2}$/.test(raw) ? raw : fallback;
+}
+
+function toThemeMode(value: unknown): ThemeMode | undefined {
+  return value === "system" || value === "time" || value === "light" || value === "dark"
+    ? value
+    : undefined;
+}
+
+function sanitizeTransaction(value: unknown): Transaction | null {
+  if (!isRecord(value)) return null;
+  const type = value.type === "in" || value.type === "out" ? value.type : null;
+  const amt = toPositiveNumber(value.amt);
+  if (!type || amt <= 0) return null;
+
+  const walletId = value.walletId === undefined ? undefined : toFiniteNumber(value.walletId, NaN);
+  const goalId = value.goalId === undefined ? undefined : toFiniteNumber(value.goalId, NaN);
+
+  return {
+    id: toFiniteNumber(value.id, createId()),
+    type,
+    amt,
+    cat: toStringValue(value.cat, "Lainnya").slice(0, 80),
+    desc: toStringValue(value.desc, "").slice(0, 240),
+    date: toDateKey(value.date),
+    ...(Number.isFinite(walletId) ? { walletId } : {}),
+    ...(Number.isFinite(goalId) ? { goalId } : {}),
+  };
+}
+
+function sanitizeSchedule(value: unknown): ScheduleItem | null {
+  if (!isRecord(value)) return null;
+  const name = toStringValue(value.name).trim();
+  if (!name) return null;
+
+  const day = toStringValue(value.day);
+  const date = typeof value.date === "string" && value.date ? toDateKey(value.date) : undefined;
+  const end = typeof value.end === "string" && value.end ? toTimeValue(value.end) : undefined;
+  const untilDate = typeof value.untilDate === "string" && value.untilDate ? toDateKey(value.untilDate) : undefined;
+
+  return {
+    id: toFiniteNumber(value.id, createId()),
+    name: name.slice(0, 120),
+    desc: toStringValue(value.desc, "").slice(0, 240),
+    ...(day ? { day: day.slice(0, 20) } : {}),
+    ...(date ? { date } : {}),
+    start: toTimeValue(value.start),
+    ...(end ? { end } : {}),
+    icon: toStringValue(value.icon, "📌").slice(0, 12),
+    recurring: Boolean(value.recurring),
+    ...(untilDate ? { untilDate } : {}),
+  };
+}
+
+function sanitizeGoal(value: unknown): Goal | null {
+  if (!isRecord(value)) return null;
+  const name = toStringValue(value.name).trim();
+  const target = toPositiveNumber(value.target);
+  if (!name || target <= 0) return null;
+
+  const deadline = typeof value.deadline === "string" && value.deadline ? toDateKey(value.deadline) : undefined;
+
+  return {
+    id: toFiniteNumber(value.id, createId()),
+    name: name.slice(0, 120),
+    target,
+    current: Math.min(toPositiveNumber(value.current), target),
+    ...(deadline ? { deadline } : {}),
+    icon: toStringValue(value.icon, "🎯").slice(0, 12),
+  };
+}
+
+function sanitizeWallet(value: unknown): Wallet | null {
+  if (!isRecord(value)) return null;
+  const name = toStringValue(value.name).trim();
+  if (!name) return null;
+
+  return {
+    id: toFiniteNumber(value.id, createId()),
+    name: name.slice(0, 80),
+    balance: toFiniteNumber(value.balance),
+    icon: toStringValue(value.icon, "💳").slice(0, 12),
+    color: toStringValue(value.color, "from-emerald-500/20 to-emerald-500/5").slice(0, 120),
+  };
+}
+
+function sanitizeSettings(value: unknown): Partial<Settings> {
+  if (!isRecord(value)) return { name: "Kamu", themeMode: "time" };
+
+  const themeMode = toThemeMode(value.themeMode);
+  const avatar = typeof value.avatar === "string" && value.avatar.startsWith("data:image/")
+    ? value.avatar
+    : undefined;
+  const calendarToken = typeof value.calendarToken === "string" && value.calendarToken.length <= 200
+    ? value.calendarToken
+    : undefined;
+
+  return {
+    name: toStringValue(value.name, "Kamu").trim().slice(0, 80) || "Kamu",
+    themeMode: themeMode ?? "time",
+    ...(avatar ? { avatar } : {}),
+    ...(calendarToken ? { calendarToken } : {}),
+  };
+}
+
+export function sanitizeImportedUserData(value: unknown): UserData {
+  if (!isRecord(value)) throw new Error("Format backup tidak valid.");
+
+  const wallets = Array.isArray(value.wallets)
+    ? value.wallets.map(sanitizeWallet).filter((item): item is Wallet => Boolean(item))
+    : [];
+
+  return {
+    txs: Array.isArray(value.txs)
+      ? value.txs.map(sanitizeTransaction).filter((item): item is Transaction => Boolean(item))
+      : [],
+    scheds: Array.isArray(value.scheds)
+      ? value.scheds.map(sanitizeSchedule).filter((item): item is ScheduleItem => Boolean(item))
+      : [],
+    goals: Array.isArray(value.goals)
+      ? value.goals.map(sanitizeGoal).filter((item): item is Goal => Boolean(item))
+      : [],
+    moods: isRecord(value.moods)
+      ? Object.fromEntries(
+          Object.entries(value.moods).flatMap(([date, mood]) => {
+            if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !isRecord(mood)) return [];
+            return [[
+              date,
+              {
+                mood: toStringValue(mood.mood, "🙂").slice(0, 12),
+                label: toStringValue(mood.label, "Biasa").slice(0, 80),
+                note: toStringValue(mood.note, "").slice(0, 500),
+              },
+            ]];
+          })
+        )
+      : {},
+    settings: sanitizeSettings(value.settings),
+    wallets: wallets.length > 0 ? wallets : DEFAULT_WALLETS.map((wallet) => ({ ...wallet })),
   };
 }
 
@@ -435,6 +601,20 @@ function useDuitStoreInternal() {
   const settings: Settings = useMemo(
     () => ({ name: "Kamu", themeMode: "time", ...data.settings }),
     [data.settings]
+  );
+
+  const backupData: UserData = useMemo(
+    () => ({
+      txs: data.txs.map((transaction) => ({ ...transaction })),
+      scheds: data.scheds.map((schedule) => ({ ...schedule })),
+      goals: data.goals.map((goal) => ({ ...goal })),
+      moods: Object.fromEntries(
+        Object.entries(data.moods).map(([date, mood]) => [date, { ...mood }])
+      ),
+      settings: { ...settings },
+      wallets: data.wallets.map((wallet) => ({ ...wallet })),
+    }),
+    [data.goals, data.moods, data.scheds, data.txs, data.wallets, settings]
   );
 
   /* ══════════════════════════════════════════════════════════
@@ -762,6 +942,11 @@ function useDuitStoreInternal() {
     [updateData]
   );
 
+  const replaceAll = useCallback(
+    (nextData: UserData) => updateData(() => sanitizeImportedUserData(nextData)),
+    [updateData]
+  );
+
   /* ══════════════════════════════════════════════════════════
      DERIVED VALUES
      ══════════════════════════════════════════════════════════ */
@@ -878,6 +1063,7 @@ function useDuitStoreInternal() {
     goals,
     moods,
     settings,
+    backupData,
     wallets: walletsWithBalance,
     // Loading & sync states
     loading,
@@ -903,6 +1089,7 @@ function useDuitStoreInternal() {
     setTodayNote,
     updateSettings,
     resetAll,
+    replaceAll,
     // Derived
     totalIn,
     totalOut,
