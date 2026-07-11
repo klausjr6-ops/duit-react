@@ -67,6 +67,100 @@ const FINANCE_KEYWORDS = [
 const MAX_INPUT_CHARACTERS = 4000;
 const MAX_API_MESSAGES = 16;
 
+const MAX_RENDERED_IMAGE_DATA_URL_LENGTH = 1_500_000;
+
+function isSafeImageSource(src: string): boolean {
+  const trimmed = src.trim();
+  if (!trimmed) return false;
+
+  if (/^data:image\/(png|jpe?g|webp|gif);base64,/i.test(trimmed)) {
+    return trimmed.length <= MAX_RENDERED_IMAGE_DATA_URL_LENGTH;
+  }
+
+  try {
+    const url = new URL(trimmed, window.location.origin);
+    return url.protocol === "https:" || url.protocol === "http:";
+  } catch {
+    return false;
+  }
+}
+
+function renderInlineMarkdown(text: string, keyPrefix: string, isDark: boolean): React.ReactNode[] {
+  const nodes: React.ReactNode[] = [];
+  const pattern = /!\[([^\]]*)\]\(([^\s)]+)\)|\*\*([\s\S]+?)\*\*|`([^`]+)`|\*([^*\n]+)\*/g;
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+
+  while ((match = pattern.exec(text)) !== null) {
+    if (match.index > lastIndex) {
+      nodes.push(text.slice(lastIndex, match.index));
+    }
+
+    const [raw, imageAlt, imageSrc, boldText, codeText, italicText] = match;
+    if (imageSrc) {
+      const src = imageSrc.trim();
+      if (isSafeImageSource(src)) {
+        nodes.push(
+          <img
+            key={`${keyPrefix}-img-${match.index}`}
+            src={src}
+            alt={imageAlt || "Gambar dari DUIT"}
+            loading="lazy"
+            className="my-2 max-h-72 max-w-full rounded-xl border border-black/10 object-contain shadow-sm"
+          />
+        );
+      } else {
+        nodes.push(raw);
+      }
+    } else if (boldText) {
+      nodes.push(
+        <strong key={`${keyPrefix}-bold-${match.index}`} className="font-semibold">
+          {renderInlineMarkdown(boldText, `${keyPrefix}-bold-${match.index}`, isDark)}
+        </strong>
+      );
+    } else if (codeText) {
+      nodes.push(
+        <code
+          key={`${keyPrefix}-code-${match.index}`}
+          className={isDark
+            ? "rounded bg-black/30 px-1 py-0.5 font-mono text-[0.9em] text-teal-200"
+            : "rounded bg-white px-1 py-0.5 font-mono text-[0.9em] text-blue-700"
+          }
+        >
+          {codeText}
+        </code>
+      );
+    } else if (italicText) {
+      nodes.push(
+        <em key={`${keyPrefix}-italic-${match.index}`}>
+          {italicText}
+        </em>
+      );
+    }
+
+    lastIndex = match.index + raw.length;
+  }
+
+  if (lastIndex < text.length) nodes.push(text.slice(lastIndex));
+  return nodes;
+}
+
+function ChatMessageText({ text, rich, isDark }: { text: string; rich: boolean; isDark: boolean }) {
+  if (!rich) return <>{text}</>;
+
+  const lines = text.split("\n");
+  return (
+    <>
+      {lines.map((line, index) => (
+        <span key={`line-${index}`}>
+          {renderInlineMarkdown(line, `line-${index}`, isDark)}
+          {index < lines.length - 1 && <br />}
+        </span>
+      ))}
+    </>
+  );
+}
+
 function needsFinanceContext(text: string): boolean {
   const lower = text.toLowerCase();
   return FINANCE_KEYWORDS.some((kw) => lower.includes(kw));
@@ -291,13 +385,13 @@ export default function ChatWidget({ open, onClose }: ChatWidgetProps) {
                     className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
                   >
                     <div
-                      className={`max-w-[85%] px-4 py-3 rounded-2xl text-sm leading-relaxed whitespace-pre-wrap break-words ${
+                      className={`max-w-[85%] px-4 py-3 rounded-2xl text-sm leading-relaxed break-words ${
                         msg.role === "user"
-                          ? "bg-gradient-to-br from-teal-400 to-blue-500 text-zinc-900 font-medium rounded-br-sm"
+                          ? "whitespace-pre-wrap bg-gradient-to-br from-teal-400 to-blue-500 text-zinc-900 font-medium rounded-br-sm"
                           : `${msgAssistant} rounded-bl-sm`
                       }`}
                     >
-                      {msg.text}
+                      <ChatMessageText text={msg.text} rich={msg.role === "assistant"} isDark={isDark} />
                     </div>
                   </motion.div>
                 ))}
