@@ -116,8 +116,10 @@ export default function AccountModal({ open, onClose }: AccountModalProps) {
   const [confirmLogout, setConfirmLogout] = useState(false);
   const [confirmReset, setConfirmReset] = useState(false);
   const [confirmImport, setConfirmImport] = useState(false);
+  const [confirmCalendarReset, setConfirmCalendarReset] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
   const [calendarCopied, setCalendarCopied] = useState(false);
+  const [calendarNotice, setCalendarNotice] = useState<string | null>(null);
   const [avatarSaving, setAvatarSaving] = useState(false);
   const [avatarError, setAvatarError] = useState<string | null>(null);
   const [backupNotice, setBackupNotice] = useState<string | null>(null);
@@ -166,10 +168,23 @@ export default function AccountModal({ open, onClose }: AccountModalProps) {
     try {
       await navigator.clipboard.writeText(url);
       setCalendarCopied(true);
+      setCalendarNotice(null);
       window.setTimeout(() => setCalendarCopied(false), 2200);
     } catch {
       window.prompt("Salin link kalender pribadi ini. Jangan dibagikan.", url);
     }
+  };
+
+  const showCalendarNotice = (message: string) => {
+    setCalendarNotice(message);
+    setCalendarCopied(false);
+    window.setTimeout(() => setCalendarNotice(null), 3200);
+  };
+
+  const regenerateCalendarFeedUrl = () => {
+    updateSettings({ calendarToken: createCalendarToken() });
+    setConfirmCalendarReset(false);
+    showCalendarNotice("Link kalender lama sudah dicabut. Salin link baru untuk subscribe ulang.");
   };
 
   const showBackupNotice = (message: string) => {
@@ -270,7 +285,9 @@ export default function AccountModal({ open, onClose }: AccountModalProps) {
     setConfirmLogout(false);
     setConfirmReset(false);
     setConfirmImport(false);
+    setConfirmCalendarReset(false);
     setPendingImport(null);
+    setCalendarNotice(null);
     setBackupError(null);
     setBackupNotice(null);
     onClose();
@@ -442,13 +459,15 @@ export default function AccountModal({ open, onClose }: AccountModalProps) {
                   </div>
 
                   <div className={`mt-4 rounded-xl border p-3 ${isDark ? "border-white/10 bg-white/5" : "border-zinc-200 bg-zinc-50"}`}>
-                    <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
                         <p className={`text-sm font-medium ${isDark ? "text-white" : "text-zinc-900"}`}>Kalender</p>
                         <p className={`mt-0.5 text-xs ${isDark ? "text-slate-500" : "text-zinc-500"}`}>
                           Salin link pribadi untuk subscribe jadwal di Calendar.
                         </p>
                       </div>
+                    </div>
+                    <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
                       <button
                         type="button"
                         onClick={copyCalendarFeedUrl}
@@ -456,9 +475,19 @@ export default function AccountModal({ open, onClose }: AccountModalProps) {
                       >
                         {calendarCopied ? "✓ Disalin" : "Salin Link"}
                       </button>
+                      <button
+                        type="button"
+                        onClick={() => setConfirmCalendarReset(true)}
+                        className="rounded-xl border border-amber-400/30 bg-amber-400/10 px-3 py-2 text-sm font-semibold text-amber-600 transition-all hover:bg-amber-400/20"
+                      >
+                        Buat Ulang Link
+                      </button>
                     </div>
+                    {calendarNotice && (
+                      <p role="status" className="mt-2 text-xs text-emerald-500">{calendarNotice}</p>
+                    )}
                     <p className={`mt-2 text-[10px] leading-relaxed ${isDark ? "text-slate-500" : "text-zinc-500"}`}>
-                      Link ini bersifat rahasia karena memberi akses baca ke jadwal kamu. Jangan dibagikan.
+                      Link ini bersifat rahasia karena memberi akses baca ke jadwal kamu. Jika link pernah tersebar, klik Buat Ulang Link untuk mencabut link lama.
                     </p>
                   </div>
 
@@ -621,6 +650,16 @@ export default function AccountModal({ open, onClose }: AccountModalProps) {
         </motion.div>
       )}
       </AnimatePresence>
+      <ConfirmDialog
+        open={open && confirmCalendarReset}
+        title="Buat Ulang Link Kalender?"
+        message="Link kalender lama akan langsung dicabut dan tidak bisa dipakai lagi. Kalender yang sudah subscribe dengan link lama perlu diganti memakai link baru."
+        confirmLabel="Ya, Buat Ulang"
+        tone="danger"
+        onClose={() => setConfirmCalendarReset(false)}
+        onConfirm={regenerateCalendarFeedUrl}
+        isDark={isDark}
+      />
       <ConfirmDialog
         open={open && confirmImport}
         title="Import Backup JSON?"
