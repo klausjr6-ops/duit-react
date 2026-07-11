@@ -105,7 +105,7 @@ function createCalendarToken(): string {
   return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
-type SubView = "main" | "email" | "password";
+type SubView = "main" | "calendar" | "backup" | "email" | "password";
 
 export default function AccountModal({ open, onClose }: AccountModalProps) {
   const { settings, backupData, updateSettings, resetAll, replaceAll } = useStore();
@@ -360,6 +360,8 @@ export default function AccountModal({ open, onClose }: AccountModalProps) {
                   <p className="text-xs font-semibold text-teal-500">AKUN</p>
                   <p id="account-dialog-title" className={`text-sm font-medium ${isDark ? "text-white" : "text-zinc-900"}`}>
                     {subView === "main" && "Pengaturan Akun"}
+                    {subView === "calendar" && "Kalender"}
+                    {subView === "backup" && "Backup Data"}
                     {subView === "email" && "Ganti Email"}
                     {subView === "password" && "Ganti Password"}
                   </p>
@@ -458,75 +460,34 @@ export default function AccountModal({ open, onClose }: AccountModalProps) {
                     </div>
                   </div>
 
-                  <div className={`mt-4 rounded-xl border p-3 ${isDark ? "border-white/10 bg-white/5" : "border-zinc-200 bg-zinc-50"}`}>
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
+                  <div className="mt-4 mb-4 space-y-2">
+                    <button
+                      type="button"
+                      onClick={() => setSubView("calendar")}
+                      className={cardBtn}
+                    >
+                      <div>
                         <p className={`text-sm font-medium ${isDark ? "text-white" : "text-zinc-900"}`}>Kalender</p>
-                        <p className={`mt-0.5 text-xs ${isDark ? "text-slate-500" : "text-zinc-500"}`}>
-                          Salin link pribadi untuk subscribe jadwal di Calendar.
+                        <p className={`text-xs ${isDark ? "text-slate-500" : "text-zinc-500"}`}>
+                          Link pribadi jadwal DUIT
                         </p>
                       </div>
-                    </div>
-                    <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
-                      <button
-                        type="button"
-                        onClick={copyCalendarFeedUrl}
-                        className={btnPrimary}
-                      >
-                        {calendarCopied ? "✓ Disalin" : "Salin Link"}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setConfirmCalendarReset(true)}
-                        className="rounded-xl border border-amber-400/30 bg-amber-400/10 px-3 py-2 text-sm font-semibold text-amber-600 transition-all hover:bg-amber-400/20"
-                      >
-                        Buat Ulang Link
-                      </button>
-                    </div>
-                    {calendarNotice && (
-                      <p role="status" className="mt-2 text-xs text-emerald-500">{calendarNotice}</p>
-                    )}
-                    <p className={`mt-2 text-[10px] leading-relaxed ${isDark ? "text-slate-500" : "text-zinc-500"}`}>
-                      Link ini bersifat rahasia karena memberi akses baca ke jadwal kamu. Jika link pernah tersebar, klik Buat Ulang Link untuk mencabut link lama.
-                    </p>
-                  </div>
+                      <span className={isDark ? "text-slate-500" : "text-zinc-400"}>›</span>
+                    </button>
 
-                  <div className={`mt-4 rounded-xl border p-3 ${isDark ? "border-white/10 bg-white/5" : "border-zinc-200 bg-zinc-50"}`}>
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
+                    <button
+                      type="button"
+                      onClick={() => setSubView("backup")}
+                      className={cardBtn}
+                    >
+                      <div>
                         <p className={`text-sm font-medium ${isDark ? "text-white" : "text-zinc-900"}`}>Backup Data</p>
-                        <p className={`mt-0.5 text-xs ${isDark ? "text-slate-500" : "text-zinc-500"}`}>
-                          Export backup atau restore data dari file JSON DUIT.
+                        <p className={`text-xs ${isDark ? "text-slate-500" : "text-zinc-500"}`}>
+                          Export / import JSON & CSV
                         </p>
                       </div>
-                    </div>
-                    <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-3">
-                      <button type="button" onClick={exportBackupJson} className={btnPrimary}>
-                        Export JSON
-                      </button>
-                      <button type="button" onClick={exportTransactionsCsv} className={btnSecondary}>
-                        Export CSV
-                      </button>
-                      <button type="button" onClick={() => backupInputRef.current?.click()} className={btnSecondary}>
-                        Import JSON
-                      </button>
-                    </div>
-                    <input
-                      ref={backupInputRef}
-                      type="file"
-                      accept="application/json,.json"
-                      className="hidden"
-                      onChange={handleImportBackup}
-                    />
-                    {backupNotice && (
-                      <p role="status" className="mt-2 text-xs text-emerald-500">{backupNotice}</p>
-                    )}
-                    {backupError && (
-                      <p role="alert" className="mt-2 text-xs text-rose-500">{backupError}</p>
-                    )}
-                    <p className={`mt-2 text-[10px] leading-relaxed ${isDark ? "text-slate-500" : "text-zinc-500"}`}>
-                      Import JSON akan mengganti data akun saat ini setelah kamu konfirmasi. Simpan export JSON terbaru sebelum restore.
-                    </p>
+                      <span className={isDark ? "text-slate-500" : "text-zinc-400"}>›</span>
+                    </button>
                   </div>
 
                   <div className={`h-px w-full my-4 ${isDark ? "bg-white/10" : "bg-zinc-200"}`} />
@@ -624,6 +585,89 @@ export default function AccountModal({ open, onClose }: AccountModalProps) {
                   >
                     🗑️ Hapus Semua Data
                   </button>
+                </motion.div>
+              )}
+
+              {/* ═══════════════ CALENDAR VIEW ═══════════════ */}
+              {subView === "calendar" && (
+                <motion.div
+                  key="calendar"
+                  initial={{ opacity: 0, x: 10 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: 10 }}
+                  transition={{ duration: 0.15 }}
+                  className="space-y-3"
+                >
+                  <div className={`rounded-xl border p-4 ${isDark ? "border-white/10 bg-white/5" : "border-zinc-200 bg-zinc-50"}`}>
+                    <p className={`text-sm font-semibold ${isDark ? "text-white" : "text-zinc-900"}`}>Link Kalender Pribadi</p>
+                    <p className={`mt-1 text-xs leading-relaxed ${isDark ? "text-slate-400" : "text-zinc-600"}`}>
+                      Salin link ini untuk subscribe jadwal DUIT di Apple Calendar, Google Calendar, atau aplikasi kalender lain.
+                    </p>
+                    <div className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                      <button type="button" onClick={copyCalendarFeedUrl} className={btnPrimary}>
+                        {calendarCopied ? "✓ Disalin" : "Salin Link"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setConfirmCalendarReset(true)}
+                        className="rounded-xl border border-amber-400/30 bg-amber-400/10 px-3 py-2 text-sm font-semibold text-amber-600 transition-all hover:bg-amber-400/20"
+                      >
+                        Buat Ulang Link
+                      </button>
+                    </div>
+                    {calendarNotice && (
+                      <p role="status" className="mt-3 text-xs text-emerald-500">{calendarNotice}</p>
+                    )}
+                  </div>
+                  <p className={`text-[11px] leading-relaxed ${isDark ? "text-slate-500" : "text-zinc-500"}`}>
+                    Link ini bersifat rahasia karena memberi akses baca ke jadwal kamu. Jika link pernah tersebar, klik Buat Ulang Link untuk mencabut link lama.
+                  </p>
+                </motion.div>
+              )}
+
+              {/* ═══════════════ BACKUP VIEW ═══════════════ */}
+              {subView === "backup" && (
+                <motion.div
+                  key="backup"
+                  initial={{ opacity: 0, x: 10 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: 10 }}
+                  transition={{ duration: 0.15 }}
+                  className="space-y-3"
+                >
+                  <div className={`rounded-xl border p-4 ${isDark ? "border-white/10 bg-white/5" : "border-zinc-200 bg-zinc-50"}`}>
+                    <p className={`text-sm font-semibold ${isDark ? "text-white" : "text-zinc-900"}`}>Export & Import Data</p>
+                    <p className={`mt-1 text-xs leading-relaxed ${isDark ? "text-slate-400" : "text-zinc-600"}`}>
+                      Simpan backup data DUIT atau restore dari file JSON backup.
+                    </p>
+                    <div className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-3">
+                      <button type="button" onClick={exportBackupJson} className={btnPrimary}>
+                        Export JSON
+                      </button>
+                      <button type="button" onClick={exportTransactionsCsv} className={btnSecondary}>
+                        Export CSV
+                      </button>
+                      <button type="button" onClick={() => backupInputRef.current?.click()} className={btnSecondary}>
+                        Import JSON
+                      </button>
+                    </div>
+                    <input
+                      ref={backupInputRef}
+                      type="file"
+                      accept="application/json,.json"
+                      className="hidden"
+                      onChange={handleImportBackup}
+                    />
+                    {backupNotice && (
+                      <p role="status" className="mt-3 text-xs text-emerald-500">{backupNotice}</p>
+                    )}
+                    {backupError && (
+                      <p role="alert" className="mt-3 text-xs text-rose-500">{backupError}</p>
+                    )}
+                  </div>
+                  <p className={`text-[11px] leading-relaxed ${isDark ? "text-slate-500" : "text-zinc-500"}`}>
+                    Import JSON akan mengganti data akun saat ini setelah kamu konfirmasi. Simpan export JSON terbaru sebelum restore.
+                  </p>
                 </motion.div>
               )}
 
