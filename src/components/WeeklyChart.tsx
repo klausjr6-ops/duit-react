@@ -22,7 +22,7 @@ export default function WeeklyChart() {
       const date = addDaysToDateKey(today, -offset);
       const dayTransactions = txs.filter((transaction) => transaction.date === date);
       const income = dayTransactions
-        .filter((transaction) => transaction.type === "in")
+        .filter((transaction) => transaction.type === "in" && !transaction.goalId)
         .reduce((amount, transaction) => amount + transaction.amt, 0);
       const expense = dayTransactions
         .filter((transaction) => transaction.type === "out" && !transaction.goalId)

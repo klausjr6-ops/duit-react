@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import Card from "../components/Card";
 import GoalModal from "../components/GoalModal";
 import AddFundModal from "../components/AddFundModal";
+import WithdrawFundModal from "../components/WithdrawFundModal";
 import { useStore } from "../lib/store";
 import { formatRupiah } from "../lib/format";
 import type { Goal } from "../lib/store";
@@ -14,6 +15,7 @@ export default function GoalsView() {
   const { isDark } = useTheme();
   const [showModal, setShowModal] = useState(false);
   const [fundGoal, setFundGoal] = useState<Goal | null>(null);
+  const [withdrawGoalState, setWithdrawGoalState] = useState<Goal | null>(null);
   const [goalToDelete, setGoalToDelete] = useState<Goal | null>(null);
 
   const formatDeadline = (d: string) => {
@@ -84,15 +86,28 @@ export default function GoalsView() {
                       <motion.div initial={{ width: 0 }} animate={{ width: `${pct}%` }} transition={{ duration: 0.8, ease: "easeOut" }} className={`h-full rounded-full ${isDone ? "bg-gradient-to-r from-emerald-400 to-emerald-600" : "bg-gradient-to-r from-blue-400 to-blue-600"}`} />
                     </div>
 
-                    <div className="flex items-center justify-between">
+                    <div className="flex items-center justify-between gap-2 flex-wrap">
                       <span className={`text-xs font-bold ${isDone ? "text-emerald-600" : "text-blue-600"}`}>
                         {pct}% {isDone && "🎉 Tercapai!"}
                       </span>
-                      {!isDone && (
-                        <button onClick={() => setFundGoal(g)} className={isDark ? "text-xs font-semibold bg-white/10 hover:bg-white/20 text-white px-3 py-1.5 rounded-lg transition-colors" : "text-xs font-semibold bg-zinc-900 hover:bg-zinc-800 text-white px-3 py-1.5 rounded-lg transition-colors"}>
-                          + Nabung
-                        </button>
-                      )}
+                      <div className="flex items-center gap-2">
+                        {g.current > 0 && (
+                          <button
+                            onClick={() => setWithdrawGoalState(g)}
+                            className={isDark
+                              ? "text-xs font-semibold border border-white/15 hover:bg-white/10 text-slate-200 px-3 py-1.5 rounded-lg transition-colors"
+                              : "text-xs font-semibold border border-zinc-300 hover:bg-zinc-50 text-zinc-700 px-3 py-1.5 rounded-lg transition-colors"
+                            }
+                          >
+                            Tarik
+                          </button>
+                        )}
+                        {!isDone && (
+                          <button onClick={() => setFundGoal(g)} className={isDark ? "text-xs font-semibold bg-white/10 hover:bg-white/20 text-white px-3 py-1.5 rounded-lg transition-colors" : "text-xs font-semibold bg-zinc-900 hover:bg-zinc-800 text-white px-3 py-1.5 rounded-lg transition-colors"}>
+                            + Nabung
+                          </button>
+                        )}
+                      </div>
                     </div>
                   </Card>
                 </motion.div>
@@ -104,6 +119,7 @@ export default function GoalsView() {
 
       <AnimatePresence>{showModal && <GoalModal onClose={() => setShowModal(false)} />}</AnimatePresence>
       <AnimatePresence>{fundGoal && <AddFundModal goal={fundGoal} onClose={() => setFundGoal(null)} />}</AnimatePresence>
+      <AnimatePresence>{withdrawGoalState && <WithdrawFundModal goal={withdrawGoalState} onClose={() => setWithdrawGoalState(null)} />}</AnimatePresence>
       <ConfirmDialog
         open={Boolean(goalToDelete)}
         title="Hapus Goal?"

@@ -49,7 +49,10 @@ export default function TransactionList({ filterWallet = "all" }: Props) {
       ) : (
         <div className="space-y-3">
           <AnimatePresence>
-            {sorted.map((t) => (
+            {sorted.map((t) => {
+              const isGoal = Boolean(t.goalId);
+              const goalLabel = t.type === "in" ? "Transfer dari Goal" : "Transfer ke Goal";
+              return (
               <motion.div
                 key={t.id}
                 layout
@@ -61,19 +64,19 @@ export default function TransactionList({ filterWallet = "all" }: Props) {
                 <div className="flex items-center gap-3 min-w-0 flex-1">
                   <div
                     className={`w-10 h-10 rounded-xl flex items-center justify-center text-lg shrink-0 ${
-                      t.goalId
+                      isGoal
                         ? isDark ? "bg-blue-500/20 text-blue-400" : "bg-blue-50 text-blue-600"
                         : t.type === "in"
                           ? isDark ? "bg-emerald-500/20 text-emerald-400" : "bg-emerald-50 text-emerald-600"
                           : isDark ? "bg-rose-500/20 text-rose-400" : "bg-rose-50 text-rose-600"
                     }`}
                   >
-                    {t.goalId ? "🎯" : t.type === "in" ? "⬆️" : "⬇️"}
+                    {isGoal ? "🎯" : t.type === "in" ? "⬆️" : "⬇️"}
                   </div>
                   <div className="min-w-0 flex-1">
                     <p className={titleText}>{t.desc}</p>
                     <p className={subText}>
-                      {formatDate(t.date)} · {t.goalId ? "Transfer ke Goal" : t.cat} · {getWalletIcon(t.walletId)}{" "}
+                      {formatDate(t.date)} · {isGoal ? goalLabel : t.cat} · {getWalletIcon(t.walletId)}{" "}
                       {getWalletName(t.walletId)}
                     </p>
                   </div>
@@ -81,14 +84,14 @@ export default function TransactionList({ filterWallet = "all" }: Props) {
                 <div className="flex items-center gap-3 shrink-0">
                   <span
                     className={`font-bold text-sm ${
-                      t.goalId
+                      isGoal
                         ? isDark ? "text-blue-400" : "text-blue-600"
                         : t.type === "in"
                           ? isDark ? "text-emerald-400" : "text-emerald-600"
                           : isDark ? "text-rose-400" : "text-rose-600"
                     }`}
                   >
-                    {t.goalId ? "→" : t.type === "in" ? "+" : "-"}
+                    {isGoal ? (t.type === "in" ? "← " : "→ ") : t.type === "in" ? "+" : "-"}
                     {formatRupiah(t.amt)}
                   </span>
                   <button
@@ -102,7 +105,8 @@ export default function TransactionList({ filterWallet = "all" }: Props) {
                   </button>
                 </div>
               </motion.div>
-            ))}
+              );
+            })}
           </AnimatePresence>
         </div>
       )}
