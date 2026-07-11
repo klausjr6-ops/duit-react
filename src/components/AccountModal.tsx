@@ -4,19 +4,94 @@ import { useStore } from "../lib/store";
 import { useAuth } from "../lib/AuthContext";
 import { useTheme, type ThemeMode } from "../lib/ThemeContext";
 import { useModalDialog } from "../hooks/useModalDialog";
+import ConfirmDialog from "./ConfirmDialog";
 
 interface AccountModalProps {
   open: boolean;
   onClose: () => void;
 }
 
-function toBase64(file: File): Promise<string> {
+const MAX_AVATAR_SOURCE_BYTES = 5 * 1024 * 1024;
+const MAX_AVATAR_OUTPUT_BYTES = 160 * 1024;
+const ALLOWED_AVATAR_TYPES = ["image/jpeg", "image/png", "image/webp"];
+
+function dataUrlSize(dataUrl: string): number {
+  const base64 = dataUrl.split(",")[1] || "";
+  return Math.floor((base64.length * 3) / 4);
+}
+
+function loadImage(file: File): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result as string);
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
+    const image = new Image();
+    const objectUrl = URL.createObjectURL(file);
+    image.onload = () => {
+      URL.revokeObjectURL(objectUrl);
+      resolve(image);
+    };
+    image.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      reject(new Error("Foto tidak dapat dibaca."));
+    };
+    image.src = objectUrl;
   });
+}
+
+function canvasToDataUrl(canvas: HTMLCanvasElement, quality: number): Promise<string> {
+  return new Promise((resolve, reject) => {
+    canvas.toBlob(
+      (blob) => {
+        if (!blob) {
+          reject(new Error("Foto tidak dapat dikompres."));
+          return;
+        }
+
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = () => reject(new Error("Foto tidak dapat diproses."));
+        reader.readAsDataURL(blob);
+      },
+      "image/jpeg",
+      quality
+    );
+  });
+}
+
+async function prepareAvatar(file: File): Promise<string> {
+  if (!ALLOWED_AVATAR_TYPES.includes(file.type)) {
+    throw new Error("Gunakan foto berformat JPG, PNG, atau WebP.");
+  }
+  if (file.size > MAX_AVATAR_SOURCE_BYTES) {
+    throw new Error("Ukuran foto maksimal 5 MB.");
+  }
+
+  const image = await loadImage(file);
+  const sourceMax = Math.max(image.naturalWidth, image.naturalHeight);
+
+  // Progressively reduce image dimensions/quality until it is safe to store
+  // inside the user's single Firestore document.
+  for (const maxDimension of [512, 420, 320, 256]) {
+    const scale = Math.min(1, maxDimension / sourceMax);
+    const width = Math.max(1, Math.round(image.naturalWidth * scale));
+    const height = Math.max(1, Math.round(image.naturalHeight * scale));
+    const canvas = document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = height;
+
+    const context = canvas.getContext("2d");
+    if (!context) throw new Error("Browser tidak mendukung pemrosesan foto.");
+
+    // JPEG has no transparency; white is consistent with the light avatar UI.
+    context.fillStyle = "#ffffff";
+    context.fillRect(0, 0, width, height);
+    context.drawImage(image, 0, 0, width, height);
+
+    for (const quality of [0.82, 0.72, 0.62]) {
+      const dataUrl = await canvasToDataUrl(canvas, quality);
+      if (dataUrlSize(dataUrl) <= MAX_AVATAR_OUTPUT_BYTES) return dataUrl;
+    }
+  }
+
+  throw new Error("Foto masih terlalu besar setelah dikompres. Coba foto lain.");
 }
 
 function createCalendarToken(): string {
@@ -39,8 +114,11 @@ export default function AccountModal({ open, onClose }: AccountModalProps) {
 
   const [name, setName] = useState(settings.name);
   const [confirmLogout, setConfirmLogout] = useState(false);
+  const [confirmReset, setConfirmReset] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
   const [calendarCopied, setCalendarCopied] = useState(false);
+  const [avatarSaving, setAvatarSaving] = useState(false);
+  const [avatarError, setAvatarError] = useState<string | null>(null);
   const [subView, setSubView] = useState<SubView>("main");
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -51,11 +129,22 @@ export default function AccountModal({ open, onClose }: AccountModalProps) {
     if (open) setName(settings.name);
   }, [open, settings.name]);
 
-  const handleAvatarPick = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
+  const handleAvatarPick = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
     if (!file) return;
-    const b64 = await toBase64(file);
-    updateSettings({ avatar: b64 });
+
+    setAvatarError(null);
+    setAvatarSaving(true);
+    try {
+      const avatar = await prepareAvatar(file);
+      updateSettings({ avatar });
+    } catch (error) {
+      setAvatarError(error instanceof Error ? error.message : "Foto gagal diproses.");
+    } finally {
+      setAvatarSaving(false);
+      // Allow choosing the same photo again after a validation error.
+      event.target.value = "";
+    }
   };
 
   const saveName = () => {
@@ -91,6 +180,7 @@ export default function AccountModal({ open, onClose }: AccountModalProps) {
   const handleClose = () => {
     setSubView("main");
     setConfirmLogout(false);
+    setConfirmReset(false);
     onClose();
   };
 
@@ -120,7 +210,8 @@ export default function AccountModal({ open, onClose }: AccountModalProps) {
   const displayedThemeMode = themeMode === "system" ? "time" : themeMode;
 
   return (
-    <AnimatePresence>
+    <>
+      <AnimatePresence>
       {open && (
         <motion.div
           initial={{ opacity: 0 }}
@@ -180,8 +271,11 @@ export default function AccountModal({ open, onClose }: AccountModalProps) {
                   {/* Avatar */}
                   <div className="mb-5 flex flex-col items-center">
                     <button
+                      type="button"
+                      disabled={avatarSaving}
+                      aria-label="Ganti foto avatar"
                       onClick={() => fileRef.current?.click()}
-                      className="group relative h-20 w-20 overflow-hidden rounded-full ring-2 ring-teal-400/40"
+                      className="group relative h-20 w-20 overflow-hidden rounded-full ring-2 ring-teal-400/40 disabled:cursor-wait disabled:opacity-70"
                     >
                       {settings.avatar ? (
                         <img src={settings.avatar} alt="Avatar" className="h-full w-full object-cover" />
@@ -190,12 +284,17 @@ export default function AccountModal({ open, onClose }: AccountModalProps) {
                           {name ? name[0].toUpperCase() : "?"}
                         </div>
                       )}
-                      <div className="absolute inset-0 flex items-center justify-center bg-black/40 text-lg opacity-0 transition-opacity group-hover:opacity-100">
-                        📷
+                      <div className={`absolute inset-0 flex items-center justify-center bg-black/40 text-lg transition-opacity ${avatarSaving ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}>
+                        {avatarSaving ? <span className="h-5 w-5 animate-spin rounded-full border-2 border-white/30 border-t-white" /> : "📷"}
                       </div>
                     </button>
-                    <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleAvatarPick} />
-                    <p className={`mt-2 text-xs ${isDark ? "text-slate-500" : "text-zinc-500"}`}>Klik foto untuk ganti avatar</p>
+                    <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={handleAvatarPick} />
+                    <p className={`mt-2 text-xs ${isDark ? "text-slate-500" : "text-zinc-500"}`}>
+                      {avatarSaving ? "Menyiapkan foto..." : "Klik foto untuk ganti avatar"}
+                    </p>
+                    {avatarError && (
+                      <p role="alert" className="mt-2 max-w-xs text-center text-xs text-rose-500">{avatarError}</p>
+                    )}
                   </div>
 
                   {/* Nama */}
@@ -357,12 +456,8 @@ export default function AccountModal({ open, onClose }: AccountModalProps) {
 
                   {/* Hapus data */}
                   <button
-                    onClick={() => {
-                      if (confirm("Yakin mau hapus semua data akun? Transaksi, jadwal, goal, mood, dan dompet di cloud akan direset.")) {
-                        resetAll();
-                        handleClose();
-                      }
-                    }}
+                    type="button"
+                    onClick={() => setConfirmReset(true)}
                     className="mt-3 w-full rounded-xl border border-rose-400/30 bg-rose-400/10 py-2.5 text-sm font-semibold text-rose-500 hover:bg-rose-400/20"
                   >
                     🗑️ Hapus Semua Data
@@ -392,7 +487,21 @@ export default function AccountModal({ open, onClose }: AccountModalProps) {
           </motion.div>
         </motion.div>
       )}
-    </AnimatePresence>
+      </AnimatePresence>
+      <ConfirmDialog
+        open={open && confirmReset}
+        title="Reset Semua Data?"
+        message="Semua transaksi, jadwal, goal, mood, dan dompet di akun cloud akan direset. Tindakan ini tidak dapat dibatalkan."
+        confirmLabel="Ya, Reset"
+        tone="danger"
+        onClose={() => setConfirmReset(false)}
+        onConfirm={() => {
+          resetAll();
+          handleClose();
+        }}
+        isDark={isDark}
+      />
+    </>
   );
 }
 

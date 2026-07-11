@@ -1,7 +1,9 @@
+import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { formatRupiah } from "../lib/format";
-import { useStore } from "../lib/store";
+import { useStore, type Transaction } from "../lib/store";
 import { useTheme } from "../lib/ThemeContext";
+import ConfirmDialog from "./ConfirmDialog";
 
 interface Props {
   filterWallet?: string;
@@ -10,6 +12,7 @@ interface Props {
 export default function TransactionList({ filterWallet = "all" }: Props) {
   const { txs, wallets, delTx } = useStore();
   const { isDark } = useTheme();
+  const [transactionToDelete, setTransactionToDelete] = useState<Transaction | null>(null);
 
   const filtered =
     filterWallet === "all" ? txs : txs.filter((t) => t.walletId === parseInt(filterWallet));
@@ -38,7 +41,8 @@ export default function TransactionList({ filterWallet = "all" }: Props) {
   const subText = isDark ? "text-xs text-slate-400 truncate" : "text-xs text-zinc-500 truncate";
 
   return (
-    <div className={panel}>
+    <>
+      <div className={panel}>
       <h3 className={heading}>Transaksi Terbaru</h3>
       {sorted.length === 0 ? (
         <p className={emptyText}>Belum ada transaksi</p>
@@ -88,8 +92,10 @@ export default function TransactionList({ filterWallet = "all" }: Props) {
                     {formatRupiah(t.amt)}
                   </span>
                   <button
-                    onClick={() => { if (confirm("Hapus transaksi ini?")) delTx(t.id); }}
+                    type="button"
+                    onClick={() => setTransactionToDelete(t)}
                     className={isDark ? "text-slate-500 hover:text-rose-400 transition-colors p-1" : "text-zinc-400 hover:text-rose-500 transition-colors p-1"}
+                    aria-label={`Hapus transaksi ${t.desc}`}
                     title="Hapus"
                   >
                     🗑️
@@ -100,6 +106,19 @@ export default function TransactionList({ filterWallet = "all" }: Props) {
           </AnimatePresence>
         </div>
       )}
-    </div>
+      </div>
+      <ConfirmDialog
+        open={Boolean(transactionToDelete)}
+        title="Hapus Transaksi?"
+        message={transactionToDelete ? `Transaksi “${transactionToDelete.desc}” sebesar ${formatRupiah(transactionToDelete.amt)} akan dihapus.` : ""}
+        confirmLabel="Ya, Hapus"
+        onClose={() => setTransactionToDelete(null)}
+        onConfirm={() => {
+          if (transactionToDelete) delTx(transactionToDelete.id);
+          setTransactionToDelete(null);
+        }}
+        isDark={isDark}
+      />
+    </>
   );
 }

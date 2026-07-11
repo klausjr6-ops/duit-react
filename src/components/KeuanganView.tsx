@@ -25,16 +25,23 @@ export default function KeuanganView() {
   const [date, setDate] = useState(todayStr());
   const [filterWallet, setFilterWallet] = useState<string>("all");
   const [showWalletManager, setShowWalletManager] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    setFormError(null);
     if (!type || !cat || !walletId || !amt) {
-      alert("Lengkapi semua field!");
+      setFormError("Lengkapi tipe, kategori, dompet, dan jumlah transaksi.");
       return;
     }
-    const numAmt = parseInt(amt.replace(/\D/g, ""));
-    if (isNaN(numAmt) || numAmt <= 0) {
-      alert("Jumlah tidak valid!");
+    const numAmt = parseInt(amt.replace(/\D/g, ""), 10);
+    if (Number.isNaN(numAmt) || numAmt <= 0) {
+      setFormError("Jumlah transaksi tidak valid.");
+      return;
+    }
+    const selectedWallet = wallets.find((wallet) => wallet.id === parseInt(walletId, 10));
+    if (type === "out" && selectedWallet && numAmt > selectedWallet.balance) {
+      setFormError("Saldo dompet tidak mencukupi untuk pengeluaran ini.");
       return;
     }
     addTx({
@@ -192,6 +199,10 @@ export default function KeuanganView() {
               <label className={labelCls}>Tanggal</label>
               <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className={inputCls} />
             </div>
+
+            {formError && (
+              <p role="alert" className="rounded-lg border border-rose-400/30 bg-rose-400/10 px-3 py-2 text-xs text-rose-500">{formError}</p>
+            )}
 
             <button
               type="submit"

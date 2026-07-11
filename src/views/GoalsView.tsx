@@ -7,12 +7,14 @@ import { useStore } from "../lib/store";
 import { formatRupiah } from "../lib/format";
 import type { Goal } from "../lib/store";
 import { useTheme } from "../lib/ThemeContext";
+import ConfirmDialog from "../components/ConfirmDialog";
 
 export default function GoalsView() {
   const { goals, delGoal } = useStore();
   const { isDark } = useTheme();
   const [showModal, setShowModal] = useState(false);
   const [fundGoal, setFundGoal] = useState<Goal | null>(null);
+  const [goalToDelete, setGoalToDelete] = useState<Goal | null>(null);
 
   const formatDeadline = (d: string) => {
     const date = new Date(d + "T00:00:00");
@@ -63,7 +65,14 @@ export default function GoalsView() {
                         <p className={`font-bold truncate ${mainText}`}>{g.name}</p>
                         {g.deadline && (<p className={`text-xs mt-1 ${muted2}`}>🗓️ {formatDeadline(g.deadline)}</p>)}
                       </div>
-                      <button onClick={() => { if (confirm(`Hapus goal "${g.name}"? Transfer tabungan terkait akan dibatalkan dan saldo dompet sumber dikembalikan.`)) delGoal(g.id); }} className={`${isDark ? "text-slate-500 hover:text-rose-400" : "text-zinc-400 hover:text-rose-500"} transition-colors p-1 shrink-0`}>🗑️</button>
+                      <button
+                        type="button"
+                        aria-label={`Hapus goal ${g.name}`}
+                        onClick={() => setGoalToDelete(g)}
+                        className={`${isDark ? "text-slate-500 hover:text-rose-400" : "text-zinc-400 hover:text-rose-500"} shrink-0 p-1 transition-colors`}
+                      >
+                        🗑️
+                      </button>
                     </div>
 
                     <div className="flex items-end justify-between mb-2">
@@ -95,6 +104,18 @@ export default function GoalsView() {
 
       <AnimatePresence>{showModal && <GoalModal onClose={() => setShowModal(false)} />}</AnimatePresence>
       <AnimatePresence>{fundGoal && <AddFundModal goal={fundGoal} onClose={() => setFundGoal(null)} />}</AnimatePresence>
+      <ConfirmDialog
+        open={Boolean(goalToDelete)}
+        title="Hapus Goal?"
+        message={goalToDelete ? `Goal “${goalToDelete.name}” akan dihapus. Transfer tabungan terkait dibatalkan dan saldo dompet sumber dikembalikan.` : ""}
+        confirmLabel="Ya, Hapus"
+        onClose={() => setGoalToDelete(null)}
+        onConfirm={() => {
+          if (goalToDelete) delGoal(goalToDelete.id);
+          setGoalToDelete(null);
+        }}
+        isDark={isDark}
+      />
     </motion.div>
   );
 }

@@ -1,9 +1,10 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { useStore } from "../lib/store";
+import { useStore, type Wallet } from "../lib/store";
 import { formatRupiah } from "../lib/format";
 import { useTheme } from "../lib/ThemeContext";
 import { useModalDialog } from "../hooks/useModalDialog";
+import ConfirmDialog from "./ConfirmDialog";
 
 interface Props {
   onClose: () => void;
@@ -17,10 +18,20 @@ export default function WalletManager({ onClose }: Props) {
   const [name, setName] = useState("");
   const [icon, setIcon] = useState("💳");
   const [initBalance, setInitBalance] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [walletToDelete, setWalletToDelete] = useState<Wallet | null>(null);
   const { dialogRef, onDialogKeyDown } = useModalDialog(true, onClose);
 
   const handleAdd = () => {
-    if (!name.trim()) { alert("Nama dompet harus diisi!"); return; }
+    setError(null);
+    if (!name.trim()) {
+      setError("Nama dompet harus diisi.");
+      return;
+    }
+    if (wallets.some((wallet) => wallet.name.trim().toLowerCase() === name.trim().toLowerCase())) {
+      setError("Nama dompet sudah digunakan.");
+      return;
+    }
     addWallet({
       name: name.trim(),
       balance: parseInt(initBalance.replace(/\D/g, "") || "0"),
@@ -50,7 +61,8 @@ export default function WalletManager({ onClose }: Props) {
       : "text-xl p-2 rounded-lg border transition-all border-zinc-200 hover:border-zinc-400 bg-white";
 
   return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={onClose} className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <>
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={onClose} className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
       <motion.div
         ref={dialogRef}
         role="dialog"
@@ -82,7 +94,9 @@ export default function WalletManager({ onClose }: Props) {
                   </div>
                 </div>
                 <button
-                  onClick={() => { if (confirm(`Hapus dompet "${w.name}"? Transaksi yang terhubung tidak akan dihapus.`)) delWallet(w.id); }}
+                  type="button"
+                  aria-label={`Hapus dompet ${w.name}`}
+                  onClick={() => setWalletToDelete(w)}
                   className={`${isDark ? "text-slate-500 hover:text-rose-400" : "text-zinc-400 hover:text-rose-500"} p-2`}
                 >🗑️</button>
               </div>
@@ -108,11 +122,27 @@ export default function WalletManager({ onClose }: Props) {
             <label className={labelCls}>Saldo Awal (Rp)</label>
             <input type="text" inputMode="numeric" value={initBalance ? `Rp ${parseInt(initBalance).toLocaleString("id-ID")}` : ""} onChange={(e) => setInitBalance(e.target.value.replace(/\D/g, ""))} placeholder="Rp 0" className={inputCls} />
           </div>
-          <button onClick={handleAdd} className="w-full bg-gradient-to-br from-teal-400 to-blue-500 text-zinc-900 font-bold py-3 rounded-xl hover:brightness-105 transition-all">
+          {error && (
+            <p role="alert" className="rounded-lg border border-rose-400/30 bg-rose-400/10 px-3 py-2 text-xs text-rose-500">{error}</p>
+          )}
+          <button type="button" onClick={handleAdd} className="w-full bg-gradient-to-br from-teal-400 to-blue-500 text-zinc-900 font-bold py-3 rounded-xl hover:brightness-105 transition-all">
             + Tambah Dompet
           </button>
         </div>
       </motion.div>
-    </motion.div>
+      </motion.div>
+      <ConfirmDialog
+        open={Boolean(walletToDelete)}
+        title="Hapus Dompet?"
+        message={walletToDelete ? `Dompet “${walletToDelete.name}” akan dihapus. Transaksi yang sudah tercatat tetap ada di riwayat.` : ""}
+        confirmLabel="Ya, Hapus"
+        onClose={() => setWalletToDelete(null)}
+        onConfirm={() => {
+          if (walletToDelete) delWallet(walletToDelete.id);
+          setWalletToDelete(null);
+        }}
+        isDark={isDark}
+      />
+    </>
   );
 }

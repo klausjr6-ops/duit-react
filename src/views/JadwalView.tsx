@@ -4,6 +4,8 @@ import Card from "../components/Card";
 import ScheduleModal from "../components/ScheduleModal";
 import { getNextScheduleOccurrence, todayStr, useStore } from "../lib/store";
 import { useTheme } from "../lib/ThemeContext";
+import ConfirmDialog from "../components/ConfirmDialog";
+import type { ScheduleItem } from "../lib/store";
 
 function dateAtJakartaNoon(dateKey: string): Date {
   const [year, month, day] = dateKey.split("-").map(Number);
@@ -43,6 +45,7 @@ export default function JadwalView() {
   const { scheds, delSched } = useStore();
   const { isDark } = useTheme();
   const [showModal, setShowModal] = useState(false);
+  const [scheduleToDelete, setScheduleToDelete] = useState<ScheduleItem | null>(null);
   const today = todayStr();
 
   const enriched = useMemo(
@@ -161,9 +164,8 @@ export default function JadwalView() {
                     </div>
 
                     <button
-                      onClick={() => {
-                        if (confirm(`Hapus jadwal "${schedule.name}"?`)) delSched(schedule.id);
-                      }}
+                      type="button"
+                      onClick={() => setScheduleToDelete(schedule)}
                       className={isDark ? "shrink-0 rounded-lg bg-rose-500/10 px-4 py-2 text-sm font-semibold text-rose-400 transition-colors hover:bg-rose-500/20" : "shrink-0 rounded-lg bg-rose-50 px-4 py-2 text-sm font-semibold text-rose-600 transition-colors hover:bg-rose-100"}
                     >
                       Hapus
@@ -179,6 +181,18 @@ export default function JadwalView() {
       <AnimatePresence>
         {showModal && <ScheduleModal onClose={() => setShowModal(false)} />}
       </AnimatePresence>
+      <ConfirmDialog
+        open={Boolean(scheduleToDelete)}
+        title="Hapus Jadwal?"
+        message={scheduleToDelete ? `Jadwal “${scheduleToDelete.name}” akan dihapus permanen.` : ""}
+        confirmLabel="Ya, Hapus"
+        onClose={() => setScheduleToDelete(null)}
+        onConfirm={() => {
+          if (scheduleToDelete) delSched(scheduleToDelete.id);
+          setScheduleToDelete(null);
+        }}
+        isDark={isDark}
+      />
     </motion.div>
   );
 }

@@ -19,12 +19,31 @@ export default function ScheduleModal({ onClose }: Props) {
   const [end, setEnd] = useState("");
   const [recurring, setRecurring] = useState(false);
   const [untilDate, setUntilDate] = useState("");
+  const [error, setError] = useState<string | null>(null);
   const { dialogRef, onDialogKeyDown } = useModalDialog(true, onClose);
 
   const handleSubmit = () => {
-    if (!name.trim()) { alert("Nama jadwal harus diisi!"); return; }
-    if (!date || !start) { alert("Tanggal dan jam mulai harus diisi!"); return; }
-    if (recurring && !untilDate) { alert("Isi tanggal batas pengulangan!"); return; }
+    setError(null);
+    if (!name.trim()) {
+      setError("Nama jadwal harus diisi.");
+      return;
+    }
+    if (!date || !start) {
+      setError("Tanggal dan jam mulai harus diisi.");
+      return;
+    }
+    if (end && end <= start) {
+      setError("Jam selesai harus setelah jam mulai.");
+      return;
+    }
+    if (recurring && !untilDate) {
+      setError("Isi tanggal batas pengulangan.");
+      return;
+    }
+    if (recurring && untilDate < date) {
+      setError("Tanggal batas pengulangan tidak boleh sebelum tanggal mulai.");
+      return;
+    }
     addSched({ name: name.trim(), desc: desc.trim() || undefined, date, start, end: end || undefined, recurring, untilDate: recurring ? untilDate : undefined });
     onClose();
   };
@@ -92,7 +111,10 @@ export default function ScheduleModal({ onClose }: Props) {
               <input type="date" value={untilDate} onChange={(e) => setUntilDate(e.target.value)} min={date} className={inputCls} />
             </motion.div>
           )}
-          <button onClick={handleSubmit} className="w-full bg-gradient-to-br from-teal-400 to-blue-500 text-zinc-900 font-bold py-3 rounded-xl hover:brightness-105 transition-all">
+          {error && (
+            <p role="alert" className="rounded-lg border border-rose-400/30 bg-rose-400/10 px-3 py-2 text-xs text-rose-500">{error}</p>
+          )}
+          <button type="button" onClick={handleSubmit} className="w-full bg-gradient-to-br from-teal-400 to-blue-500 text-zinc-900 font-bold py-3 rounded-xl hover:brightness-105 transition-all">
             Simpan Jadwal
           </button>
         </div>

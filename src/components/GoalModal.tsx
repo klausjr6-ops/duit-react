@@ -16,6 +16,7 @@ export default function GoalModal({ onClose }: Props) {
   const [target, setTarget] = useState("");
   const [current, setCurrent] = useState("");
   const [deadline, setDeadline] = useState("");
+  const [error, setError] = useState<string | null>(null);
   const { dialogRef, onDialogKeyDown } = useModalDialog(true, onClose);
 
   const formatInputRupiah = (val: string) => {
@@ -24,16 +25,21 @@ export default function GoalModal({ onClose }: Props) {
   };
 
   const handleSubmit = () => {
+    setError(null);
     if (!name.trim()) {
-      alert("Nama goal harus diisi!");
+      setError("Nama goal harus diisi.");
       return;
     }
-    const targetNum = parseInt(target.replace(/\D/g, ""));
-    if (isNaN(targetNum) || targetNum <= 0) {
-      alert("Target tabungan tidak valid!");
+    const targetNum = parseInt(target.replace(/\D/g, ""), 10);
+    if (Number.isNaN(targetNum) || targetNum <= 0) {
+      setError("Target tabungan tidak valid.");
       return;
     }
-    const currentNum = parseInt(current.replace(/\D/g, "") || "0");
+    const currentNum = parseInt(current.replace(/\D/g, "") || "0", 10);
+    if (currentNum > targetNum) {
+      setError("Tabungan awal tidak boleh melebihi target.");
+      return;
+    }
 
     addGoal({
       name: name.trim(),
@@ -98,7 +104,10 @@ export default function GoalModal({ onClose }: Props) {
             <label className={labelCls}>Target Tanggal (opsional)</label>
             <input type="date" value={deadline} onChange={(e) => setDeadline(e.target.value)} className={inputCls} />
           </div>
-          <button onClick={handleSubmit} className="w-full bg-gradient-to-br from-teal-400 to-blue-500 text-zinc-900 font-bold py-3 rounded-xl hover:brightness-105 transition-all">
+          {error && (
+            <p role="alert" className="rounded-lg border border-rose-400/30 bg-rose-400/10 px-3 py-2 text-xs text-rose-500">{error}</p>
+          )}
+          <button type="button" onClick={handleSubmit} className="w-full bg-gradient-to-br from-teal-400 to-blue-500 text-zinc-900 font-bold py-3 rounded-xl hover:brightness-105 transition-all">
             Simpan Goal
           </button>
         </div>
