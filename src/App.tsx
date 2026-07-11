@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, lazy, Suspense } from "react";
 import Sidebar from "./components/Sidebar";
 import Header from "./components/Header";
 import ClockCard from "./components/ClockCard";
@@ -8,15 +8,29 @@ import StatCard from "./components/StatCard";
 import TimelineCard from "./components/TimelineCard";
 import MoodCard from "./components/MoodCard";
 import ReportCard from "./components/ReportCard";
-import ChatWidget from "./components/ChatWidget";
-import AccountModal from "./components/AccountModal";
-import KeuanganView from "./components/KeuanganView";
 import LoginScreen from "./components/LoginScreen";
-import JadwalView from "./views/JadwalView";
-import GoalsView from "./views/GoalsView";
 import { useStore } from "./lib/store";
 import { useAuth } from "./lib/AuthContext";
 import { useTheme } from "./lib/ThemeContext";
+
+// Heavy views – lazy loaded for faster initial paint
+const KeuanganView = lazy(() => import("./components/KeuanganView"));
+const JadwalView = lazy(() => import("./views/JadwalView"));
+const GoalsView = lazy(() => import("./views/GoalsView"));
+const ChatWidget = lazy(() => import("./components/ChatWidget"));
+const AccountModal = lazy(() => import("./components/AccountModal"));
+
+function ViewLoader() {
+  const { isDark } = useTheme();
+  return (
+    <div className={`py-16 flex items-center justify-center ${isDark ? "text-slate-400" : "text-zinc-500"}`}>
+      <div className="flex items-center gap-3 text-sm">
+        <span className="h-4 w-4 animate-spin rounded-full border-2 border current border-t-transparent opacity-60" />
+        Memuat…
+      </div>
+    </div>
+  );
+}
 
 export default function App() {
   const { user, loading: authLoading } = useAuth();
@@ -174,9 +188,21 @@ export default function App() {
             </>
           )}
 
-          {active === "wallet" && <KeuanganView />}
-          {active === "calendar" && <JadwalView />}
-          {active === "target" && <GoalsView />}
+          {active === "wallet" && (
+            <Suspense fallback={<ViewLoader />}>
+              <KeuanganView />
+            </Suspense>
+          )}
+          {active === "calendar" && (
+            <Suspense fallback={<ViewLoader />}>
+              <JadwalView />
+            </Suspense>
+          )}
+          {active === "target" && (
+            <Suspense fallback={<ViewLoader />}>
+              <GoalsView />
+            </Suspense>
+          )}
         </div>
       </main>
 
@@ -201,10 +227,18 @@ export default function App() {
       </button>
 
       {/* ── Modal Chat AI (popup) ── */}
-      <ChatWidget open={showChat} onClose={() => setShowChat(false)} />
+      {showChat && (
+        <Suspense fallback={null}>
+          <ChatWidget open={showChat} onClose={() => setShowChat(false)} />
+        </Suspense>
+      )}
 
       {/* ── Modal Account (Profile) ── */}
-      <AccountModal open={showAccount} onClose={() => setShowAccount(false)} />
+      {showAccount && (
+        <Suspense fallback={null}>
+          <AccountModal open={showAccount} onClose={() => setShowAccount(false)} />
+        </Suspense>
+      )}
     </div>
   );
 }
