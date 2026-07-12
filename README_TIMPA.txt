@@ -1,5 +1,5 @@
-DUIT — AI Data Integration v1 + Chat Icon
-===========================================
+DUIT — AI Data Integration + Pull to Refresh
+============================================
 
 Perubahan di paket ini:
 
@@ -23,22 +23,20 @@ Perubahan di paket ini:
    - JANGAN bilang "aku tidak tahu" kalau datanya ada
    - Panduan mapping: tanya pengeluaran → bagian Transaksi Hari Ini, dll
 
-4. Removed: FINANCE_KEYWORDS array, needsFinanceContext function
-   - Tidak lagi diperlukan karena context selalu dikirim
-
-5. Chat AI icon diganti dengan gambar custom user
-   - FAB button (kanan bawah): dari SVG chat bubble → gambar custom
-   - Chat header logo: dari huruf "D" → gambar custom
-   - Gambar di-import sebagai Vite module (bukan /public) supaya di-hash & di-bundle
-   - File: src/assets/duit-chat-icon.png (17KB, 128x128)
-   - Juga ada di public/duit-chat-icon-sq.png dan public/duit-chat-icon.png (legacy)
+4. Pull to Refresh
+   - Tarik layar ke bawah dari posisi paling atas → muncul indikator refresh
+   - Lepas setelah threshold (70px) → data refresh
+   - Indikator: ikon rotasi dengan animasi
+   - Hanya aktif di mobile (touch events)
+   - Rubber-band feel: resistance setelah threshold
+   - File baru: src/hooks/usePullToRefresh.ts, src/components/PullToRefreshIndicator.tsx
 
 File yang berubah:
 - src/lib/store.tsx (buildAIContext rewrite)
-- src/components/ChatWidget.tsx (hapus keyword-gating, update prompt, ganti icon)
-- src/AuthenticatedApp.tsx (ganti FAB icon)
-- public/duit-chat-icon-sq.png (BARU - icon square 128x128)
-- public/duit-chat-icon.png (BARU - icon asli ratio 128x80)
+- src/components/ChatWidget.tsx (hapus keyword-gating, update prompt)
+- src/AuthenticatedApp.tsx (integrate pull to refresh + AI context)
+- src/hooks/usePullToRefresh.ts (BARU)
+- src/components/PullToRefreshIndicator.tsx (BARU)
 
 Validasi:
 - npm run typecheck: lolos

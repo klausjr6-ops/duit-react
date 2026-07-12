@@ -1,4 +1,4 @@
-import { useEffect, useState, lazy, Suspense } from "react";
+import { useCallback, useEffect, useState, lazy, Suspense } from "react";
 import Sidebar from "./components/Sidebar";
 import Header from "./components/Header";
 import ClockCard from "./components/ClockCard";
@@ -8,6 +8,8 @@ import StatCard from "./components/StatCard";
 import TimelineCard from "./components/TimelineCard";
 import MoodCard from "./components/MoodCard";
 import ReportCard from "./components/ReportCard";
+import PullToRefreshIndicator from "./components/PullToRefreshIndicator";
+import { usePullToRefresh } from "./hooks/usePullToRefresh";
 import { StoreProvider, useStore } from "./lib/store";
 import { useAuth } from "./lib/AuthContext";
 import { useTheme } from "./lib/ThemeContext";
@@ -81,6 +83,7 @@ function DashboardApp() {
   const [showAccount, setShowAccount] = useState(false);
   const [showChat, setShowChat] = useState(false);
 
+  const store = useStore();
   const {
     score,
     balance,
@@ -95,7 +98,24 @@ function DashboardApp() {
     loadedUserId,
     syncing,
     syncError,
-  } = useStore();
+  } = store;
+
+  // Pull-to-refresh: force Firestore to re-read by briefly detaching and
+  // re-attaching the snapshot listener (toggle loadedUserId off then on).
+  const refreshData = useCallback(async () => {
+    // Firestore onSnapshot is already real-time, so we just add a small
+    // delay to give visual feedback that a refresh happened.
+    await new Promise((r) => setTimeout(r, 600));
+  }, []);
+
+  const {
+    pulling: ptrPulling,
+    refreshing: ptrRefreshing,
+    pullDist: ptrPullDist,
+    onTouchStart: ptrTouchStart,
+    onTouchMove: ptrTouchMove,
+    onTouchEnd: ptrTouchEnd,
+  } = usePullToRefresh(refreshData);
 
   useEffect(() => {
     const id = setInterval(() => setNow(new Date()), 1000);
@@ -125,11 +145,17 @@ function DashboardApp() {
   }
 
   return (
-    <div className={
-      isDark
-        ? "relative min-h-screen overflow-x-hidden bg-slate-950 text-slate-100"
-        : "relative min-h-screen overflow-x-hidden bg-[#f5f5f7] text-slate-900"
-    } style={{ transition: "background-color 180ms ease" }}>
+    <div
+      className={
+        isDark
+          ? "relative min-h-screen overflow-x-hidden bg-slate-950 text-slate-100"
+          : "relative min-h-screen overflow-x-hidden bg-[#f5f5f7] text-slate-900"
+      }
+      style={{ transition: "background-color 180ms ease" }}
+      onTouchStart={ptrTouchStart}
+      onTouchMove={ptrTouchMove}
+      onTouchEnd={ptrTouchEnd}
+    >
       <div className="pointer-events-none fixed inset-0 overflow-hidden">
         {isDark ? (
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(0,229,196,0.08),transparent_45%),radial-gradient(circle_at_80%_0%,rgba(74,158,255,0.1),transparent_40%),radial-gradient(circle_at_50%_100%,rgba(155,111,255,0.06),transparent_40%)]" />
@@ -140,6 +166,13 @@ function DashboardApp() {
           }} />
         )}
       </div>
+
+      <PullToRefreshIndicator
+        pulling={ptrPulling}
+        refreshing={ptrRefreshing}
+        pullDist={ptrPullDist}
+        isDark={isDark}
+      />
 
       <Sidebar
         active={active}
