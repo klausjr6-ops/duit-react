@@ -1027,33 +1027,137 @@ function useDuitStoreInternal() {
   });
 
   const buildAIContext = () => {
-    const topCategories = Object.entries(categories)
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 3)
-      .map(([category, amount]) => `${category} Rp${Math.round(amount).toLocaleString("id-ID")}`)
-      .join(", ");
-    const goalsSummary = goals
-      .map((goal) => `${goal.name} ${Math.round((goal.current / (goal.target || 1)) * 100)}%`)
-      .join(", ");
-    const upcomingSchedules = scheds
-      .map((schedule) => ({ schedule, date: getNextScheduleOccurrence(schedule, today) }))
-      .filter((item): item is { schedule: ScheduleItem; date: string } => Boolean(item.date))
-      .sort((a, b) => (a.date === b.date ? a.schedule.start.localeCompare(b.schedule.start) : a.date.localeCompare(b.date)))
-      .slice(0, 5)
-      .map(({ schedule, date }) => `${date} ${schedule.start}${schedule.end ? `-${schedule.end}` : ""} ${schedule.name}`)
-      .join("; ");
+    const fmt = (n: number) => `Rp${Math.round(n).toLocaleString("id-ID")}`;
+    const lines: string[] = [];
 
-    return [
-      `Saldo saat ini: Rp${Math.round(balance).toLocaleString("id-ID")}.`,
-      `Total pemasukan: Rp${Math.round(totalIn).toLocaleString("id-ID")}, total pengeluaran: Rp${Math.round(totalOut).toLocaleString("id-ID")}.`,
-      `Pengeluaran bulan ini: Rp${Math.round(outMonth).toLocaleString("id-ID")}.`,
-      topCategories ? `Kategori pengeluaran terbesar: ${topCategories}.` : "",
-      goalsSummary ? `Progress goals: ${goalsSummary}.` : "",
-      upcomingSchedules ? `Jadwal terdekat: ${upcomingSchedules}.` : "",
-      `Skor kesehatan keuangan: ${score}/100.`,
-    ]
-      .filter(Boolean)
-      .join(" ");
+    lines.push(`Hari ini: ${today}`);
+    lines.push("");
+
+    // ── Dompet ──
+    lines.push("### Dompet");
+    for (const w of walletsWithBalance) {
+      lines.push(`- ${w.icon} ${w.name}: ${fmt(w.balance)}`);
+    }
+    lines.push(`Total saldo: ${fmt(balance)}`);
+    lines.push("");
+
+    // ── Transaksi hari ini ──
+    const todayTxList = txs.filter((t) => t.date === today && !t.goalId);
+    const todayInList = todayTxList.filter((t) => t.type === "in");
+    const todayOutList = todayTxList.filter((t) => t.type === "out");
+
+    lines.push("### Transaksi Hari Ini");
+    if (todayTxList.length === 0) {
+      lines.push("Belum ada transaksi.");
+    } else {
+      if (todayInList.length > 0) {
+        lines.push("Pemasukan:");
+        for (const t of todayInList) {
+          const w = walletsWithBalance.find((ww) => ww.id === t.walletId);
+          lines.push(`- ${t.cat}: ${fmt(t.amt)}${w ? ` (${w.name})` : ""}${t.desc ? ` — ${t.desc}` : ""}`);
+        }
+      }
+      if (todayOutList.length > 0) {
+        lines.push("Pengeluaran:");
+        for (const t of todayOutList) {
+          const w = walletsWithBalance.find((ww) => ww.id === t.walletId);
+          lines.push(`- ${t.cat}: ${fmt(t.amt)}${w ? ` (${w.name})` : ""}${t.desc ? ` — ${t.desc}` : ""}`);
+        }
+      }
+      lines.push(`Total: masuk ${fmt(todayIncome)}, keluar ${fmt(todayExpense)}`);
+    }
+    lines.push("");
+
+    // ── Transaksi 7 hari terakhir (selain hari ini) ──
+    const sevenDaysAgo = addDaysToDateKey(today, -7);
+    const recentTxList = txs
+      .filter((t) => !t.goalId && t.date !== today && t.date >= sevenDaysAgo)
+      .slice(0, 30);
+
+    if (recentTxList.length > 0) {
+      lines.push("### Transaksi 7 Hari Terakhir");
+      for (const t of recentTxList) {
+        const w = walletsWithBalance.find((ww) => ww.id === t.walletId);
+        const arrow = t.type === "in" ? "↑" : "↓";
+        lines.push(`- ${t.date} ${arrow} ${t.cat}: ${fmt(t.amt)}${w ? ` (${w.name})` : ""}${t.desc ? ` — ${t.desc}` : ""}`);
+      }
+      lines.push("");
+    }
+
+    // ── Rekap bulan ini ──
+    lines.push("### Rekap Bulan Ini");
+    lines.push(`- Pemasukan: ${fmt(inMonth)}`);
+    lines.push(`- Pengeluaran: ${fmt(outMonth)}`);
+    const topCats = Object.entries(categories)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5)
+      .map(([cat, amt]) => `${cat} ${fmt(amt)}`)
+      .join(", ");
+    if (topCats) {
+      lines.push(`- Top pengeluaran: ${topCats}`);
+    }
+    lines.push("");
+
+    // ── Goals ──
+    if (goals.length > 0) {
+      lines.push("### Goals");
+      for (const g of goals) {
+        const pct = Math.round((g.current / (g.target || 1)) * 100);
+        const dl = g.deadline ? ` (target: ${g.deadline})` : "";
+        lines.push(`- ${g.icon} ${g.name}: ${fmt(g.current)} / ${fmt(g.target)} (${pct}%)${dl}`);
+      }
+      lines.push(`Total ditabung: ${fmt(totalSaved)}`);
+      lines.push("");
+    }
+
+    // ── Jadwal hari ini ──
+    if (todaySchedules.length > 0) {
+      lines.push("### Jadwal Hari Ini");
+      for (const s of todaySchedules) {
+        lines.push(`- ${s.start}${s.end ? `–${s.end}` : ""} ${s.icon} ${s.name}${s.desc ? ` — ${s.desc}` : ""}`);
+      }
+      lines.push("");
+    }
+
+    // ── Jadwal terdekat (selain hari ini) ──
+    const upcoming = scheds
+      .map((s) => ({ s, date: getNextScheduleOccurrence(s, today) }))
+      .filter((item): item is { s: ScheduleItem; date: string } => Boolean(item.date) && item.date !== today)
+      .sort((a, b) =>
+        a.date === b.date ? a.s.start.localeCompare(b.s.start) : a.date.localeCompare(b.date)
+      )
+      .slice(0, 5);
+
+    if (upcoming.length > 0) {
+      lines.push("### Jadwal Terdekat");
+      for (const { s, date } of upcoming) {
+        lines.push(`- ${date}: ${s.start}${s.end ? `–${s.end}` : ""} ${s.icon} ${s.name}`);
+      }
+      lines.push("");
+    }
+
+    // ── Mood ──
+    if (todayMood) {
+      lines.push(`Mood: ${todayMood.mood} ${todayMood.label}${todayMood.note ? ` — "${todayMood.note}"` : ""}`);
+      lines.push("");
+    }
+
+    // ── Skor ──
+    lines.push(`Skor kesehatan keuangan: ${score}/100`);
+
+    // Safety: cap context length to avoid exceeding system prompt limit
+    let context = lines.join("\n");
+    if (context.length > 14000) {
+      const cutIndex = context.indexOf("### Transaksi 7 Hari Terakhir");
+      if (cutIndex !== -1) {
+        const nextSection = context.indexOf("### Rekap Bulan Ini", cutIndex);
+        context = nextSection !== -1
+          ? context.slice(0, cutIndex) + context.slice(nextSection)
+          : context.slice(0, cutIndex);
+      }
+    }
+
+    return context;
   };
 
   return {

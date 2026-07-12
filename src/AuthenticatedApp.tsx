@@ -8,6 +8,7 @@ import StatCard from "./components/StatCard";
 import TimelineCard from "./components/TimelineCard";
 import MoodCard from "./components/MoodCard";
 import ReportCard from "./components/ReportCard";
+import { CHAT_ICON_DATA_URI } from "./assets/chatIcon";
 import { StoreProvider, useStore } from "./lib/store";
 import { useAuth } from "./lib/AuthContext";
 import { useTheme } from "./lib/ThemeContext";
@@ -248,21 +249,14 @@ function DashboardApp() {
       {/* ── Floating Action Button (FAB) untuk buka Chat AI ── */}
       <button
         onClick={() => setShowChat(true)}
-        className="fixed bottom-24 right-5 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-teal-400 to-blue-500 text-zinc-900 shadow-lg shadow-teal-500/25 transition-transform hover:scale-105 active:scale-95 md:bottom-8 md:right-8 md:h-16 md:w-16"
+        className="fixed bottom-24 right-5 z-40 h-14 w-14 rounded-full shadow-lg shadow-teal-500/25 transition-transform hover:scale-105 active:scale-95 md:bottom-8 md:right-8 md:h-16 md:w-16 overflow-hidden border-2 border-white/30"
         aria-label="Buka Chat AI"
       >
-        <svg
-          width="26"
-          height="26"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2.5"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        >
-          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-        </svg>
+        <img
+          src={CHAT_ICON_DATA_URI}
+          alt="Chat AI"
+          className="h-full w-full object-cover"
+        />
       </button>
 
       {/* ── Modal Chat AI (popup) ── */}

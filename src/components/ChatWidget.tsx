@@ -4,6 +4,7 @@ import { useStore } from "../lib/store";
 import { useTheme } from "../lib/ThemeContext";
 import { useAuth } from "../lib/AuthContext";
 import { useModalDialog } from "../hooks/useModalDialog";
+import { CHAT_ICON_DATA_URI } from "../assets/chatIcon";
 
 interface Message {
   id: number;
@@ -39,30 +40,30 @@ const SYSTEM_PROMPT = `Kamu adalah "DUIT" — asisten personal & teman ngobrol y
 - Kalau user curhat: acknowledge dulu perasaannya, baru respons
 - Kalau ditanya opini: kasih opini beneran, jangan "tergantung sudut pandang"
 - Kalau soal politik: boleh kritis, tapi fair & berbasis fakta
-- Kalau ditanya soal keuangan: pakai data user di bawah (kalau ada)
+- Kalau ditanya soal keuangan, jadwal, atau goals: WAJIB pakai data user yang dilampirkan di system prompt. JANGAN bilang "aku tidak tahu" kalau datanya ada
 - Jangan sok tau — kalau gak yakin, bilang aja
+
+## Data User:
+Data keuangan user SELALU dilampirkan di system prompt setiap pesan. Gunakan untuk menjawab secara spesifik dan akurat:
+- Ditanya pengeluaran hari ini → list dari bagian "Transaksi Hari Ini"
+- Ditanya saldo → sebutkan dari bagian "Dompet"
+- Ditanya progress goal → dari bagian "Goals"
+- Ditanya jadwal hari ini → dari bagian "Jadwal Hari Ini"
+- Ditanya rekap bulan ini → dari bagian "Rekap Bulan Ini"
+Kalau data yang ditanyakan belum tercatat (misal user belum input), bilang jujur dan sarankan untuk mencatatnya.
 
 ## Yang JANGAN dilakuin:
 - Jangan paksa bahas keuangan kalau user gak nanya
 - Jangan terlalu formal atau kayak customer service
 - Jangan disclaimer berlebihan ("saya AI jadi mungkin...")
 - Jangan lecture panjang lebar kalau user cuma mau ngobrol santai
+- Jangan bilang "aku tidak tahu" soal data user kalau datanya ada di system prompt
 
 Kalau user nyapa/basa-basi, respons kayak temen — jangan langsung "ada yang bisa saya bantu?"`;
 
 // ═══════════════════════════════════════════════════════════════
-// Keyword deteksi topik keuangan (untuk conditional context)
+// Constants
 // ═══════════════════════════════════════════════════════════════
-const FINANCE_KEYWORDS = [
-  "saldo", "duit", "uang", "keuangan", "finansial",
-  "pengeluaran", "pemasukan", "belanja", "beli",
-  "tabungan", "nabung", "hemat", "boros",
-  "budget", "anggaran", "cicilan", "utang",
-  "gaji", "income", "kategori", "transaksi",
-  "goal", "target", "dompet", "wallet",
-  "bulan ini", "bulan lalu", "minggu ini",
-  "berapa", "total", "rekap", "laporan",
-];
 
 const MAX_INPUT_CHARACTERS = 4000;
 const MAX_API_MESSAGES = 16;
@@ -161,11 +162,6 @@ function ChatMessageText({ text, rich, isDark }: { text: string; rich: boolean; 
   );
 }
 
-function needsFinanceContext(text: string): boolean {
-  const lower = text.toLowerCase();
-  return FINANCE_KEYWORDS.some((kw) => lower.includes(kw));
-}
-
 // ═══════════════════════════════════════════════════════════════
 // COMPONENT — Modal Popup Chat AI
 // ═══════════════════════════════════════════════════════════════
@@ -175,7 +171,7 @@ interface ChatWidgetProps {
 }
 
 export default function ChatWidget({ open, onClose }: ChatWidgetProps) {
-  const { buildAIContext, settings, todayMood } = useStore();
+  const { buildAIContext, settings } = useStore();
   const { user } = useAuth();
   const { isDark } = useTheme();
 
@@ -229,20 +225,11 @@ export default function ChatWidget({ open, onClose }: ChatWidgetProps) {
       if (settings.name && settings.name !== "Kamu") {
         fullSystem += `\n\n## Info User:\nNama: ${settings.name}`;
       }
-      if (todayMood) {
-        fullSystem += `\nMood hari ini: ${todayMood.mood} ${todayMood.label}`;
-        if (todayMood.note) {
-          fullSystem += `\nCatatan mood: "${todayMood.note}"`;
-        }
-      }
-      const isFinanceTopic =
-        needsFinanceContext(cleanText) ||
-        nextMessages.slice(-3).some((message) => needsFinanceContext(message.text));
 
-      if (isFinanceTopic) {
-        const context = buildAIContext();
-        fullSystem += `\n\n## Data Keuangan User (untuk referensi):\n${context}`;
-      }
+      // Always attach user data so the AI can answer questions about
+      // transactions, wallets, goals, and schedules accurately.
+      const context = buildAIContext();
+      fullSystem += `\n\n## Data User DUIT:\n${context}`;
 
       // Keep the conversation natural while preventing an unbounded request
       // payload after a long chat. The assistant persona stays unchanged.
@@ -355,8 +342,12 @@ export default function ChatWidget({ open, onClose }: ChatWidgetProps) {
             >
               <div className={`flex items-center justify-between px-5 py-4 border-b ${headerBorder} shrink-0`}>
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-teal-400 to-blue-500 flex items-center justify-center shadow-lg">
-                    <span className="text-zinc-900 font-black text-lg">D</span>
+                  <div className="w-10 h-10 rounded-xl shadow-lg overflow-hidden">
+                    <img
+                      src={CHAT_ICON_DATA_URI}
+                      alt="DUIT"
+                      className="h-full w-full object-cover rounded-xl"
+                    />
                   </div>
                   <div>
                     <h2 id="chat-dialog-title" className={`${headerTitle} font-bold text-base leading-tight`}>Tanya DUIT</h2>
