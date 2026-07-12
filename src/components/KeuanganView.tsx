@@ -46,6 +46,10 @@ export default function KeuanganView({ quickType, quickNonce, onQuickDone }: Keu
     }, 80);
   }, [quickNonce, quickType]);
 
+  const scrollToTransactionForm = () => {
+    transactionFormRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setFormError(null);
@@ -262,7 +266,7 @@ export default function KeuanganView({ quickType, quickNonce, onQuickDone }: Keu
         </select>
       </Card>
 
-      <TransactionList filterWallet={filterWallet} />
+      <TransactionList filterWallet={filterWallet} onAddClick={scrollToTransactionForm} />
 
       <AnimatePresence>
         {showWalletManager && <WalletManager onClose={() => setShowWalletManager(false)} />}

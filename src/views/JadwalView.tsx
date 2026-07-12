@@ -6,6 +6,7 @@ import EditScheduleModal from "../components/EditScheduleModal";
 import { getNextScheduleOccurrence, todayStr, useStore } from "../lib/store";
 import { useTheme } from "../lib/ThemeContext";
 import ConfirmDialog from "../components/ConfirmDialog";
+import EmptyState from "../components/EmptyState";
 import type { ScheduleItem } from "../lib/store";
 
 function dateAtJakartaNoon(dateKey: string): Date {
@@ -109,9 +110,15 @@ export default function JadwalView() {
 
       <div className={listClass}>
         {enriched.length === 0 ? (
-          <div className="py-16 text-center">
-            <p className={`text-sm ${mutedClass}`}>Belum ada jadwal, yuk tambahkan!</p>
-          </div>
+          <EmptyState
+            compact
+            icon="📅"
+            title="Belum ada jadwal"
+            description="Tambahkan jadwal tagihan, rutinitas mingguan, kelas, meeting, atau reminder penting supaya hari kamu lebih teratur."
+            tips={["💡 Bayar listrik", "🏃 Olahraga", "💼 Meeting", "🔄 Mingguan"]}
+            actionLabel="Tambah Jadwal"
+            onAction={() => setShowModal(true)}
+          />
         ) : (
           <div className="space-y-3">
             <AnimatePresence>

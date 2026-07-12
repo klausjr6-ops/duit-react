@@ -10,6 +10,7 @@ import { formatRupiah } from "../lib/format";
 import type { Goal } from "../lib/store";
 import { useTheme } from "../lib/ThemeContext";
 import ConfirmDialog from "../components/ConfirmDialog";
+import EmptyState from "../components/EmptyState";
 
 export default function GoalsView() {
   const { goals, delGoal } = useStore();
@@ -27,8 +28,6 @@ export default function GoalsView() {
 
   const titleCls = isDark ? "text-3xl font-bold text-white" : "text-3xl font-bold text-zinc-900";
   const subCls = isDark ? "text-slate-400 text-sm mt-1" : "text-zinc-500 text-sm mt-1";
-  const emptyWrap = isDark ? "bg-slate-900/60 rounded-3xl border border-white/10 py-24 flex flex-col items-center justify-center" : "bg-white rounded-3xl border border-zinc-200 shadow-sm py-24 flex flex-col items-center justify-center";
-  const muted = isDark ? "text-slate-400" : "text-zinc-500";
   const muted2 = isDark ? "text-slate-500" : "text-zinc-500";
   const mainText = isDark ? "text-white" : "text-zinc-900";
 
@@ -50,11 +49,14 @@ export default function GoalsView() {
       </div>
 
       {goals.length === 0 ? (
-        <div className={emptyWrap}>
-          <motion.div initial={{ scale: 0.5, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ type: "spring", stiffness: 200, damping: 15 }} className="text-6xl mb-4">🎯</motion.div>
-          <p className={`text-lg ${muted}`}>Belum ada goal</p>
-          <p className={`text-sm mt-1 ${muted2}`}>Buat goal pertama Anda dan mulai menabung!</p>
-        </div>
+        <EmptyState
+          icon="🎯"
+          title="Belum ada goal"
+          description="Buat target pertama agar tabungan punya arah. Kamu bisa mulai dari dana darurat, liburan, gadget, atau cicilan impian."
+          tips={["🚨 Dana darurat", "🏝️ Liburan", "💻 Laptop", "🏠 Rumah"]}
+          actionLabel="Buat Goal Pertama"
+          onAction={() => setShowModal(true)}
+        />
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           <AnimatePresence>

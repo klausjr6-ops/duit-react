@@ -5,12 +5,14 @@ import { useStore, type Transaction } from "../lib/store";
 import { useTheme } from "../lib/ThemeContext";
 import ConfirmDialog from "./ConfirmDialog";
 import EditTransactionModal from "./EditTransactionModal";
+import EmptyState from "./EmptyState";
 
 interface Props {
   filterWallet?: string;
+  onAddClick?: () => void;
 }
 
-export default function TransactionList({ filterWallet = "all" }: Props) {
+export default function TransactionList({ filterWallet = "all", onAddClick }: Props) {
   const { txs, wallets, delTx } = useStore();
   const { isDark } = useTheme();
   const [transactionToDelete, setTransactionToDelete] = useState<Transaction | null>(null);
@@ -37,7 +39,6 @@ export default function TransactionList({ filterWallet = "all" }: Props) {
     ? "bg-slate-900/60 p-6 rounded-3xl border border-white/10"
     : "bg-white p-6 rounded-3xl border border-zinc-200 shadow-sm";
   const heading = isDark ? "text-sm font-bold text-slate-400 uppercase tracking-widest mb-4" : "text-sm font-bold text-zinc-500 uppercase tracking-widest mb-4";
-  const emptyText = isDark ? "text-center text-slate-500 py-8 text-sm" : "text-center text-zinc-500 py-8 text-sm";
   const rowBase = isDark ? "flex justify-between items-center p-3 bg-white/5 rounded-xl hover:bg-white/10 transition-colors" : "flex justify-between items-center p-3 bg-zinc-50 rounded-xl hover:bg-zinc-100 transition-colors border border-zinc-100";
   const titleText = isDark ? "text-white font-semibold text-sm truncate" : "text-zinc-900 font-semibold text-sm truncate";
   const subText = isDark ? "text-xs text-slate-400 truncate" : "text-xs text-zinc-500 truncate";
@@ -47,7 +48,18 @@ export default function TransactionList({ filterWallet = "all" }: Props) {
       <div className={panel}>
       <h3 className={heading}>Transaksi Terbaru</h3>
       {sorted.length === 0 ? (
-        <p className={emptyText}>Belum ada transaksi</p>
+        <EmptyState
+          compact
+          icon={filterWallet === "all" ? "🧾" : "👛"}
+          title={filterWallet === "all" ? "Belum ada transaksi" : "Belum ada transaksi di dompet ini"}
+          description={filterWallet === "all"
+            ? "Catat pemasukan atau pengeluaran pertama supaya laporan, grafik, dan saldo DUIT mulai hidup."
+            : "Coba pilih dompet lain atau catat transaksi baru untuk dompet ini."
+          }
+          tips={["Makan", "Transport", "Gaji", "Tagihan"]}
+          actionLabel={onAddClick ? "Catat Transaksi" : undefined}
+          onAction={onAddClick}
+        />
       ) : (
         <div className="space-y-3">
           <AnimatePresence>
