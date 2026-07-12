@@ -4,7 +4,7 @@ import { useStore } from "../lib/store";
 import { useTheme } from "../lib/ThemeContext";
 import { useAuth } from "../lib/AuthContext";
 import { useModalDialog } from "../hooks/useModalDialog";
-import ChatAIIcon from "./ChatAIIcon";
+import { CHAT_ICON_DATA_URI } from "../assets/chatIcon";
 
 interface Message {
   id: number;
@@ -342,8 +342,12 @@ export default function ChatWidget({ open, onClose }: ChatWidgetProps) {
             >
               <div className={`flex items-center justify-between px-5 py-4 border-b ${headerBorder} shrink-0`}>
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-teal-400 to-blue-500 flex items-center justify-center shadow-lg">
-                    <ChatAIIcon className="h-7 w-7 text-zinc-900" />
+                  <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-teal-400 to-blue-500 flex items-center justify-center shadow-lg overflow-hidden">
+                    <img
+                      src={CHAT_ICON_DATA_URI}
+                      alt="DUIT"
+                      className="h-8 w-8 object-contain"
+                    />
                   </div>
                   <div>
                     <h2 id="chat-dialog-title" className={`${headerTitle} font-bold text-base leading-tight`}>Tanya DUIT</h2>

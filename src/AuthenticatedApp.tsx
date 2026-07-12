@@ -8,7 +8,7 @@ import StatCard from "./components/StatCard";
 import TimelineCard from "./components/TimelineCard";
 import MoodCard from "./components/MoodCard";
 import ReportCard from "./components/ReportCard";
-import ChatAIIcon from "./components/ChatAIIcon";
+import { CHAT_ICON_DATA_URI } from "./assets/chatIcon";
 import { StoreProvider, useStore } from "./lib/store";
 import { useAuth } from "./lib/AuthContext";
 import { useTheme } from "./lib/ThemeContext";
@@ -249,10 +249,14 @@ function DashboardApp() {
       {/* ── Floating Action Button (FAB) untuk buka Chat AI ── */}
       <button
         onClick={() => setShowChat(true)}
-        className="fixed bottom-24 right-5 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-teal-400 to-blue-500 shadow-lg shadow-teal-500/25 transition-transform hover:scale-105 active:scale-95 md:bottom-8 md:right-8 md:h-16 md:w-16"
+        className="fixed bottom-24 right-5 z-40 h-14 w-14 rounded-full bg-gradient-to-br from-teal-400 to-blue-500 shadow-lg shadow-teal-500/25 transition-transform hover:scale-105 active:scale-95 md:bottom-8 md:right-8 md:h-16 md:w-16 overflow-hidden"
         aria-label="Buka Chat AI"
       >
-        <ChatAIIcon className="h-9 w-9 md:h-10 md:w-10 text-zinc-900" />
+        <img
+          src={CHAT_ICON_DATA_URI}
+          alt="Chat AI"
+          className="h-full w-full object-contain p-1"
+        />
       </button>
 
       {/* ── Modal Chat AI (popup) ── */}
