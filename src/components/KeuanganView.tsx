@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import Card from "./Card";
 import TransactionList from "./TransactionList";
@@ -13,7 +13,13 @@ const CATEGORIES: Record<"in" | "out", string[]> = {
   out: ["Makan", "Transport", "Belanja", "Tagihan", "Hiburan", "Kesehatan", "Lainnya"],
 };
 
-export default function KeuanganView() {
+interface KeuanganViewProps {
+  quickType?: "in" | "out";
+  quickNonce?: number;
+  onQuickDone?: () => void;
+}
+
+export default function KeuanganView({ quickType, quickNonce, onQuickDone }: KeuanganViewProps) {
   const { wallets, addTx, inMonth, outMonth, balance } = useStore();
   const { isDark } = useTheme();
 
@@ -25,7 +31,20 @@ export default function KeuanganView() {
   const [date, setDate] = useState(todayStr());
   const [filterWallet, setFilterWallet] = useState<string>("all");
   const [showWalletManager, setShowWalletManager] = useState(false);
+  const transactionFormRef = useRef<HTMLDivElement>(null);
   const [formError, setFormError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!quickType) return;
+    setType(quickType);
+    setCat("");
+    setDate(todayStr());
+    setFormError(null);
+
+    window.setTimeout(() => {
+      transactionFormRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 80);
+  }, [quickNonce, quickType]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -53,6 +72,7 @@ export default function KeuanganView() {
       walletId: parseInt(walletId),
     });
     setType(""); setCat(""); setWalletId(""); setAmt(""); setDesc(""); setDate(todayStr());
+    onQuickDone?.();
   };
 
   const formatInputRupiah = (val: string) => {
@@ -133,8 +153,18 @@ export default function KeuanganView() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div ref={transactionFormRef}>
         <Card>
-          <p className={`text-xs font-semibold mb-6 uppercase tracking-widest ${isDark ? "text-slate-400" : "text-zinc-500"}`}>Tambah Transaksi</p>
+          <p className={`text-xs font-semibold mb-2 uppercase tracking-widest ${isDark ? "text-slate-400" : "text-zinc-500"}`}>Tambah Transaksi</p>
+          {quickType && (
+            <p className={`mb-4 rounded-xl px-3 py-2 text-xs ${
+              quickType === "in"
+                ? isDark ? "bg-emerald-400/10 text-emerald-300" : "bg-emerald-50 text-emerald-700"
+                : isDark ? "bg-rose-400/10 text-rose-300" : "bg-rose-50 text-rose-700"
+            }`}>
+              Mode cepat dari Beranda: {quickType === "in" ? "catat pemasukan hari ini" : "catat pengeluaran hari ini"}.
+            </p>
+          )}
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="grid grid-cols-2 gap-3">
               <div>
@@ -212,6 +242,7 @@ export default function KeuanganView() {
             </button>
           </form>
         </Card>
+        </div>
 
         <Card>
           <p className={`text-xs font-semibold mb-6 uppercase tracking-widest ${isDark ? "text-slate-400" : "text-zinc-500"}`}>7 Hari Terakhir</p>

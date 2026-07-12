@@ -77,6 +77,7 @@ function DashboardApp() {
   const { isDark } = useTheme();
   const [now, setNow] = useState(new Date());
   const [active, setActive] = useState("home");
+  const [quickTransaction, setQuickTransaction] = useState<{ type: "in" | "out"; nonce: number } | null>(null);
   const [showAccount, setShowAccount] = useState(false);
   const [showChat, setShowChat] = useState(false);
 
@@ -109,6 +110,16 @@ function DashboardApp() {
   // Ini mencegah perubahan awal menimpa data cloud yang belum sempat dimuat.
   const appLoading = authLoading || Boolean(user && (storeLoading || loadedUserId !== user.uid));
 
+  const handleNavigation = (key: string) => {
+    if (key === "wallet") setQuickTransaction(null);
+    setActive(key);
+  };
+
+  const openQuickTransaction = (type: "in" | "out") => {
+    setQuickTransaction({ type, nonce: Date.now() });
+    setActive("wallet");
+  };
+
   if (appLoading) {
     return <DashboardLoader />;
   }
@@ -132,7 +143,7 @@ function DashboardApp() {
 
       <Sidebar
         active={active}
-        setActive={setActive}
+        setActive={handleNavigation}
         onAvatarClick={() => setShowAccount(true)}
       />
 
@@ -169,6 +180,9 @@ function DashboardApp() {
                   income={todayIncome}
                   expense={todayExpense}
                   scheduleCount={todaySchedules.length}
+                  onIncomeClick={() => openQuickTransaction("in")}
+                  onExpenseClick={() => openQuickTransaction("out")}
+                  onScheduleClick={() => setActive("calendar")}
                 />
               </div>
 
@@ -211,7 +225,11 @@ function DashboardApp() {
 
           {active === "wallet" && (
             <Suspense fallback={<ViewLoader />}>
-              <KeuanganView />
+              <KeuanganView
+                quickType={quickTransaction?.type}
+                quickNonce={quickTransaction?.nonce}
+                onQuickDone={() => setQuickTransaction(null)}
+              />
             </Suspense>
           )}
           {active === "calendar" && (
