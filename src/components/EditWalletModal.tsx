@@ -3,25 +3,18 @@ import { motion } from "framer-motion";
 import { useStore, type Wallet } from "../lib/store";
 import { useTheme } from "../lib/ThemeContext";
 import { useModalDialog } from "../hooks/useModalDialog";
+import { WALLET_COLORS, resolveColorKey } from "../utils/walletColors";
 
 interface Props { wallet: Wallet; onClose: () => void; }
 
 const ICONS = ["💳","💵","🏦","💰","👛","💎","📱","🪙"];
-const COLORS = [
-  "from-emerald-500/20 to-emerald-500/5",
-  "from-blue-500/20 to-blue-500/5",
-  "from-amber-500/20 to-amber-500/5",
-  "from-rose-500/20 to-rose-500/5",
-  "from-violet-500/20 to-violet-500/5",
-  "from-teal-500/20 to-teal-500/5",
-];
 
 export default function EditWalletModal({ wallet, onClose }: Props) {
   const { updateWallet, txs } = useStore();
   const { isDark } = useTheme();
   const [name, setName] = useState(wallet.name);
   const [icon, setIcon] = useState(wallet.icon);
-  const [color, setColor] = useState(wallet.color);
+  const [colorKey, setColorKey] = useState(resolveColorKey(wallet.color));
   const [initialBalance, setInitialBalance] = useState(String(wallet.balance - txs.filter(t=>t.walletId===wallet.id).reduce((s,t)=> s + (t.type==="in"?t.amt:-t.amt),0)));
   const [error, setError] = useState<string|null>(null);
   const { dialogRef, onDialogKeyDown } = useModalDialog(true, onClose);
@@ -31,7 +24,7 @@ export default function EditWalletModal({ wallet, onClose }: Props) {
     if (!name.trim()) { setError("Nama dompet harus diisi."); return; }
     const bal = parseInt(initialBalance.replace(/\D/g,"")||"0",10);
     if (Number.isNaN(bal) || bal < 0) { setError("Saldo awal tidak valid."); return; }
-    updateWallet(wallet.id, { name: name.trim(), icon, color, balance: bal });
+    updateWallet(wallet.id, { name: name.trim(), icon, color: colorKey, balance: bal });
     onClose();
   };
 
@@ -51,7 +44,27 @@ export default function EditWalletModal({ wallet, onClose }: Props) {
             <div className="mt-2 grid grid-cols-8 gap-2">{ICONS.map(ic=><button type="button" key={ic} onClick={()=>setIcon(ic)} className={`rounded-lg border p-2 text-lg ${icon===ic ? "border-teal-400 bg-teal-400/10":"border-white/10 hover:bg-white/5"} ${!isDark && icon!==ic ? "border-zinc-200 hover:bg-zinc-50":""}`}>{ic}</button>)}</div>
           </div>
           <div><label className={labelCls}>Warna</label>
-            <div className="mt-2 grid grid-cols-3 gap-2">{COLORS.map(c=><button type="button" key={c} onClick={()=>setColor(c)} className={`h-8 rounded-lg bg-gradient-to-br ${c} border ${color===c ? "border-teal-400 ring-2 ring-teal-400/30":"border-white/10"} ${!isDark ? "border-zinc-200":""}`} />)}</div>
+            <div className="mt-2 grid grid-cols-4 gap-2">
+              {WALLET_COLORS.map((c) => {
+                const active = colorKey === c.key;
+                return (
+                  <button
+                    type="button"
+                    key={c.key}
+                    onClick={() => setColorKey(c.key)}
+                    className="h-10 rounded-xl border-2 transition-all flex items-center justify-center gap-1.5"
+                    style={{
+                      background: `linear-gradient(135deg, ${c.hex}20, ${c.hex}08)`,
+                      borderColor: active ? c.hex : (isDark ? "rgba(255,255,255,0.1)" : "#e4e4e7"),
+                      boxShadow: active ? `0 0 0 3px ${c.hex}30` : "none",
+                    }}
+                  >
+                    <span className="w-3 h-3 rounded-full" style={{ background: c.hex }} />
+                    <span className={`text-[10px] font-bold ${active ? "" : isDark ? "text-slate-400" : "text-zinc-500"}`} style={active ? { color: c.hex } : {}}>{c.label}</span>
+                  </button>
+                );
+              })}
+            </div>
           </div>
           <div><label className={labelCls}>Saldo Awal</label>
             <input type="text" inputMode="numeric" value={initialBalance ? `Rp ${formatRp(initialBalance)}`:""} onChange={e=>setInitialBalance(e.target.value.replace(/\D/g,""))} className={inputCls} />

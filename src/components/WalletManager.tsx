@@ -7,6 +7,7 @@ import { useModalDialog } from "../hooks/useModalDialog";
 import ConfirmDialog from "./ConfirmDialog";
 import EditWalletModal from "./EditWalletModal";
 import TransferModal from "./TransferModal";
+import { getWalletHex } from "../utils/walletColors";
 
 interface Props {
   onClose: () => void;
@@ -41,7 +42,7 @@ export default function WalletManager({ onClose }: Props) {
       name: name.trim(),
       balance: parseInt(initBalance.replace(/\D/g, "") || "0"),
       icon,
-      color: "from-emerald-500/20 to-emerald-500/5",
+      color: "emerald",
     });
     setName(""); setIcon("💳"); setInitBalance("");
   };
@@ -56,8 +57,6 @@ export default function WalletManager({ onClose }: Props) {
     : "bg-white border border-zinc-200 rounded-3xl p-6 max-w-md w-full max-h-[85vh] overflow-y-auto shadow-xl";
   const titleCls = isDark ? "text-xl font-bold text-white" : "text-xl font-bold text-zinc-900";
   const closeCls = isDark ? "text-slate-400 hover:text-white text-3xl leading-none w-8 h-8 flex items-center justify-center" : "text-zinc-500 hover:text-zinc-900 text-3xl leading-none w-8 h-8 flex items-center justify-center";
-  const itemCls = isDark ? "flex items-center justify-between p-3 bg-white/5 rounded-xl" : "flex items-center justify-between p-3 bg-zinc-50 border border-zinc-200 rounded-xl";
-  const nameCls = isDark ? "font-semibold text-white text-sm" : "font-semibold text-zinc-900 text-sm";
   const labelCls = isDark ? "text-[11px] font-bold text-slate-500 uppercase" : "text-[11px] font-bold text-zinc-500 uppercase";
   const sectionLabel = isDark ? "text-xs font-bold text-slate-400 uppercase tracking-wider" : "text-xs font-bold text-zinc-500 uppercase tracking-wider";
   const inputCls = isDark
@@ -106,13 +105,23 @@ export default function WalletManager({ onClose }: Props) {
           {wallets.length === 0 ? (
             <p className={`text-center py-4 text-sm ${isDark ? "text-slate-500" : "text-zinc-500"}`}>Belum ada dompet</p>
           ) : (
-            wallets.map((w) => (
-              <div key={w.id} className={itemCls}>
+            wallets.map((w) => {
+              const hex = getWalletHex(w.color);
+              return (
+              <div
+                key={w.id}
+                onClick={() => setWalletToEdit(w)}
+                className="flex items-center justify-between p-3 rounded-xl cursor-pointer hover:brightness-110 transition-all"
+                style={{
+                  background: isDark ? `linear-gradient(135deg, ${hex}14, ${hex}08)` : `linear-gradient(135deg, ${hex}10, ${hex}06)`,
+                  border: `1px solid ${hex}30`,
+                }}
+              >
                 <div className="flex items-center gap-3">
                   <span className="text-2xl">{w.icon}</span>
                   <div>
-                    <p className={nameCls}>{w.name}</p>
-                    <p className="text-xs text-emerald-600 font-semibold">{formatRupiah(w.balance)}</p>
+                    <p className={isDark ? "font-semibold text-white text-sm" : "font-semibold text-zinc-900 text-sm"}>{w.name}</p>
+                    <p className="text-xs font-semibold" style={{ color: hex }}>{formatRupiah(w.balance)}</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-1">
@@ -120,7 +129,7 @@ export default function WalletManager({ onClose }: Props) {
                   <button
                     type="button"
                     aria-label={`Transfer dari ${w.name}`}
-                    onClick={() => openTransfer(w)}
+                    onClick={(e) => { e.stopPropagation(); openTransfer(w); }}
                     className={`${isDark ? "text-slate-500 hover:text-violet-400" : "text-zinc-400 hover:text-violet-500"} p-2`}
                     title="Transfer"
                   >
@@ -129,19 +138,14 @@ export default function WalletManager({ onClose }: Props) {
                 )}
                 <button
                   type="button"
-                  aria-label={`Edit dompet ${w.name}`}
-                  onClick={() => setWalletToEdit(w)}
-                  className={`${isDark ? "text-slate-500 hover:text-teal-400" : "text-zinc-400 hover:text-teal-600"} p-2`}
-                >✏️</button>
-                <button
-                  type="button"
                   aria-label={`Hapus dompet ${w.name}`}
-                  onClick={() => setWalletToDelete(w)}
+                  onClick={(e) => { e.stopPropagation(); setWalletToDelete(w); }}
                   className={`${isDark ? "text-slate-500 hover:text-rose-400" : "text-zinc-400 hover:text-rose-500"} p-2`}
                 >🗑️</button>
                 </div>
               </div>
-            ))
+              );
+            })
           )}
         </div>
 

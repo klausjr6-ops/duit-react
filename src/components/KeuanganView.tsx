@@ -4,9 +4,11 @@ import Card from "./Card";
 import TransactionList from "./TransactionList";
 import WeeklyChart from "./WeeklyChart";
 import WalletManager from "./WalletManager";
+import EditWalletModal from "./EditWalletModal";
 import { formatRupiah } from "../lib/format";
-import { useStore, todayStr } from "../lib/store";
+import { useStore, todayStr, type Wallet } from "../lib/store";
 import { useTheme } from "../lib/ThemeContext";
+import { walletCardStyle, walletCardHoverBorder, getWalletHex } from "../utils/walletColors";
 
 const CATEGORIES: Record<"in" | "out", string[]> = {
   in: ["Gaji", "Bonus", "Hadiah", "Investasi", "Lainnya"],
@@ -31,6 +33,8 @@ export default function KeuanganView({ quickType, quickNonce, onQuickDone }: Keu
   const [date, setDate] = useState(todayStr());
   const [filterWallet, setFilterWallet] = useState<string>("all");
   const [showWalletManager, setShowWalletManager] = useState(false);
+  const [walletToEdit, setWalletToEdit] = useState<Wallet | null>(null);
+  const [hoveredWallet, setHoveredWallet] = useState<number | null>(null);
   const transactionFormRef = useRef<HTMLDivElement>(null);
   const [formError, setFormError] = useState<string | null>(null);
 
@@ -117,7 +121,9 @@ export default function KeuanganView({ quickType, quickNonce, onQuickDone }: Keu
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
-        {wallets.map((w, i) => (
+        {wallets.map((w, i) => {
+          const hex = getWalletHex(w.color);
+          return (
           <motion.div
             key={w.id}
             initial={{ opacity: 0, y: 24 }}
@@ -125,16 +131,21 @@ export default function KeuanganView({ quickType, quickNonce, onQuickDone }: Keu
             viewport={{ once: true, margin: "-40px" }}
             transition={{ duration: 0.5, delay: i * 0.05, ease: [0.22, 1, 0.36, 1] }}
             whileHover={{ y: -4, transition: { duration: 0.2 } }}
-            className={isDark
-              ? "bg-gradient-to-br from-emerald-500/10 to-emerald-500/5 border border-emerald-500/30 rounded-2xl p-4 hover:border-emerald-400 transition-shadow duration-300 shadow-lg shadow-black/5 cursor-pointer"
-              : "bg-gradient-to-br from-emerald-50 to-teal-50/60 border border-emerald-200 rounded-2xl p-4 hover:border-emerald-400 transition-shadow duration-300 shadow-sm hover:shadow-md cursor-pointer"
-            }
+            onClick={() => setWalletToEdit(w)}
+            style={{
+              ...walletCardStyle(w.color, isDark),
+              ...(hoveredWallet === w.id ? walletCardHoverBorder(w.color) : {}),
+            }}
+            onMouseEnter={() => setHoveredWallet(w.id)}
+            onMouseLeave={() => setHoveredWallet(null)}
+            className="rounded-2xl p-4 transition-shadow duration-300 cursor-pointer hover:shadow-md"
           >
             <div className="text-2xl mb-2">{w.icon}</div>
             <p className={`text-xs font-bold uppercase tracking-wider ${isDark ? "text-slate-300" : "text-zinc-600"}`}>{w.name}</p>
-            <p className="text-lg font-extrabold text-emerald-600 mt-1">{formatRupiah(w.balance)}</p>
+            <p className="text-lg font-extrabold mt-1" style={{ color: hex }}>{formatRupiah(w.balance)}</p>
           </motion.div>
-        ))}
+          );
+        })}
         <motion.div
           initial={{ opacity: 0, y: 24 }}
           whileInView={{ opacity: 1, y: 0 }}
@@ -270,6 +281,8 @@ export default function KeuanganView({ quickType, quickNonce, onQuickDone }: Keu
       <AnimatePresence>
         {showWalletManager && <WalletManager onClose={() => setShowWalletManager(false)} />}
       </AnimatePresence>
+
+      {walletToEdit && <EditWalletModal wallet={walletToEdit} onClose={() => setWalletToEdit(null)} />}
     </motion.div>
   );
 }

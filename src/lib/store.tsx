@@ -164,8 +164,8 @@ export function getNextScheduleOccurrence(
 }
 
 const DEFAULT_WALLETS: Wallet[] = [
-  { id: 1, name: "BCA", balance: 0, icon: "💳", color: "from-emerald-500/20 to-emerald-500/5" },
-  { id: 2, name: "Cash", balance: 0, icon: "💵", color: "from-emerald-500/20 to-emerald-500/5" },
+  { id: 1, name: "BCA", balance: 0, icon: "💳", color: "emerald" },
+  { id: 2, name: "Cash", balance: 0, icon: "💵", color: "teal" },
 ];
 
 /* ══════════════════════════════════════════════════════════════
@@ -301,7 +301,7 @@ function sanitizeWallet(value: unknown): Wallet | null {
     name: name.slice(0, 80),
     balance: toFiniteNumber(value.balance),
     icon: toStringValue(value.icon, "💳").slice(0, 12),
-    color: toStringValue(value.color, "from-emerald-500/20 to-emerald-500/5").slice(0, 120),
+    color: toStringValue(value.color, "emerald").slice(0, 120),
   };
 }
 
