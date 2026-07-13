@@ -150,8 +150,16 @@ export default function KeuanganView({ quickType, quickNonce, onQuickDone }: Keu
             : "w-full h-full min-h-[110px] border-2 border-dashed border-zinc-300 rounded-2xl p-4 flex flex-col items-center justify-center hover:border-emerald-400 hover:bg-emerald-50 transition-all group bg-white"
           }
         >
-          <div className="text-2xl mb-1 group-hover:scale-110 transition-transform">👛</div>
-          <p className={`text-xs font-semibold ${isDark ? "text-slate-400 group-hover:text-emerald-400" : "text-zinc-500 group-hover:text-emerald-600"}`}>Kelola Dompet</p>
+          <div className="w-7 h-7 mb-1 group-hover:scale-110 transition-transform flex items-center justify-center">
+            <svg viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full h-full text-teal-500 group-hover:text-emerald-500 transition-colors">
+              <rect x="2" y="10" width="36" height="24" rx="5" className="fill-current" />
+              <rect x="2" y="10" width="36" height="24" rx="5" stroke="currentColor" strokeWidth="1.5" className="stroke-teal-700 group-hover:stroke-emerald-700 transition-colors" />
+              <rect x="4" y="6" width="32" height="8" rx="3" className="fill-current opacity-50" />
+              <circle cx="31" cy="22" r="3.5" fill="#fff" />
+              <circle cx="31" cy="22" r="2" className="fill-teal-700 group-hover:fill-emerald-700 transition-colors" />
+            </svg>
+          </div>
+          <p className={`text-xs font-semibold ${isDark ? "text-slate-400 group-hover:text-emerald-400" : "text-zinc-500 group-hover:text-emerald-600"}`}>Dompet</p>
         </button>
         </motion.div>
       </div>

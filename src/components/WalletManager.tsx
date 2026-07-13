@@ -6,6 +6,7 @@ import { useTheme } from "../lib/ThemeContext";
 import { useModalDialog } from "../hooks/useModalDialog";
 import ConfirmDialog from "./ConfirmDialog";
 import EditWalletModal from "./EditWalletModal";
+import TransferModal from "./TransferModal";
 
 interface Props {
   onClose: () => void;
@@ -22,6 +23,8 @@ export default function WalletManager({ onClose }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [walletToDelete, setWalletToDelete] = useState<Wallet | null>(null);
   const [walletToEdit, setWalletToEdit] = useState<Wallet | null>(null);
+  const [showTransfer, setShowTransfer] = useState(false);
+  const [transferFrom, setTransferFrom] = useState<Wallet | undefined>(undefined);
   const { dialogRef, onDialogKeyDown } = useModalDialog(true, onClose);
 
   const handleAdd = () => {
@@ -41,6 +44,11 @@ export default function WalletManager({ onClose }: Props) {
       color: "from-emerald-500/20 to-emerald-500/5",
     });
     setName(""); setIcon("💳"); setInitBalance("");
+  };
+
+  const openTransfer = (from?: Wallet) => {
+    setTransferFrom(from);
+    setShowTransfer(true);
   };
 
   const panel = isDark
@@ -77,10 +85,22 @@ export default function WalletManager({ onClose }: Props) {
         onClick={(e) => e.stopPropagation()}
         className={panel}
       >
-        <div className="flex justify-between items-center mb-6">
-          <h2 id="wallet-dialog-title" className={titleCls}>Kelola Dompet</h2>
-          <button aria-label="Tutup kelola dompet" onClick={onClose} className={closeCls}>×</button>
+        <div className="flex justify-between items-center mb-4">
+          <h2 id="wallet-dialog-title" className={titleCls}>Dompet</h2>
+          <button aria-label="Tutup dompet" onClick={onClose} className={closeCls}>×</button>
         </div>
+
+        {/* Transfer button */}
+        {wallets.length >= 2 && (
+          <button
+            type="button"
+            onClick={() => openTransfer()}
+            className="w-full mb-4 flex items-center justify-center gap-2 bg-gradient-to-r from-violet-500/10 to-blue-500/10 border border-violet-400/30 hover:border-violet-400 text-violet-400 font-semibold text-sm py-2.5 rounded-xl transition-all hover:brightness-110"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M7 16V4m0 0L3 8m4-4l4 4"/><path d="M17 8v12m0 0l4-4m-4 4l-4-4"/></svg>
+            Transfer Antar Dompet
+          </button>
+        )}
 
         <div className="space-y-2 mb-6">
           {wallets.length === 0 ? (
@@ -96,6 +116,17 @@ export default function WalletManager({ onClose }: Props) {
                   </div>
                 </div>
                 <div className="flex items-center gap-1">
+                {wallets.length >= 2 && (
+                  <button
+                    type="button"
+                    aria-label={`Transfer dari ${w.name}`}
+                    onClick={() => openTransfer(w)}
+                    className={`${isDark ? "text-slate-500 hover:text-violet-400" : "text-zinc-400 hover:text-violet-500"} p-2`}
+                    title="Transfer"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M7 16V4m0 0L3 8m4-4l4 4"/><path d="M17 8v12m0 0l4-4m-4 4l-4-4"/></svg>
+                  </button>
+                )}
                 <button
                   type="button"
                   aria-label={`Edit dompet ${w.name}`}
@@ -142,10 +173,11 @@ export default function WalletManager({ onClose }: Props) {
       </motion.div>
       </motion.div>
       {walletToEdit && <EditWalletModal wallet={walletToEdit} onClose={()=>setWalletToEdit(null)} />}
+      {showTransfer && <TransferModal fromWallet={transferFrom} onClose={() => { setShowTransfer(false); setTransferFrom(undefined); }} />}
       <ConfirmDialog
         open={Boolean(walletToDelete)}
         title="Hapus Dompet?"
-        message={walletToDelete ? `Dompet “${walletToDelete.name}” akan dihapus. Transaksi yang sudah tercatat tetap ada di riwayat.` : ""}
+        message={walletToDelete ? `Dompet "${walletToDelete.name}" akan dihapus. Transaksi yang sudah tercatat tetap ada di riwayat.` : ""}
         confirmLabel="Ya, Hapus"
         onClose={() => setWalletToDelete(null)}
         onConfirm={() => {

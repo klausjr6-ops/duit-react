@@ -25,6 +25,8 @@ export interface Transaction {
   walletId?: number;
   /** Present when this outgoing transaction is a transfer into a savings goal. */
   goalId?: number;
+  /** Present when this transaction is part of a wallet-to-wallet transfer. */
+  transferId?: number;
 }
 
 export interface ScheduleItem {
@@ -232,6 +234,7 @@ function sanitizeTransaction(value: unknown): Transaction | null {
 
   const walletId = value.walletId === undefined ? undefined : toFiniteNumber(value.walletId, NaN);
   const goalId = value.goalId === undefined ? undefined : toFiniteNumber(value.goalId, NaN);
+  const transferId = value.transferId === undefined ? undefined : toFiniteNumber(value.transferId, NaN);
 
   return {
     id: toFiniteNumber(value.id, createId()),
@@ -242,6 +245,7 @@ function sanitizeTransaction(value: unknown): Transaction | null {
     date: toDateKey(value.date),
     ...(Number.isFinite(walletId) ? { walletId } : {}),
     ...(Number.isFinite(goalId) ? { goalId } : {}),
+    ...(Number.isFinite(transferId) ? { transferId } : {}),
   };
 }
 
@@ -883,6 +887,38 @@ function useDuitStoreInternal() {
     [updateData]
   );
 
+  const transferWallet = useCallback(
+    (fromId: number, toId: number, amount: number) => {
+      const transferId = createId();
+      const date = todayStr();
+      const outTx: Transaction = {
+        id: createId(),
+        type: "out",
+        amt: amount,
+        cat: "Transfer",
+        desc: "Transfer antar dompet",
+        date,
+        walletId: fromId,
+        transferId,
+      };
+      const inTx: Transaction = {
+        id: createId(),
+        type: "in",
+        amt: amount,
+        cat: "Transfer",
+        desc: "Transfer antar dompet",
+        date,
+        walletId: toId,
+        transferId,
+      };
+      updateData((previous) => ({
+        ...previous,
+        txs: [outTx, inTx, ...previous.txs],
+      }));
+    },
+    [updateData]
+  );
+
   /* ══════════════════════════════════════════════════════════
      MOODS
      ══════════════════════════════════════════════════════════ */
@@ -960,13 +996,13 @@ function useDuitStoreInternal() {
     .filter((transaction) => transaction.type === "out")
     .reduce((amount, transaction) => amount + transaction.amt, 0);
 
-  // Reporting totals exclude goal transfers – they are internal moves,
-  // not real income/spending.
+  // Reporting totals exclude goal transfers and wallet transfers – they are
+  // internal moves, not real income/spending.
   const totalIn = txs
-    .filter((transaction) => transaction.type === "in" && !transaction.goalId)
+    .filter((transaction) => transaction.type === "in" && !transaction.goalId && !transaction.transferId)
     .reduce((amount, transaction) => amount + transaction.amt, 0);
   const totalOut = txs
-    .filter((transaction) => transaction.type === "out" && !transaction.goalId)
+    .filter((transaction) => transaction.type === "out" && !transaction.goalId && !transaction.transferId)
     .reduce((amount, transaction) => amount + transaction.amt, 0);
 
   const initialWalletBalance = wallets.reduce((amount, wallet) => amount + wallet.balance, 0);
@@ -974,20 +1010,20 @@ function useDuitStoreInternal() {
 
   const thisMonth = todayStr().slice(0, 7);
   const outMonth = txs
-    .filter((transaction) => transaction.type === "out" && !transaction.goalId && transaction.date?.startsWith(thisMonth))
+    .filter((transaction) => transaction.type === "out" && !transaction.goalId && !transaction.transferId && transaction.date?.startsWith(thisMonth))
     .reduce((amount, transaction) => amount + transaction.amt, 0);
   const inMonth = txs
-    .filter((transaction) => transaction.type === "in" && !transaction.goalId && transaction.date?.startsWith(thisMonth))
+    .filter((transaction) => transaction.type === "in" && !transaction.goalId && !transaction.transferId && transaction.date?.startsWith(thisMonth))
     .reduce((amount, transaction) => amount + transaction.amt, 0);
 
   const totalSaved = goals.reduce((amount, goal) => amount + goal.current, 0);
 
   const today = todayStr();
   const todayIncome = txs
-    .filter((transaction) => transaction.type === "in" && !transaction.goalId && transaction.date === today)
+    .filter((transaction) => transaction.type === "in" && !transaction.goalId && !transaction.transferId && transaction.date === today)
     .reduce((amount, transaction) => amount + transaction.amt, 0);
   const todayExpense = txs
-    .filter((transaction) => transaction.type === "out" && !transaction.goalId && transaction.date === today)
+    .filter((transaction) => transaction.type === "out" && !transaction.goalId && !transaction.transferId && transaction.date === today)
     .reduce((amount, transaction) => amount + transaction.amt, 0);
 
   const todaySchedules = scheds
@@ -1005,7 +1041,7 @@ function useDuitStoreInternal() {
   );
 
   const categories = txs
-    .filter((transaction) => transaction.type === "out" && !transaction.goalId)
+    .filter((transaction) => transaction.type === "out" && !transaction.goalId && !transaction.transferId)
     .reduce<Record<string, number>>((result, transaction) => {
       const category = transaction.cat || "Lainnya";
       result[category] = (result[category] || 0) + transaction.amt;
@@ -1042,7 +1078,7 @@ function useDuitStoreInternal() {
     lines.push("");
 
     // ── Transaksi hari ini ──
-    const todayTxList = txs.filter((t) => t.date === today && !t.goalId);
+    const todayTxList = txs.filter((t) => t.date === today && !t.goalId && !t.transferId);
     const todayInList = todayTxList.filter((t) => t.type === "in");
     const todayOutList = todayTxList.filter((t) => t.type === "out");
 
@@ -1071,7 +1107,7 @@ function useDuitStoreInternal() {
     // ── Transaksi 7 hari terakhir (selain hari ini) ──
     const sevenDaysAgo = addDaysToDateKey(today, -7);
     const recentTxList = txs
-      .filter((t) => !t.goalId && t.date !== today && t.date >= sevenDaysAgo)
+      .filter((t) => !t.goalId && !t.transferId && t.date !== today && t.date >= sevenDaysAgo)
       .slice(0, 30);
 
     if (recentTxList.length > 0) {
@@ -1189,6 +1225,7 @@ function useDuitStoreInternal() {
     addWallet,
     delWallet,
     updateWallet,
+    transferWallet,
     setTodayMood,
     setTodayNote,
     updateSettings,
