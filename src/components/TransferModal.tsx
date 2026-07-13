@@ -105,7 +105,10 @@ export default function TransferModal({ fromWallet, onClose }: Props) {
             <label className={labelCls}>Dari Dompet</label>
             <select
               value={fromId}
-              onChange={(e) => setFromId(e.target.value)}
+              onChange={(e) => {
+                setFromId(e.target.value);
+                if (toId === e.target.value) setToId("");
+              }}
               className={inputCls}
             >
               <option value="">-- Pilih Dompet --</option>
@@ -151,11 +154,13 @@ export default function TransferModal({ fromWallet, onClose }: Props) {
               className={inputCls}
             >
               <option value="">-- Pilih Dompet --</option>
-              {wallets.map((w) => (
-                <option key={w.id} value={w.id}>
-                  {w.icon} {w.name} — {formatRupiah(w.balance)}
-                </option>
-              ))}
+              {wallets
+                .filter((w) => !fromId || w.id !== parseInt(fromId, 10))
+                .map((w) => (
+                  <option key={w.id} value={w.id}>
+                    {w.icon} {w.name} — {formatRupiah(w.balance)}
+                  </option>
+                ))}
             </select>
           </div>
 
