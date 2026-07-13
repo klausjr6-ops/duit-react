@@ -170,7 +170,7 @@ interface ChatWidgetProps {
 }
 
 export default function ChatWidget({ open, onClose }: ChatWidgetProps) {
-  const { buildAIContext, settings } = useStore();
+  const { buildAIContext, settings, score, inMonth, outMonth } = useStore();
   const { user } = useAuth();
   const { isDark } = useTheme();
 
@@ -341,9 +341,45 @@ export default function ChatWidget({ open, onClose }: ChatWidgetProps) {
             >
               <div className={`flex items-center justify-between px-5 py-4 border-b ${headerBorder} shrink-0`}>
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-teal-400 to-blue-500 flex items-center justify-center shadow-lg">
-                    <span className="text-zinc-900 font-black text-lg">D</span>
-                  </div>
+                  {(() => {
+                    const dStatus = (outMonth > inMonth && inMonth > 0)
+                      ? "danger"
+                      : (outMonth > inMonth * 0.8 && inMonth > 0)
+                        ? "warning"
+                        : score >= 70
+                          ? "good"
+                          : "neutral";
+
+                    const dGradient = dStatus === "danger"
+                      ? "from-rose-400 to-rose-600"
+                      : dStatus === "warning"
+                        ? "from-amber-400 to-orange-500"
+                        : dStatus === "good"
+                          ? "from-emerald-400 to-teal-500"
+                          : "from-teal-400 to-blue-500";
+
+                    const dGlow = dStatus === "danger"
+                      ? "shadow-rose-500/30"
+                      : dStatus === "warning"
+                        ? "shadow-amber-500/20"
+                        : dStatus === "good"
+                          ? "shadow-emerald-500/20"
+                          : "shadow-teal-500/20";
+
+                    const dEmoji = dStatus === "danger"
+                      ? "😰"
+                      : dStatus === "warning"
+                        ? "😅"
+                        : dStatus === "good"
+                          ? "😊"
+                          : "👋";
+
+                    return (
+                      <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${dGradient} flex items-center justify-center shadow-lg ${dGlow} transition-all duration-500`}>
+                        <span className="text-zinc-900 font-black text-lg">{dEmoji}</span>
+                      </div>
+                    );
+                  })()}
                   <div>
                     <h2 id="chat-dialog-title" className={`${headerTitle} font-bold text-base leading-tight`}>Tanya DUIT</h2>
                     <p className={`${headerSub} text-xs`}>Teman ngobrol serba bisa</p>

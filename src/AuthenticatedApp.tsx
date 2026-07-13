@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState, lazy, Suspense } from "react";
+import { motion } from "framer-motion";
 import Sidebar from "./components/Sidebar";
 import Header from "./components/Header";
 import ClockCard from "./components/ClockCard";
@@ -279,24 +280,72 @@ function DashboardApp() {
       </main>
 
       {/* ── Floating Action Button (FAB) untuk buka Chat AI ── */}
-      <button
-        onClick={() => setShowChat(true)}
-        className="fixed bottom-24 right-5 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-teal-400 to-blue-500 text-zinc-900 shadow-lg shadow-teal-500/25 transition-transform hover:scale-105 active:scale-95 md:bottom-8 md:right-8 md:h-16 md:w-16"
-        aria-label="Buka Chat AI"
-      >
-        <svg
-          width="26"
-          height="26"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2.5"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        >
-          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-        </svg>
-      </button>
+      {(() => {
+        const fabStatus = (outMonth > inMonth && inMonth > 0)
+          ? "danger"
+          : (outMonth > inMonth * 0.8 && inMonth > 0)
+            ? "warning"
+            : score >= 70
+              ? "good"
+              : "neutral";
+
+        const fabGlow = fabStatus === "danger"
+          ? "shadow-rose-500/40"
+          : fabStatus === "warning"
+            ? "shadow-amber-500/30"
+            : fabStatus === "good"
+              ? "shadow-emerald-500/30"
+              : "shadow-teal-500/25";
+
+        const fabGradient = fabStatus === "danger"
+          ? "from-rose-400 to-rose-600"
+          : fabStatus === "warning"
+            ? "from-amber-400 to-orange-500"
+            : fabStatus === "good"
+              ? "from-emerald-400 to-teal-500"
+              : "from-teal-400 to-blue-500";
+
+        const fabPulse = fabStatus === "danger" || fabStatus === "warning";
+
+        const tooltipText = fabStatus === "danger"
+          ? "⚠️ Overspend bulan ini!"
+          : fabStatus === "warning"
+            ? "⚡ Budget mulai ketat"
+            : fabStatus === "good"
+              ? "💚 Keuangan sehat!"
+              : "Tanya DUIT";
+
+        return (
+          <div className="fixed bottom-24 right-5 z-40 flex flex-col items-center md:bottom-8 md:right-8">
+            {/* Tooltip */}
+            <div className={`mb-2 px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-opacity ${isDark ? "bg-slate-800 text-slate-200 border border-white/10" : "bg-white text-zinc-700 border border-zinc-200 shadow-lg"} opacity-0 group-fab-hover:opacity-100 pointer-events-none`}>
+              {tooltipText}
+            </div>
+            <motion.button
+              onClick={() => setShowChat(true)}
+              animate={fabPulse ? { scale: [1, 1.08, 1] } : {}}
+              transition={fabPulse ? { duration: 2, repeat: Infinity, ease: "easeInOut" } : {}}
+              whileHover={{ scale: 1.1 }}
+              whileTap={{ scale: 0.95 }}
+              className={`group/fab flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br ${fabGradient} text-zinc-900 shadow-lg ${fabGlow} transition-shadow md:h-16 md:w-16`}
+              aria-label="Buka Chat AI"
+            >
+              <svg
+                width="26"
+                height="26"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+              </svg>
+            </motion.button>
+          </div>
+        );
+      })()}
 
       {/* ── Modal Chat AI (popup) ── */}
       {showChat && (
