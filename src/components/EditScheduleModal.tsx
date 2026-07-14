@@ -3,6 +3,7 @@ import { motion } from "framer-motion";
 import { useStore, type ScheduleItem } from "../lib/store";
 import { useTheme } from "../lib/ThemeContext";
 import { useModalDialog } from "../hooks/useModalDialog";
+import { IconRepeat } from "../utils/icons";
 
 interface Props { sched: ScheduleItem; onClose: () => void; }
 
@@ -49,7 +50,7 @@ export default function EditScheduleModal({ sched, onClose }: Props) {
           <div><label className={labelCls}>Deskripsi</label><input value={desc} onChange={e=>setDesc(e.target.value)} className={inputCls} /></div>
           <label className={isDark?"flex items-center gap-3 cursor-pointer bg-white/5 rounded-xl p-3":"flex items-center gap-3 cursor-pointer bg-zinc-50 border border-zinc-200 rounded-xl p-3"}>
             <input type="checkbox" checked={recurring} onChange={e=>setRecurring(e.target.checked)} className="w-4 h-4 accent-teal-500" />
-            <span className={isDark?"text-sm text-white font-medium":"text-sm text-zinc-900 font-medium"}>🔄 Ulangi Setiap Minggu</span>
+            <span className={isDark?"text-sm text-white font-medium":"text-sm text-zinc-900 font-medium"}><span className="inline-flex items-center gap-1.5"><IconRepeat size={14} /> Ulangi Setiap Minggu</span></span>
           </label>
           {recurring && <div><label className={labelCls}>Berulang Sampai</label><input type="date" value={untilDate} onChange={e=>setUntilDate(e.target.value)} min={date} className={inputCls} /></div>}
           {error && <p role="alert" className="rounded-lg border border-rose-400/30 bg-rose-400/10 px-3 py-2 text-xs text-rose-500">{error}</p>}

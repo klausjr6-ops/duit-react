@@ -1,4 +1,4 @@
-import { IconCalendar } from "../utils/icons";
+import { IconCalendar, IconClock, IconRepeat, IconEdit, IconTrash } from "../utils/icons";
 import { useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import Card from "../components/Card";
@@ -116,7 +116,7 @@ export default function JadwalView() {
             icon={<IconCalendar size={32} />}
             title="Belum ada jadwal"
             description="Tambahkan jadwal tagihan, rutinitas mingguan, kelas, meeting, atau reminder penting supaya hari kamu lebih teratur."
-            tips={["💡 Bayar listrik", "🏃 Olahraga", "💼 Meeting", "🔄 Mingguan"]}
+            tips={["Bayar listrik", "Olahraga", "Meeting", "Mingguan"]}
             actionLabel="Tambah Jadwal"
             onAction={() => setShowModal(true)}
           />
@@ -157,12 +157,12 @@ export default function JadwalView() {
                       </div>
                       <div className="mt-1.5 flex flex-wrap items-center gap-2">
                         <span className={`flex items-center gap-1 text-sm ${isDark ? "text-slate-300" : "text-zinc-700"}`}>
-                          🕐 {schedule.start}{schedule.end ? ` - ${schedule.end}` : ""}
+                          <IconClock size={14} /> {schedule.start}{schedule.end ? ` - ${schedule.end}` : ""}
                         </span>
                         {schedule.recurring && (
                           <>
-                            <span className={isDark ? "rounded-full bg-purple-500/15 px-2.5 py-1 text-xs font-semibold text-purple-300" : "rounded-full bg-purple-50 px-2.5 py-1 text-xs font-semibold text-purple-700"}>
-                              🔄 Setiap Minggu
+                            <span className={`flex items-center gap-1 ${isDark ? "rounded-full bg-purple-500/15 px-2.5 py-1 text-xs font-semibold text-purple-300" : "rounded-full bg-purple-50 px-2.5 py-1 text-xs font-semibold text-purple-700"}`}>
+                              <IconRepeat size={12} /> Setiap Minggu
                             </span>
                             {schedule.untilDate && (
                               <span className={`text-xs ${mutedClass}`}>s/d {formatFullDate(schedule.untilDate)}</span>
@@ -177,16 +177,18 @@ export default function JadwalView() {
                     <button
                       type="button"
                       onClick={() => setScheduleToEdit(schedule)}
-                      className={isDark ? "rounded-lg bg-white/5 px-3 py-2 text-sm font-semibold text-slate-200 hover:bg-white/10" : "rounded-lg bg-zinc-100 px-3 py-2 text-sm font-semibold text-zinc-700 hover:bg-zinc-200"}
+                      className={isDark ? "p-2 rounded-lg text-slate-400 hover:text-teal-400 hover:bg-white/10 transition-colors" : "p-2 rounded-lg text-zinc-400 hover:text-teal-600 hover:bg-zinc-100 transition-colors"}
+                      aria-label={`Edit jadwal ${schedule.name}`}
                     >
-                      Edit
+                      <IconEdit size={16} />
                     </button>
                     <button
                       type="button"
                       onClick={() => setScheduleToDelete(schedule)}
-                      className={isDark ? "rounded-lg bg-rose-500/10 px-4 py-2 text-sm font-semibold text-rose-400 transition-colors hover:bg-rose-500/20" : "rounded-lg bg-rose-50 px-4 py-2 text-sm font-semibold text-rose-600 transition-colors hover:bg-rose-100"}
+                      className={isDark ? "p-2 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 transition-colors" : "p-2 rounded-lg text-zinc-400 hover:text-rose-500 hover:bg-rose-50 transition-colors"}
+                      aria-label={`Hapus jadwal ${schedule.name}`}
                     >
-                      Hapus
+                      <IconTrash size={16} />
                     </button>
                     </div>
                   </motion.div>

@@ -3,6 +3,7 @@ import { motion } from "framer-motion";
 import { useStore, todayStr } from "../lib/store";
 import { useTheme } from "../lib/ThemeContext";
 import { useModalDialog } from "../hooks/useModalDialog";
+import { IconRepeat } from "../utils/icons";
 
 interface Props {
   onClose: () => void;
@@ -103,7 +104,7 @@ export default function ScheduleModal({ onClose }: Props) {
           </div>
           <label className={checkWrap}>
             <input type="checkbox" checked={recurring} onChange={(e) => setRecurring(e.target.checked)} className="w-4 h-4 accent-teal-500" />
-            <span className={checkText}>🔄 Ulangi Setiap Minggu</span>
+            <span className={checkText}><span className="inline-flex items-center gap-1.5"><IconRepeat size={14} /> Ulangi Setiap Minggu</span></span>
           </label>
           {recurring && (
             <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }}>
