@@ -2,6 +2,7 @@ import { motion } from "framer-motion";
 import Card from "./Card";
 import { useStore, type ScheduleItem } from "../lib/store";
 import { useTheme } from "../lib/ThemeContext";
+import { IconCalendar } from "../utils/icons";
 
 function timeToHour(t?: string) {
   if (!t) return 0;
@@ -36,7 +37,7 @@ export default function TimelineCard() {
             ? "rounded-full bg-teal-400/10 px-3 py-1 text-xs font-semibold text-teal-400"
             : "rounded-full bg-teal-50 px-3 py-1 text-xs font-semibold text-teal-700"
           }>
-            {closest.icon ?? "📌"} {closest.name}
+            <IconCalendar size={12} /> {closest.name}
           </span>
         )}
       </div>
@@ -73,7 +74,7 @@ export default function TimelineCard() {
       <div className="mt-6 grid flex-1 grid-cols-1 gap-2 overflow-y-auto sm:grid-cols-2">
         {todaySchedules.length === 0 && (
           <div className={`col-span-full flex flex-col items-center justify-center gap-2 rounded-xl border border-dashed py-8 text-center ${isDark ? "border-white/10 text-slate-500" : "border-zinc-300 text-zinc-500"}`}>
-            <span className="text-2xl">📅</span>
+            <span className="text-teal-500"><IconCalendar size={28} /></span>
             <span className="text-sm">Belum ada jadwal hari ini</span>
           </div>
         )}
@@ -87,7 +88,7 @@ export default function TimelineCard() {
                 isActive ? "border-teal-400/40 bg-teal-400/10" : itemBorder
               }`}
             >
-              <span className="text-lg">{a.icon ?? "📌"}</span>
+              <span className="text-lg">{a.icon ?? <IconCalendar size={18} />}</span>
               <div>
                 <p className={`text-sm font-medium ${textMain}`}>{a.name}</p>
                 <p className={`text-xs ${muted}`}>

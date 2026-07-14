@@ -1,3 +1,4 @@
+import { IconCalendar } from "../utils/icons";
 import { useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import Card from "../components/Card";
@@ -112,7 +113,7 @@ export default function JadwalView() {
         {enriched.length === 0 ? (
           <EmptyState
             compact
-            icon="📅"
+            icon={<IconCalendar size={32} />}
             title="Belum ada jadwal"
             description="Tambahkan jadwal tagihan, rutinitas mingguan, kelas, meeting, atau reminder penting supaya hari kamu lebih teratur."
             tips={["💡 Bayar listrik", "🏃 Olahraga", "💼 Meeting", "🔄 Mingguan"]}

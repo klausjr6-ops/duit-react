@@ -2,6 +2,7 @@ import { motion } from "framer-motion";
 import Card from "./Card";
 import { formatRupiah } from "../lib/format";
 import { useTheme } from "../lib/ThemeContext";
+import { IconArrowDown, IconArrowUp, IconCalendar } from "../utils/icons";
 
 interface TodayCardProps {
   income: number;
@@ -23,7 +24,7 @@ export default function TodayCard({
   const { isDark } = useTheme();
   const rows = [
     {
-      icon: "⬇️",
+      icon: <IconArrowDown size={18} />,
       iconBg: isDark ? "bg-blue-500/15 text-blue-400" : "bg-blue-50 text-blue-600",
       label: "Masuk Hari Ini",
       value: formatRupiah(income),
@@ -32,7 +33,7 @@ export default function TodayCard({
       ariaLabel: "Catat pemasukan hari ini",
     },
     {
-      icon: "⬆️",
+      icon: <IconArrowUp size={18} />,
       iconBg: isDark ? "bg-rose-500/15 text-rose-400" : "bg-rose-50 text-rose-600",
       label: "Keluar Hari Ini",
       value: formatRupiah(expense),
@@ -41,7 +42,7 @@ export default function TodayCard({
       ariaLabel: "Catat pengeluaran hari ini",
     },
     {
-      icon: "📅",
+      icon: <IconCalendar size={18} />,
       iconBg: isDark ? "bg-indigo-500/15 text-indigo-400" : "bg-indigo-50 text-indigo-600",
       label: "Jadwal Aktif",
       value: `${scheduleCount} kegiatan`,
@@ -75,7 +76,7 @@ export default function TodayCard({
             }`}
           >
             <div className="flex items-center gap-3">
-              <span className={`flex h-10 w-10 items-center justify-center rounded-xl text-lg transition-transform ${row.onClick ? "group-hover:scale-105" : ""} ${row.iconBg}`}>
+              <span className={`flex h-10 w-10 items-center justify-center rounded-xl transition-transform ${row.onClick ? "group-hover:scale-105" : ""} ${row.iconBg}`}>
                 {row.icon}
               </span>
               <span className={`text-sm ${isDark ? "text-slate-300" : "text-zinc-700"}`}>{row.label}</span>

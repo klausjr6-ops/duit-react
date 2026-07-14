@@ -22,10 +22,10 @@ export default function WeeklyChart() {
       const date = addDaysToDateKey(today, -offset);
       const dayTransactions = txs.filter((transaction) => transaction.date === date);
       const income = dayTransactions
-        .filter((transaction) => transaction.type === "in" && !transaction.goalId)
+        .filter((transaction) => transaction.type === "in" && !transaction.goalId && !transaction.transferId)
         .reduce((amount, transaction) => amount + transaction.amt, 0);
       const expense = dayTransactions
-        .filter((transaction) => transaction.type === "out" && !transaction.goalId)
+        .filter((transaction) => transaction.type === "out" && !transaction.goalId && !transaction.transferId)
         .reduce((amount, transaction) => amount + transaction.amt, 0);
       days.push({ label: weekdayLabel(date), date, in: income, out: expense });
     }
