@@ -637,10 +637,40 @@ function useDuitStoreInternal() {
 
   const delTx = useCallback(
     (id: number) =>
-      updateData((previous) => ({
-        ...previous,
-        txs: previous.txs.filter((transaction) => transaction.id !== id),
-      })),
+      updateData((previous) => {
+        const tx = previous.txs.find((t) => t.id === id);
+        if (!tx) return previous;
+
+        // Collect IDs to remove: the target tx + any paired transfer
+        const idsToRemove = new Set([id]);
+        if (tx.transferId) {
+          for (const t of previous.txs) {
+            if (t.transferId === tx.transferId && t.id !== id) {
+              idsToRemove.add(t.id);
+            }
+          }
+        }
+
+        // Adjust goal.current for deleted goal transactions:
+        //   "out" (funding)   → was +amt to goal, undo by -amt
+        //   "in"  (withdrawal) → was -amt from goal, undo by +amt
+        let goals = previous.goals;
+        for (const t of previous.txs) {
+          if (!idsToRemove.has(t.id) || !t.goalId) continue;
+          const delta = t.type === "out" ? -t.amt : t.amt;
+          goals = goals.map((g) =>
+            g.id === t.goalId
+              ? { ...g, current: Math.max(0, Math.min(g.target, g.current + delta)) }
+              : g
+          );
+        }
+
+        return {
+          ...previous,
+          txs: previous.txs.filter((t) => !idsToRemove.has(t.id)),
+          goals,
+        };
+      }),
     [updateData]
   );
 
@@ -869,10 +899,41 @@ function useDuitStoreInternal() {
 
   const delWallet = useCallback(
     (id: number) =>
-      updateData((previous) => ({
-        ...previous,
-        wallets: previous.wallets.filter((wallet) => wallet.id !== id),
-      })),
+      updateData((previous) => {
+        // Find all transferIds originating from this wallet so we can
+        // remove the paired transaction on the other wallet too.
+        const walletTransferIds = new Set(
+          previous.txs
+            .filter((t) => t.walletId === id && t.transferId)
+            .map((t) => t.transferId)
+        );
+
+        // Collect all transaction IDs to remove
+        const idsToRemove = new Set<number>();
+        for (const t of previous.txs) {
+          if (t.walletId === id) idsToRemove.add(t.id);
+          if (t.transferId && walletTransferIds.has(t.transferId)) idsToRemove.add(t.id);
+        }
+
+        // Adjust goal.current for deleted goal transactions
+        let goals = previous.goals;
+        for (const t of previous.txs) {
+          if (!idsToRemove.has(t.id) || !t.goalId) continue;
+          const delta = t.type === "out" ? -t.amt : t.amt;
+          goals = goals.map((g) =>
+            g.id === t.goalId
+              ? { ...g, current: Math.max(0, Math.min(g.target, g.current + delta)) }
+              : g
+          );
+        }
+
+        return {
+          ...previous,
+          wallets: previous.wallets.filter((w) => w.id !== id),
+          txs: previous.txs.filter((t) => !idsToRemove.has(t.id)),
+          goals,
+        };
+      }),
     [updateData]
   );
 

@@ -146,7 +146,14 @@ export default function TransactionList({ filterWallet = "all", onAddClick }: Pr
       <ConfirmDialog
         open={Boolean(transactionToDelete)}
         title="Hapus Transaksi?"
-        message={transactionToDelete ? `Transaksi "${transactionToDelete.desc}" sebesar ${formatRupiah(transactionToDelete.amt)} akan dihapus.` : ""}
+        message={transactionToDelete ? (() => {
+          const isTransfer = Boolean(transactionToDelete.transferId);
+          const isGoal = Boolean(transactionToDelete.goalId);
+          let msg = `Transaksi "${transactionToDelete.desc}" sebesar ${formatRupiah(transactionToDelete.amt)} akan dihapus.`;
+          if (isTransfer) msg += " Pasangan transfer juga akan dihapus.";
+          if (isGoal) msg += " Saldo goal akan dikoreksi otomatis.";
+          return msg;
+        })() : ""}
         confirmLabel="Ya, Hapus"
         onClose={() => setTransactionToDelete(null)}
         onConfirm={() => {

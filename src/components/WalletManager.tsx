@@ -190,7 +190,7 @@ export default function WalletManager({ onClose }: Props) {
       <ConfirmDialog
         open={Boolean(walletToDelete)}
         title="Hapus Dompet?"
-        message={walletToDelete ? `Dompet "${walletToDelete.name}" akan dihapus. Transaksi yang sudah tercatat tetap ada di riwayat.` : ""}
+        message={walletToDelete ? `Dompet "${walletToDelete.name}" dan semua transaksinya akan dihapus. Transfer & tabungan terkait juga akan dikoreksi.` : ""}
         confirmLabel="Ya, Hapus"
         onClose={() => setWalletToDelete(null)}
         onConfirm={() => {
