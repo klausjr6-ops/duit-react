@@ -56,7 +56,7 @@ export default function ReportCard({ income, expense, savingsPct: _savingsPct }:
             ]}
             onHoverSlice={setHovered}
           />
-          <div className="h-10 flex items-center justify-center">
+          <div className="h-14 flex items-center justify-center">
             <AnimatePresence mode="wait">
               {hovered && (
                 <motion.div
@@ -65,16 +65,18 @@ export default function ReportCard({ income, expense, savingsPct: _savingsPct }:
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   exit={{ opacity: 0, y: -6, scale: 0.9 }}
                   transition={{ duration: 0.15 }}
-                  className="flex items-center gap-2 rounded-full px-3 py-1"
+                  className="flex items-center gap-2.5 rounded-xl px-4 py-2"
                   style={{ backgroundColor: hovered.color + "18" }}
                 >
-                  <span className="h-2 w-2 rounded-full" style={{ backgroundColor: hovered.color }} />
-                  <span className={`text-xs font-semibold ${isDark ? "text-slate-200" : "text-zinc-800"}`}>
-                    {hovered.label}
-                  </span>
-                  <span className="text-xs font-bold" style={{ color: hovered.color }}>
-                    {hovered.formattedAmount ?? `${hovered.pct}%`}
-                  </span>
+                  <span className="h-2.5 w-2.5 rounded-full shrink-0" style={{ backgroundColor: hovered.color }} />
+                  <div className="flex flex-col">
+                    <span className={`text-xs font-semibold leading-tight ${isDark ? "text-slate-200" : "text-zinc-800"}`}>
+                      {hovered.label}
+                    </span>
+                    <span className="text-[11px] leading-tight" style={{ color: hovered.color }}>
+                      {hovered.formattedAmount} · {hovered.pct}% dari total
+                    </span>
+                  </div>
                 </motion.div>
               )}
             </AnimatePresence>
