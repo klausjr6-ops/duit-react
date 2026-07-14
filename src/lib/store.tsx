@@ -625,14 +625,29 @@ function useDuitStoreInternal() {
      TRANSACTIONS
      ══════════════════════════════════════════════════════════ */
   const addTx = useCallback(
-    (tx: Omit<Transaction, "id">) => {
+    (tx: Omit<Transaction, "id">): { ok: boolean; message?: string } => {
+      // Validate balance for outgoing transactions
+      if (tx.type === "out" && tx.walletId) {
+        const sourceBalance = getWalletBalance(data, tx.walletId);
+        if (sourceBalance !== null && sourceBalance < tx.amt) {
+          return { ok: false, message: "Saldo dompet tidak mencukupi untuk pengeluaran ini." };
+        }
+      }
       const transaction: Transaction = { ...tx, id: createId() };
-      updateData((previous) => ({
-        ...previous,
-        txs: [transaction, ...previous.txs],
-      }));
+      updateData((previous) => {
+        // Double-check inside updater (safety net for race conditions)
+        if (transaction.type === "out" && transaction.walletId) {
+          const bal = getWalletBalance(previous, transaction.walletId);
+          if (bal !== null && bal < transaction.amt) return previous;
+        }
+        return {
+          ...previous,
+          txs: [transaction, ...previous.txs],
+        };
+      });
+      return { ok: true };
     },
-    [updateData]
+    [updateData, data]
   );
 
   const delTx = useCallback(
@@ -676,10 +691,42 @@ function useDuitStoreInternal() {
 
   const updateTx = useCallback(
     (id: number, patch: Partial<Omit<Transaction, "id" | "goalId">>) =>
-      updateData((previous) => ({
-        ...previous,
-        txs: previous.txs.map((t) => (t.id === id ? { ...t, ...patch } : t)),
-      })),
+      updateData((previous) => {
+        const existing = previous.txs.find((t) => t.id === id);
+        if (!existing) return previous;
+
+        // Block editing of transfer transactions
+        if (existing.transferId) return previous;
+
+        // Block editing of goal transactions (use fund/withdraw instead)
+        if (existing.goalId) return previous;
+
+        // If changing walletId on an "out" tx, validate the new wallet has balance
+        if (patch.walletId !== undefined && patch.walletId !== existing.walletId && existing.type === "out") {
+          const newAmt = patch.amt ?? existing.amt;
+          const sourceBalance = getWalletBalance(previous, patch.walletId);
+          if (sourceBalance !== null && sourceBalance < newAmt) return previous;
+        }
+
+        // If changing amt on an "out" tx on the same wallet, validate balance
+        if (patch.amt !== undefined && patch.amt !== existing.amt && existing.type === "out" && !existing.goalId) {
+          const walletId = patch.walletId ?? existing.walletId;
+          if (walletId) {
+            const sourceBalance = getWalletBalance(previous, walletId);
+            const oldAmt = existing.amt;
+            if (sourceBalance !== null && sourceBalance < (sourceBalance + oldAmt - patch.amt)) {
+              // new balance = old balance + oldAmt - newAmt; if negative, reject
+              const newBalance = sourceBalance + oldAmt - patch.amt;
+              if (newBalance < 0) return previous;
+            }
+          }
+        }
+
+        return {
+          ...previous,
+          txs: previous.txs.map((t) => (t.id === id ? { ...t, ...patch } : t)),
+        };
+      }),
     [updateData]
   );
 
@@ -949,7 +996,16 @@ function useDuitStoreInternal() {
   );
 
   const transferWallet = useCallback(
-    (fromId: number, toId: number, amount: number) => {
+    (fromId: number, toId: number, amount: number): { ok: boolean; message?: string } => {
+      // Pre-validate using current data
+      const sourceBalance = getWalletBalance(data, fromId);
+      if (sourceBalance === null) {
+        return { ok: false, message: "Dompet asal tidak ditemukan." };
+      }
+      if (sourceBalance < amount) {
+        return { ok: false, message: `Saldo tidak mencukupi. Saldo: Rp${sourceBalance.toLocaleString("id-ID")}` };
+      }
+
       const transferId = createId();
       const date = todayStr();
       const outTx: Transaction = {
@@ -973,19 +1029,17 @@ function useDuitStoreInternal() {
         transferId,
       };
       updateData((previous) => {
-        // Validate source wallet balance inside the update to avoid stale reads
-        const sourceBalance = getWalletBalance(previous, fromId);
-        if (sourceBalance === null || sourceBalance < amount) {
-          // Silently skip — TransferModal already pre-validates, this is a safety net
-          return previous;
-        }
+        // Double-check inside updater (safety net for race conditions)
+        const bal = getWalletBalance(previous, fromId);
+        if (bal === null || bal < amount) return previous;
         return {
           ...previous,
           txs: [outTx, inTx, ...previous.txs],
         };
       });
+      return { ok: true };
     },
-    [updateData]
+    [updateData, data]
   );
 
   /* ══════════════════════════════════════════════════════════

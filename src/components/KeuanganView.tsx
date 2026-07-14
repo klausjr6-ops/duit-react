@@ -72,7 +72,7 @@ export default function KeuanganView({ quickType, quickNonce, onQuickDone }: Keu
       setFormError("Saldo dompet tidak mencukupi untuk pengeluaran ini.");
       return;
     }
-    addTx({
+    const result = addTx({
       type,
       cat,
       desc: desc || cat,
@@ -80,6 +80,10 @@ export default function KeuanganView({ quickType, quickNonce, onQuickDone }: Keu
       date,
       walletId: parseInt(walletId),
     });
+    if (!result.ok) {
+      setFormError(result.message || "Transaksi gagal.");
+      return;
+    }
     setType(""); setCat(""); setWalletId(""); setAmt(""); setDesc(""); setDate(todayStr());
     onQuickDone?.();
   };

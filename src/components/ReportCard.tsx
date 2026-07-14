@@ -4,7 +4,7 @@ import Card from "./Card";
 import PizzaChart, { HoveredSliceData } from "./PizzaChart";
 import { formatRupiah } from "../lib/format";
 import { useTheme } from "../lib/ThemeContext";
-import { IconArrowDown, IconArrowUp, IconWallet } from "../utils/icons";
+import { IconArrowDown, IconArrowUp, IconWallet, IconTrendingDown } from "../utils/icons";
 
 interface ReportCardProps {
   income: number;
@@ -12,55 +12,104 @@ interface ReportCardProps {
 }
 
 export default function ReportCard({ income, expense }: ReportCardProps) {
+  const deficit = expense - income;
+  const isOverspend = deficit > 0;
   const balance = Math.max(income - expense, 0);
-  const chartTotal = income + expense + balance || 1;
   const { isDark } = useTheme();
   const [hovered, setHovered] = useState<HoveredSliceData | null>(null);
 
-  const rows = [
-    {
-      icon: <IconArrowDown size={16} />,
-      iconBg: isDark ? "bg-blue-500/15 text-blue-400" : "bg-blue-50 text-blue-600",
-      label: "Pemasukan",
-      value: income,
-      color: isDark ? "text-blue-400" : "text-blue-600",
-      barColor: "from-blue-400 to-cyan-400",
-      pct: (income / chartTotal) * 100,
-      dotColor: "bg-blue-500",
-    },
-    {
-      icon: <IconArrowUp size={16} />,
-      iconBg: isDark ? "bg-rose-500/15 text-rose-400" : "bg-rose-50 text-rose-600",
-      label: "Pengeluaran",
-      value: expense,
-      color: isDark ? "text-rose-400" : "text-rose-600",
-      barColor: "from-rose-500 to-orange-400",
-      pct: (expense / chartTotal) * 100,
-      dotColor: "bg-rose-500",
-    },
-    {
-      icon: <IconWallet size={16} />,
-      iconBg: isDark ? "bg-emerald-500/15 text-emerald-400" : "bg-emerald-50 text-emerald-600",
-      label: "Sisa Saldo",
-      value: balance,
-      color: isDark ? "text-emerald-400" : "text-emerald-600",
-      barColor: "from-emerald-400 to-teal-400",
-      pct: (balance / chartTotal) * 100,
-      dotColor: "bg-emerald-500",
-    },
-  ];
+  // Build chart slices — different for overspend vs normal
+  const slices = isOverspend
+    ? [
+        { value: income, color: "#3b82f6", label: "Pemasukan", amount: income, formattedAmount: formatRupiah(income) },
+        { value: expense, color: "#fb7185", label: "Pengeluaran", amount: expense, formattedAmount: formatRupiah(expense) },
+      ]
+    : [
+        { value: income, color: "#3b82f6", label: "Pemasukan", amount: income, formattedAmount: formatRupiah(income) },
+        { value: expense, color: "#fb7185", label: "Pengeluaran", amount: expense, formattedAmount: formatRupiah(expense) },
+        { value: balance, color: "#10b981", label: "Sisa Saldo", amount: balance, formattedAmount: formatRupiah(balance) },
+      ];
+
+  const rows = isOverspend
+    ? [
+        {
+          icon: <IconArrowDown size={16} />,
+          iconBg: isDark ? "bg-blue-500/15 text-blue-400" : "bg-blue-50 text-blue-600",
+          label: "Pemasukan",
+          value: income,
+          color: isDark ? "text-blue-400" : "text-blue-600",
+          barColor: "from-blue-400 to-cyan-400",
+          pct: income > 0 ? (income / (income + expense)) * 100 : 0,
+          dotColor: "bg-blue-500",
+        },
+        {
+          icon: <IconArrowUp size={16} />,
+          iconBg: isDark ? "bg-rose-500/15 text-rose-400" : "bg-rose-50 text-rose-600",
+          label: "Pengeluaran",
+          value: expense,
+          color: isDark ? "text-rose-400" : "text-rose-600",
+          barColor: "from-rose-500 to-orange-400",
+          pct: expense > 0 ? (expense / (income + expense)) * 100 : 0,
+          dotColor: "bg-rose-500",
+        },
+        {
+          icon: <IconTrendingDown size={16} />,
+          iconBg: isDark ? "bg-amber-500/15 text-amber-400" : "bg-amber-50 text-amber-600",
+          label: "Defisit",
+          value: deficit,
+          color: isDark ? "text-amber-400" : "text-amber-600",
+          barColor: "from-amber-400 to-orange-400",
+          pct: income > 0 ? (deficit / income) * 100 : 100,
+          dotColor: "bg-amber-500",
+        },
+      ]
+    : [
+        {
+          icon: <IconArrowDown size={16} />,
+          iconBg: isDark ? "bg-blue-500/15 text-blue-400" : "bg-blue-50 text-blue-600",
+          label: "Pemasukan",
+          value: income,
+          color: isDark ? "text-blue-400" : "text-blue-600",
+          barColor: "from-blue-400 to-cyan-400",
+          pct: (income / (income + expense + balance)) * 100,
+          dotColor: "bg-blue-500",
+        },
+        {
+          icon: <IconArrowUp size={16} />,
+          iconBg: isDark ? "bg-rose-500/15 text-rose-400" : "bg-rose-50 text-rose-600",
+          label: "Pengeluaran",
+          value: expense,
+          color: isDark ? "text-rose-400" : "text-rose-600",
+          barColor: "from-rose-500 to-orange-400",
+          pct: (expense / (income + expense + balance)) * 100,
+          dotColor: "bg-rose-500",
+        },
+        {
+          icon: <IconWallet size={16} />,
+          iconBg: isDark ? "bg-emerald-500/15 text-emerald-400" : "bg-emerald-50 text-emerald-600",
+          label: "Sisa Saldo",
+          value: balance,
+          color: isDark ? "text-emerald-400" : "text-emerald-600",
+          barColor: "from-emerald-400 to-teal-400",
+          pct: (balance / (income + expense + balance)) * 100,
+          dotColor: "bg-emerald-500",
+        },
+      ];
 
   return (
-    <Card accent="linear-gradient(90deg,#60a5fa,#2dd4bf,#fb7185)" delay={0.2}>
-      <p className={`mb-6 text-xs font-semibold tracking-widest ${isDark ? "text-slate-400" : "text-zinc-500"}`}>LAPORAN BULANAN</p>
+    <Card accent={isOverspend ? "linear-gradient(90deg,#f59e0b,#f97316,#fb7185)" : "linear-gradient(90deg,#60a5fa,#2dd4bf,#fb7185)"} delay={0.2}>
+      <div className="flex items-center justify-between mb-6">
+        <p className={`text-xs font-semibold tracking-widest ${isDark ? "text-slate-400" : "text-zinc-500"}`}>LAPORAN BULANAN</p>
+        {isOverspend && (
+          <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full ${isDark ? "bg-amber-500/15 text-amber-400 border border-amber-400/30" : "bg-amber-50 text-amber-600 border border-amber-200"}`}>
+            ⚠️ Overspend
+          </span>
+        )}
+      </div>
       <div className="flex flex-col items-center gap-8 sm:flex-row sm:items-center">
         <div className="flex flex-col items-center gap-2">
           <PizzaChart
-            slices={[
-              { value: income, color: "#3b82f6", label: "Pemasukan", amount: income, formattedAmount: formatRupiah(income) },
-              { value: expense, color: "#fb7185", label: "Pengeluaran", amount: expense, formattedAmount: formatRupiah(expense) },
-              { value: balance, color: "#10b981", label: "Sisa Saldo", amount: balance, formattedAmount: formatRupiah(balance) },
-            ]}
+            slices={slices}
             onHoverSlice={setHovered}
           />
           <div className="h-14 flex items-center justify-center">

@@ -40,7 +40,11 @@ export default function TransferModal({ fromWallet, onClose }: Props) {
       setError(`Saldo ${source.name} tidak mencukupi. Saldo: ${formatRupiah(source.balance)}`);
       return;
     }
-    transferWallet(parseInt(fromId, 10), parseInt(toId, 10), numAmt);
+    const result = transferWallet(parseInt(fromId, 10), parseInt(toId, 10), numAmt);
+    if (!result.ok) {
+      setError(result.message || "Transfer gagal.");
+      return;
+    }
     onClose();
   };
 
