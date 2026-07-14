@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState } from "react";
 
 interface Slice {
   value: number;
@@ -30,19 +30,6 @@ export default function PizzaChart({ slices, size = 180, onHoverSlice }: PizzaCh
     const t = setTimeout(() => setAnimated(true), 100);
     return () => clearTimeout(t);
   }, []);
-
-  const handleHover = useCallback(
-    (idx: number | null) => {
-      setHoveredIdx(idx);
-      if (idx !== null) {
-        const p = paths[idx];
-        if (p) onHoverSlice?.({ label: p.label, amount: p.amount, formattedAmount: p.formattedAmount, pct: Math.round(p.fraction * 100), color: p.color });
-      } else {
-        onHoverSlice?.(null);
-      }
-    },
-    [onHoverSlice]
-  );
 
   const total = slices.reduce((a, s) => a + s.value, 0) || 1;
   const cx = size / 2;
@@ -77,6 +64,16 @@ export default function PizzaChart({ slices, size = 180, onHoverSlice }: PizzaCh
     paths.push({ d, color: slice.color, label: slice.label, amount: slice.amount, formattedAmount: slice.formattedAmount, fraction });
     startAngle = endAngle;
   }
+
+  const handleHover = (idx: number | null) => {
+    setHoveredIdx(idx);
+    if (idx !== null) {
+      const p = paths[idx];
+      if (p) onHoverSlice?.({ label: p.label, amount: p.amount, formattedAmount: p.formattedAmount, pct: Math.round(p.fraction * 100), color: p.color });
+    } else {
+      onHoverSlice?.(null);
+    }
+  };
 
   return (
     <div className="relative flex items-center justify-center" style={{ width: size, height: size }}>
