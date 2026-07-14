@@ -1,6 +1,7 @@
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
+import { useState } from "react";
 import Card from "./Card";
-import PizzaChart from "./PizzaChart";
+import PizzaChart, { HoveredSliceData } from "./PizzaChart";
 import { formatRupiah } from "../lib/format";
 import { useTheme } from "../lib/ThemeContext";
 import { IconArrowDown, IconArrowUp } from "../utils/icons";
@@ -11,12 +12,13 @@ interface ReportCardProps {
   savingsPct: number;
 }
 
-export default function ReportCard({ income, expense, savingsPct }: ReportCardProps) {
+export default function ReportCard({ income, expense, savingsPct: _savingsPct }: ReportCardProps) {
   const total = income + expense || 1;
   const incomePct = (income / total) * 100;
   const expensePct = (expense / total) * 100;
   const remainderPct = Math.max(100 - incomePct - expensePct, 0);
   const { isDark } = useTheme();
+  const [hovered, setHovered] = useState<HoveredSliceData | null>(null);
 
   const rows = [
     {
@@ -45,18 +47,39 @@ export default function ReportCard({ income, expense, savingsPct }: ReportCardPr
     <Card accent="linear-gradient(90deg,#60a5fa,#2dd4bf,#fb7185)" delay={0.2}>
       <p className={`mb-6 text-xs font-semibold tracking-widest ${isDark ? "text-slate-400" : "text-zinc-500"}`}>LAPORAN HARIAN</p>
       <div className="flex flex-col items-center gap-8 sm:flex-row sm:items-center">
-        <PizzaChart
-          slices={[
-            { value: incomePct, color: "#3b82f6", label: "Pemasukan" },
-            { value: remainderPct, color: "#22c55e", label: "Selisih" },
-            { value: expensePct, color: "#fb7185", label: "Pengeluaran" },
-          ]}
-        >
-          <div className="flex flex-col items-center">
-            <span className={`text-3xl font-extrabold ${isDark ? "text-white" : "text-zinc-900"}`}>{Math.round(savingsPct)}%</span>
-            <span className={`text-xs ${isDark ? "text-slate-400" : "text-zinc-500"}`}>rasio</span>
+        <div className="flex flex-col items-center gap-2">
+          <PizzaChart
+            slices={[
+              { value: incomePct, color: "#3b82f6", label: "Pemasukan", amount: income, formattedAmount: formatRupiah(income) },
+              { value: remainderPct, color: "#22c55e", label: "Selisih", amount: Math.max(income - expense, 0), formattedAmount: formatRupiah(Math.max(income - expense, 0)) },
+              { value: expensePct, color: "#fb7185", label: "Pengeluaran", amount: expense, formattedAmount: formatRupiah(expense) },
+            ]}
+            onHoverSlice={setHovered}
+          />
+          <div className="h-10 flex items-center justify-center">
+            <AnimatePresence mode="wait">
+              {hovered && (
+                <motion.div
+                  key={hovered.label}
+                  initial={{ opacity: 0, y: -6, scale: 0.9 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: -6, scale: 0.9 }}
+                  transition={{ duration: 0.15 }}
+                  className="flex items-center gap-2 rounded-full px-3 py-1"
+                  style={{ backgroundColor: hovered.color + "18" }}
+                >
+                  <span className="h-2 w-2 rounded-full" style={{ backgroundColor: hovered.color }} />
+                  <span className={`text-xs font-semibold ${isDark ? "text-slate-200" : "text-zinc-800"}`}>
+                    {hovered.label}
+                  </span>
+                  <span className="text-xs font-bold" style={{ color: hovered.color }}>
+                    {hovered.formattedAmount ?? `${hovered.pct}%`}
+                  </span>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
-        </PizzaChart>
+        </div>
 
         <div className="w-full flex-1 space-y-5">
           {rows.map((row, i) => (
