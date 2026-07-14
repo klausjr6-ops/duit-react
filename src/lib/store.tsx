@@ -164,8 +164,8 @@ export function getNextScheduleOccurrence(
 }
 
 const DEFAULT_WALLETS: Wallet[] = [
-  { id: 1, name: "BCA", balance: 0, icon: "💳", color: "emerald" },
-  { id: 2, name: "Cash", balance: 0, icon: "💵", color: "teal" },
+  { id: 1, name: "BCA", balance: 0, icon: "card", color: "emerald" },
+  { id: 2, name: "Cash", balance: 0, icon: "cash", color: "teal" },
 ];
 
 /* ══════════════════════════════════════════════════════════════

@@ -3,6 +3,7 @@ import { motion } from "framer-motion";
 import { useStore, type Goal } from "../lib/store";
 import { useTheme } from "../lib/ThemeContext";
 import { useModalDialog } from "../hooks/useModalDialog";
+import { GOAL_ICONS } from "../utils/icons";
 
 interface Props { goal: Goal; onClose: () => void; }
 
@@ -12,7 +13,7 @@ export default function EditGoalModal({ goal, onClose }: Props) {
   const [name, setName] = useState(goal.name);
   const [target, setTarget] = useState(String(goal.target));
   const [deadline, setDeadline] = useState(goal.deadline || "");
-  const [icon, setIcon] = useState(goal.icon || "🎯");
+  const [icon, setIcon] = useState(goal.icon || GOAL_ICONS[0].key);
   const [error, setError] = useState<string | null>(null);
   const { dialogRef, onDialogKeyDown } = useModalDialog(true, onClose);
 
@@ -40,7 +41,35 @@ export default function EditGoalModal({ goal, onClose }: Props) {
         <div className="space-y-4">
           <div><label className={labelCls}>Nama Goal</label><input value={name} onChange={e=>setName(e.target.value)} className={inputCls} /></div>
           <div><label className={labelCls}>Target (Rp)</label><input type="text" inputMode="numeric" value={target ? `Rp ${formatInputRupiah(target)}` : ""} onChange={e=>setTarget(e.target.value.replace(/\D/g,""))} className={inputCls} /></div>
-          <div><label className={labelCls}>Icon</label><input value={icon} onChange={e=>setIcon(e.target.value)} className={inputCls} maxLength={2} /></div>
+          <div><label className={labelCls}>Icon</label>
+            <div className="grid grid-cols-4 gap-2 mt-1">
+              {GOAL_ICONS.map((ic) => (
+                <button
+                  key={ic.key}
+                  type="button"
+                  onClick={() => setIcon(ic.key)}
+                  title={ic.label}
+                  className={`flex flex-col items-center gap-1 p-2 rounded-lg border transition-all ${
+                    icon === ic.key
+                      ? "border-teal-400 bg-teal-500/10 text-teal-500"
+                      : isDark
+                        ? "border-white/10 text-slate-400 hover:border-white/30"
+                        : "border-zinc-200 text-zinc-500 hover:border-zinc-400 bg-white"
+                  }`}
+                >
+                  {ic.icon}
+                  <span className="text-[9px] font-semibold">{ic.label}</span>
+                </button>
+              ))}
+            </div>
+            {!GOAL_ICONS.some((ic) => ic.key === icon) && (
+              <div className="mt-2 flex items-center gap-2">
+                <span className={`text-xs ${isDark ? "text-slate-500" : "text-zinc-500"}`}>Icon lama:</span>
+                <span className="text-xl">{icon}</span>
+                <button type="button" onClick={() => setIcon(GOAL_ICONS[0].key)} className="text-[10px] text-teal-500 font-semibold">Ganti ke baru</button>
+              </div>
+            )}
+          </div>
           <div><label className={labelCls}>Deadline</label><input type="date" value={deadline} onChange={e=>setDeadline(e.target.value)} className={inputCls} /></div>
           <p className={isDark ? "text-xs text-slate-400":"text-xs text-zinc-500"}>Tabungan terkumpul saat ini: Rp {goal.current.toLocaleString("id-ID")} (tidak bisa diedit manual)</p>
           {error && <p role="alert" className="rounded-lg border border-rose-400/30 bg-rose-400/10 px-3 py-2 text-xs text-rose-500">{error}</p>}

@@ -1,6 +1,7 @@
 import { motion } from "framer-motion";
 import { useStore } from "../lib/store";
 import { useTheme } from "../lib/ThemeContext";
+import { IconHome, IconWallet, IconCalendar, IconTarget } from "../utils/icons";
 
 interface SidebarProps {
   active: string;
@@ -9,48 +10,10 @@ interface SidebarProps {
 }
 
 const items = [
-  {
-    key: "home",
-    label: "Beranda",
-    icon: (
-      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M3 9.5L12 3l9 6.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1V9.5z" />
-      </svg>
-    ),
-  },
-  {
-    key: "wallet",
-    label: "Transaksi",
-    icon: (
-      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-        <rect x="2" y="5" width="20" height="14" rx="3" />
-        <path d="M16 12h.01" />
-        <path d="M2 10h20" />
-      </svg>
-    ),
-  },
-  {
-    key: "calendar",
-    label: "Jadwal",
-    icon: (
-      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-        <rect x="3" y="4" width="18" height="17" rx="2" />
-        <path d="M16 2v4M8 2v4M3 10h18" />
-        <path d="M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01" />
-      </svg>
-    ),
-  },
-  {
-    key: "target",
-    label: "Goals",
-    icon: (
-      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-        <circle cx="12" cy="12" r="9" />
-        <circle cx="12" cy="12" r="5" />
-        <circle cx="12" cy="12" r="1" />
-      </svg>
-    ),
-  },
+  { key: "home", label: "Beranda", icon: <IconHome /> },
+  { key: "wallet", label: "Transaksi", icon: <IconWallet /> },
+  { key: "calendar", label: "Jadwal", icon: <IconCalendar /> },
+  { key: "target", label: "Goals", icon: <IconTarget /> },
 ];
 
 function initials(name?: string) {
@@ -78,7 +41,6 @@ export default function Sidebar({ active, setActive, onAvatarClick }: SidebarPro
       {/* ═══════════════════ DESKTOP: Sidebar Kiri ═══════════════════ */}
       <aside className={asideClass}>
         <div className="flex flex-col items-center gap-2">
-          {/* ── Logo D ── */}
           <motion.button
             onClick={() => setActive("home")}
             whileHover={{ scale: 1.08 }}
@@ -89,7 +51,6 @@ export default function Sidebar({ active, setActive, onAvatarClick }: SidebarPro
             D
           </motion.button>
 
-          {/* ── Divider ── */}
           <div className={`w-8 h-px mb-1 ${isDark ? "bg-white/10" : "bg-zinc-200"}`} />
 
           {items.map((item) => {

@@ -6,6 +6,8 @@ import { useTheme } from "../lib/ThemeContext";
 import ConfirmDialog from "./ConfirmDialog";
 import EditTransactionModal from "./EditTransactionModal";
 import EmptyState from "./EmptyState";
+import { IconArrowUp, IconArrowDown, IconTarget, IconEdit, IconTrash, IconWallet, IconTransfer } from "../utils/icons";
+import { getWalletIcon } from "../utils/icons";
 
 interface Props {
   filterWallet?: string;
@@ -24,7 +26,6 @@ export default function TransactionList({ filterWallet = "all", onAddClick }: Pr
   const sorted = [...filtered].sort((a, b) => (a.date < b.date ? 1 : -1));
 
   const getWalletName = (id?: number) => wallets.find((w) => w.id === id)?.name || "—";
-  const getWalletIcon = (id?: number) => wallets.find((w) => w.id === id)?.icon || "💰";
 
   const formatDate = (d: string) => {
     const date = new Date(d);
@@ -50,7 +51,7 @@ export default function TransactionList({ filterWallet = "all", onAddClick }: Pr
       {sorted.length === 0 ? (
         <EmptyState
           compact
-          icon={filterWallet === "all" ? "🧾" : "👛"}
+          icon={<IconWallet size={32} />}
           title={filterWallet === "all" ? "Belum ada transaksi" : "Belum ada transaksi di dompet ini"}
           description={filterWallet === "all"
             ? "Catat pemasukan atau pengeluaran pertama supaya laporan, grafik, dan saldo DUIT mulai hidup."
@@ -65,7 +66,31 @@ export default function TransactionList({ filterWallet = "all", onAddClick }: Pr
           <AnimatePresence>
             {sorted.map((t) => {
               const isGoal = Boolean(t.goalId);
+              const isTransfer = Boolean(t.transferId);
               const goalLabel = t.type === "in" ? "Transfer dari Goal" : "Transfer ke Goal";
+              const transferLabel = t.type === "in" ? "Transfer masuk" : "Transfer keluar";
+              const typeIcon = isGoal
+                ? <IconTarget size={18} />
+                : isTransfer
+                  ? <IconTransfer size={18} />
+                  : t.type === "in"
+                    ? <IconArrowUp size={18} />
+                    : <IconArrowDown size={18} />;
+              const typeClass = isGoal
+                ? isDark ? "bg-blue-500/20 text-blue-400" : "bg-blue-50 text-blue-600"
+                : isTransfer
+                  ? isDark ? "bg-violet-500/20 text-violet-400" : "bg-violet-50 text-violet-600"
+                  : t.type === "in"
+                    ? isDark ? "bg-emerald-500/20 text-emerald-400" : "bg-emerald-50 text-emerald-600"
+                    : isDark ? "bg-rose-500/20 text-rose-400" : "bg-rose-50 text-rose-600";
+              const amountClass = isGoal
+                ? isDark ? "text-blue-400" : "text-blue-600"
+                : isTransfer
+                  ? isDark ? "text-violet-400" : "text-violet-600"
+                  : t.type === "in"
+                    ? isDark ? "text-emerald-400" : "text-emerald-600"
+                    : isDark ? "text-rose-400" : "text-rose-600";
+
               return (
               <motion.div
                 key={t.id}
@@ -76,47 +101,34 @@ export default function TransactionList({ filterWallet = "all", onAddClick }: Pr
                 className={rowBase}
               >
                 <div className="flex items-center gap-3 min-w-0 flex-1">
-                  <div
-                    className={`w-10 h-10 rounded-xl flex items-center justify-center text-lg shrink-0 ${
-                      isGoal
-                        ? isDark ? "bg-blue-500/20 text-blue-400" : "bg-blue-50 text-blue-600"
-                        : t.type === "in"
-                          ? isDark ? "bg-emerald-500/20 text-emerald-400" : "bg-emerald-50 text-emerald-600"
-                          : isDark ? "bg-rose-500/20 text-rose-400" : "bg-rose-50 text-rose-600"
-                    }`}
-                  >
-                    {isGoal ? "🎯" : t.type === "in" ? "⬆️" : "⬇️"}
+                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${typeClass}`}>
+                    {typeIcon}
                   </div>
                   <div className="min-w-0 flex-1">
                     <p className={titleText}>{t.desc}</p>
                     <p className={subText}>
-                      {formatDate(t.date)} · {isGoal ? goalLabel : t.cat} · {getWalletIcon(t.walletId)}{" "}
+                      {formatDate(t.date)} · {isGoal ? goalLabel : isTransfer ? transferLabel : t.cat} ·{" "}
+                      <span className="inline-flex items-center gap-0.5 align-middle">
+                        {getWalletIcon(wallets.find((w) => w.id === t.walletId)?.icon || "", 14)}
+                      </span>{" "}
                       {getWalletName(t.walletId)}
                     </p>
                   </div>
                 </div>
                 <div className="flex items-center gap-3 shrink-0">
-                  <span
-                    className={`font-bold text-sm ${
-                      isGoal
-                        ? isDark ? "text-blue-400" : "text-blue-600"
-                        : t.type === "in"
-                          ? isDark ? "text-emerald-400" : "text-emerald-600"
-                          : isDark ? "text-rose-400" : "text-rose-600"
-                    }`}
-                  >
-                    {isGoal ? (t.type === "in" ? "← " : "→ ") : t.type === "in" ? "+" : "-"}
+                  <span className={`font-bold text-sm ${amountClass}`}>
+                    {isGoal ? (t.type === "in" ? "← " : "→ ") : isTransfer ? (t.type === "in" ? "← " : "→ ") : t.type === "in" ? "+" : "-"}
                     {formatRupiah(t.amt)}
                   </span>
                   <button
                     type="button"
                     onClick={() => setTransactionToEdit(t)}
-                    disabled={isGoal}
+                    disabled={isGoal || isTransfer}
                     className={isDark ? "text-slate-500 hover:text-teal-400 transition-colors p-1 disabled:opacity-30 disabled:cursor-not-allowed" : "text-zinc-400 hover:text-teal-600 transition-colors p-1 disabled:opacity-30 disabled:cursor-not-allowed"}
                     aria-label={`Edit transaksi ${t.desc}`}
-                    title={isGoal ? "Transaksi Goal tidak bisa diedit" : "Edit"}
+                    title={isGoal || isTransfer ? "Transaksi ini tidak bisa diedit" : "Edit"}
                   >
-                    ✏️
+                    <IconEdit size={16} />
                   </button>
                   <button
                     type="button"
@@ -125,7 +137,7 @@ export default function TransactionList({ filterWallet = "all", onAddClick }: Pr
                     aria-label={`Hapus transaksi ${t.desc}`}
                     title="Hapus"
                   >
-                    🗑️
+                    <IconTrash size={16} />
                   </button>
                 </div>
               </motion.div>
@@ -139,7 +151,7 @@ export default function TransactionList({ filterWallet = "all", onAddClick }: Pr
       <ConfirmDialog
         open={Boolean(transactionToDelete)}
         title="Hapus Transaksi?"
-        message={transactionToDelete ? `Transaksi “${transactionToDelete.desc}” sebesar ${formatRupiah(transactionToDelete.amt)} akan dihapus.` : ""}
+        message={transactionToDelete ? `Transaksi "${transactionToDelete.desc}" sebesar ${formatRupiah(transactionToDelete.amt)} akan dihapus.` : ""}
         confirmLabel="Ya, Hapus"
         onClose={() => setTransactionToDelete(null)}
         onConfirm={() => {

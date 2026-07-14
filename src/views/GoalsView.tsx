@@ -11,6 +11,7 @@ import type { Goal } from "../lib/store";
 import { useTheme } from "../lib/ThemeContext";
 import ConfirmDialog from "../components/ConfirmDialog";
 import EmptyState from "../components/EmptyState";
+import { IconTarget, IconEdit, IconTrash, IconCalendar } from "../utils/icons";
 
 export default function GoalsView() {
   const { goals, delGoal } = useStore();
@@ -50,10 +51,10 @@ export default function GoalsView() {
 
       {goals.length === 0 ? (
         <EmptyState
-          icon="🎯"
+          icon={<IconTarget size={32} />}
           title="Belum ada goal"
           description="Buat target pertama agar tabungan punya arah. Kamu bisa mulai dari dana darurat, liburan, gadget, atau cicilan impian."
-          tips={["🚨 Dana darurat", "🏝️ Liburan", "💻 Laptop", "🏠 Rumah"]}
+          tips={["Dana darurat", "Liburan", "Laptop", "Rumah"]}
           actionLabel="Buat Goal Pertama"
           onAction={() => setShowModal(true)}
         />
@@ -69,7 +70,7 @@ export default function GoalsView() {
                     <div className="flex justify-between items-start mb-4">
                       <div className="min-w-0">
                         <p className={`font-bold truncate ${mainText}`}>{g.name}</p>
-                        {g.deadline && (<p className={`text-xs mt-1 ${muted2}`}>🗓️ {formatDeadline(g.deadline)}</p>)}
+                        {g.deadline && (<p className={`text-xs mt-1 flex items-center gap-1 ${muted2}`}><IconCalendar size={12} />{formatDeadline(g.deadline)}</p>)}
                       </div>
                       <div className="flex items-center gap-1 shrink-0">
                       <button
@@ -78,7 +79,7 @@ export default function GoalsView() {
                         onClick={() => setGoalToEdit(g)}
                         className={`${isDark ? "text-slate-500 hover:text-teal-400" : "text-zinc-400 hover:text-teal-600"} p-1 transition-colors`}
                       >
-                        ✏️
+                        <IconEdit size={16} />
                       </button>
                       <button
                         type="button"
@@ -86,7 +87,7 @@ export default function GoalsView() {
                         onClick={() => setGoalToDelete(g)}
                         className={`${isDark ? "text-slate-500 hover:text-rose-400" : "text-zinc-400 hover:text-rose-500"} p-1 transition-colors`}
                       >
-                        🗑️
+                        <IconTrash size={16} />
                       </button>
                       </div>
                     </div>

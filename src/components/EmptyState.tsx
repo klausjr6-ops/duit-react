@@ -1,8 +1,9 @@
 import { motion } from "framer-motion";
 import { useTheme } from "../lib/ThemeContext";
+import type { ReactNode } from "react";
 
 interface EmptyStateProps {
-  icon: string;
+  icon: ReactNode;
   title: string;
   description: string;
   actionLabel?: string;

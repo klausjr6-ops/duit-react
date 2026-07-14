@@ -8,18 +8,17 @@ import ConfirmDialog from "./ConfirmDialog";
 import EditWalletModal from "./EditWalletModal";
 import TransferModal from "./TransferModal";
 import { getWalletHex } from "../utils/walletColors";
+import { WALLET_ICONS, getWalletIcon, IconTransfer, IconTrash } from "../utils/icons";
 
 interface Props {
   onClose: () => void;
 }
 
-const ICONS = ["💳", "💵", "💰", "🏦", "📱", "💎", "🪙", "💸"];
-
 export default function WalletManager({ onClose }: Props) {
   const { wallets, addWallet, delWallet } = useStore();
   const { isDark } = useTheme();
   const [name, setName] = useState("");
-  const [icon, setIcon] = useState("💳");
+  const [icon, setIcon] = useState(WALLET_ICONS[0].key);
   const [initBalance, setInitBalance] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [walletToDelete, setWalletToDelete] = useState<Wallet | null>(null);
@@ -44,7 +43,7 @@ export default function WalletManager({ onClose }: Props) {
       icon,
       color: "emerald",
     });
-    setName(""); setIcon("💳"); setInitBalance("");
+    setName(""); setIcon(WALLET_ICONS[0].key); setInitBalance("");
   };
 
   const openTransfer = (from?: Wallet) => {
@@ -63,11 +62,6 @@ export default function WalletManager({ onClose }: Props) {
     ? "w-full mt-1 bg-slate-950 border border-white/10 rounded-lg p-3 text-sm text-white focus:outline-none focus:border-teal-400"
     : "w-full mt-1 bg-white border border-zinc-300 rounded-lg p-3 text-sm text-zinc-900 focus:outline-none focus:border-teal-500";
   const divider = isDark ? "border-t border-white/10 pt-4 space-y-3" : "border-t border-zinc-200 pt-4 space-y-3";
-  const iconBtn = (active: boolean) => active
-    ? "text-xl p-2 rounded-lg border transition-all border-teal-400 bg-teal-500/10"
-    : isDark
-      ? "text-xl p-2 rounded-lg border transition-all border-white/10 hover:border-white/30"
-      : "text-xl p-2 rounded-lg border transition-all border-zinc-200 hover:border-zinc-400 bg-white";
 
   return (
     <>
@@ -89,14 +83,13 @@ export default function WalletManager({ onClose }: Props) {
           <button aria-label="Tutup dompet" onClick={onClose} className={closeCls}>×</button>
         </div>
 
-        {/* Transfer button */}
         {wallets.length >= 2 && (
           <button
             type="button"
             onClick={() => openTransfer()}
             className="w-full mb-4 flex items-center justify-center gap-2 bg-gradient-to-r from-violet-500/10 to-blue-500/10 border border-violet-400/30 hover:border-violet-400 text-violet-400 font-semibold text-sm py-2.5 rounded-xl transition-all hover:brightness-110"
           >
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M7 16V4m0 0L3 8m4-4l4 4"/><path d="M17 8v12m0 0l4-4m-4 4l-4-4"/></svg>
+            <IconTransfer size={16} />
             Transfer Antar Dompet
           </button>
         )}
@@ -118,7 +111,7 @@ export default function WalletManager({ onClose }: Props) {
                 }}
               >
                 <div className="flex items-center gap-3">
-                  <span className="text-2xl">{w.icon}</span>
+                  <div className="text-xl" style={{ color: hex }}>{getWalletIcon(w.icon, 24)}</div>
                   <div>
                     <p className={isDark ? "font-semibold text-white text-sm" : "font-semibold text-zinc-900 text-sm"}>{w.name}</p>
                     <p className="text-xs font-semibold" style={{ color: hex }}>{formatRupiah(w.balance)}</p>
@@ -133,7 +126,7 @@ export default function WalletManager({ onClose }: Props) {
                     className={`${isDark ? "text-slate-500 hover:text-violet-400" : "text-zinc-400 hover:text-violet-500"} p-2`}
                     title="Transfer"
                   >
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M7 16V4m0 0L3 8m4-4l4 4"/><path d="M17 8v12m0 0l4-4m-4 4l-4-4"/></svg>
+                    <IconTransfer size={16} />
                   </button>
                 )}
                 <button
@@ -141,7 +134,9 @@ export default function WalletManager({ onClose }: Props) {
                   aria-label={`Hapus dompet ${w.name}`}
                   onClick={(e) => { e.stopPropagation(); setWalletToDelete(w); }}
                   className={`${isDark ? "text-slate-500 hover:text-rose-400" : "text-zinc-400 hover:text-rose-500"} p-2`}
-                >🗑️</button>
+                >
+                  <IconTrash size={16} />
+                </button>
                 </div>
               </div>
               );
@@ -157,9 +152,23 @@ export default function WalletManager({ onClose }: Props) {
           </div>
           <div>
             <label className={labelCls}>Icon</label>
-            <div className="grid grid-cols-8 gap-2 mt-1">
-              {ICONS.map((ic) => (
-                <button key={ic} onClick={() => setIcon(ic)} className={iconBtn(icon === ic)}>{ic}</button>
+            <div className="grid grid-cols-4 gap-2 mt-1">
+              {WALLET_ICONS.map((ic) => (
+                <button
+                  key={ic.key}
+                  onClick={() => setIcon(ic.key)}
+                  title={ic.label}
+                  className={`flex flex-col items-center gap-1 p-2 rounded-lg border transition-all ${
+                    icon === ic.key
+                      ? "border-teal-400 bg-teal-500/10 text-teal-500"
+                      : isDark
+                        ? "border-white/10 text-slate-400 hover:border-white/30"
+                        : "border-zinc-200 text-zinc-500 hover:border-zinc-400 bg-white"
+                  }`}
+                >
+                  {ic.icon}
+                  <span className="text-[9px] font-semibold">{ic.label}</span>
+                </button>
               ))}
             </div>
           </div>

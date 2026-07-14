@@ -4,10 +4,9 @@ import { useStore, type Wallet } from "../lib/store";
 import { useTheme } from "../lib/ThemeContext";
 import { useModalDialog } from "../hooks/useModalDialog";
 import { WALLET_COLORS, resolveColorKey } from "../utils/walletColors";
+import { WALLET_ICONS } from "../utils/icons";
 
 interface Props { wallet: Wallet; onClose: () => void; }
-
-const ICONS = ["💳","💵","🏦","💰","👛","💎","📱","🪙"];
 
 export default function EditWalletModal({ wallet, onClose }: Props) {
   const { updateWallet, txs } = useStore();
@@ -41,7 +40,40 @@ export default function EditWalletModal({ wallet, onClose }: Props) {
         <div className="space-y-4">
           <div><label className={labelCls}>Nama Dompet</label><input value={name} onChange={e=>setName(e.target.value)} className={inputCls} /></div>
           <div><label className={labelCls}>Icon</label>
-            <div className="mt-2 grid grid-cols-8 gap-2">{ICONS.map(ic=><button type="button" key={ic} onClick={()=>setIcon(ic)} className={`rounded-lg border p-2 text-lg ${icon===ic ? "border-teal-400 bg-teal-400/10":"border-white/10 hover:bg-white/5"} ${!isDark && icon!==ic ? "border-zinc-200 hover:bg-zinc-50":""}`}>{ic}</button>)}</div>
+            <div className="grid grid-cols-4 gap-2 mt-2">
+              {WALLET_ICONS.map((ic) => (
+                <button
+                  key={ic.key}
+                  type="button"
+                  onClick={() => setIcon(ic.key)}
+                  title={ic.label}
+                  className={`flex flex-col items-center gap-1 p-2 rounded-lg border transition-all ${
+                    icon === ic.key
+                      ? "border-teal-400 bg-teal-500/10 text-teal-500"
+                      : isDark
+                        ? "border-white/10 text-slate-400 hover:border-white/30"
+                        : "border-zinc-200 text-zinc-500 hover:border-zinc-400 bg-white"
+                  }`}
+                >
+                  {ic.icon}
+                  <span className="text-[9px] font-semibold">{ic.label}</span>
+                </button>
+              ))}
+            </div>
+            {/* Fallback for legacy emoji icons not in the new list */}
+            {!WALLET_ICONS.some((ic) => ic.key === icon) && (
+              <div className="mt-2 flex items-center gap-2">
+                <span className={`text-xs ${isDark ? "text-slate-500" : "text-zinc-500"}`}>Icon lama:</span>
+                <span className="text-xl">{icon}</span>
+                <button
+                  type="button"
+                  onClick={() => setIcon(WALLET_ICONS[0].key)}
+                  className="text-[10px] text-teal-500 font-semibold"
+                >
+                  Ganti ke baru
+                </button>
+              </div>
+            )}
           </div>
           <div><label className={labelCls}>Warna</label>
             <div className="mt-2 grid grid-cols-4 gap-2">

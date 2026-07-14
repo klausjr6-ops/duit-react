@@ -3,6 +3,7 @@ import { motion } from "framer-motion";
 import { useStore } from "../lib/store";
 import { useTheme } from "../lib/ThemeContext";
 import { useModalDialog } from "../hooks/useModalDialog";
+import { GOAL_ICONS } from "../utils/icons";
 
 interface Props {
   onClose: () => void;
@@ -16,6 +17,7 @@ export default function GoalModal({ onClose }: Props) {
   const [target, setTarget] = useState("");
   const [current, setCurrent] = useState("");
   const [deadline, setDeadline] = useState("");
+  const [icon, setIcon] = useState(GOAL_ICONS[0].key);
   const [error, setError] = useState<string | null>(null);
   const { dialogRef, onDialogKeyDown } = useModalDialog(true, onClose);
 
@@ -46,7 +48,7 @@ export default function GoalModal({ onClose }: Props) {
       target: targetNum,
       current: currentNum,
       deadline: deadline || undefined,
-      icon: "🎯",
+      icon,
     });
 
     onClose();
@@ -91,6 +93,29 @@ export default function GoalModal({ onClose }: Props) {
           <div>
             <label className={labelCls}>Nama Goal</label>
             <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Misal: Liburan ke Bali" className={inputCls} />
+          </div>
+          <div>
+            <label className={labelCls}>Icon</label>
+            <div className="grid grid-cols-4 gap-2 mt-1">
+              {GOAL_ICONS.map((ic) => (
+                <button
+                  key={ic.key}
+                  type="button"
+                  onClick={() => setIcon(ic.key)}
+                  title={ic.label}
+                  className={`flex flex-col items-center gap-1 p-2 rounded-lg border transition-all ${
+                    icon === ic.key
+                      ? "border-teal-400 bg-teal-500/10 text-teal-500"
+                      : isDark
+                        ? "border-white/10 text-slate-400 hover:border-white/30"
+                        : "border-zinc-200 text-zinc-500 hover:border-zinc-400 bg-white"
+                  }`}
+                >
+                  {ic.icon}
+                  <span className="text-[9px] font-semibold">{ic.label}</span>
+                </button>
+              ))}
+            </div>
           </div>
           <div>
             <label className={labelCls}>Target Tabungan (Rp)</label>

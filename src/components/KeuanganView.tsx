@@ -9,6 +9,7 @@ import { formatRupiah } from "../lib/format";
 import { useStore, todayStr, type Wallet } from "../lib/store";
 import { useTheme } from "../lib/ThemeContext";
 import { walletCardStyle, walletCardHoverBorder, getWalletHex } from "../utils/walletColors";
+import { getWalletIcon } from "../utils/icons";
 
 const CATEGORIES: Record<"in" | "out", string[]> = {
   in: ["Gaji", "Bonus", "Hadiah", "Investasi", "Lainnya"],
@@ -140,7 +141,7 @@ export default function KeuanganView({ quickType, quickNonce, onQuickDone }: Keu
             onMouseLeave={() => setHoveredWallet(null)}
             className="rounded-2xl p-4 transition-shadow duration-300 cursor-pointer hover:shadow-md"
           >
-            <div className="text-2xl mb-2">{w.icon}</div>
+            <div className="w-7 h-7 mb-2" style={{ color: hex }}>{getWalletIcon(w.icon, 28)}</div>
             <p className={`text-xs font-bold uppercase tracking-wider ${isDark ? "text-slate-300" : "text-zinc-600"}`}>{w.name}</p>
             <p className="text-lg font-extrabold mt-1" style={{ color: hex }}>{formatRupiah(w.balance)}</p>
           </motion.div>
@@ -211,7 +212,7 @@ export default function KeuanganView({ quickType, quickNonce, onQuickDone }: Keu
               <label className={labelCls}>Dompet / Rekening</label>
               <select value={walletId} onChange={(e) => setWalletId(e.target.value)} className={inputCls}>
                 <option value="">-- Pilih Dompet --</option>
-                {wallets.map((w) => (<option key={w.id} value={w.id}>{w.icon} {w.name}</option>))}
+                {wallets.map((w) => (<option key={w.id} value={w.id}>{w.name}</option>))}
               </select>
             </div>
 
@@ -271,8 +272,8 @@ export default function KeuanganView({ quickType, quickNonce, onQuickDone }: Keu
           onChange={(e) => setFilterWallet(e.target.value)}
           className={inputCls.replace(" mt-1", " mt-2")}
         >
-          <option value="all">💼 Semua Dompet</option>
-          {wallets.map((w) => (<option key={w.id} value={w.id}>{w.icon} {w.name}</option>))}
+          <option value="all">Semua Dompet</option>
+          {wallets.map((w) => (<option key={w.id} value={w.id}>{w.name}</option>))}
         </select>
       </Card>
 
