@@ -4,7 +4,7 @@ import Card from "./Card";
 import PizzaChart, { HoveredSliceData } from "./PizzaChart";
 import { formatRupiah } from "../lib/format";
 import { useTheme } from "../lib/ThemeContext";
-import { IconArrowDown, IconArrowUp } from "../utils/icons";
+import { IconArrowDown, IconArrowUp, IconWallet } from "../utils/icons";
 
 interface ReportCardProps {
   income: number;
@@ -13,10 +13,8 @@ interface ReportCardProps {
 }
 
 export default function ReportCard({ income, expense, savingsPct: _savingsPct }: ReportCardProps) {
-  const total = income + expense || 1;
-  const incomePct = (income / total) * 100;
-  const expensePct = (expense / total) * 100;
-  const remainderPct = Math.max(100 - incomePct - expensePct, 0);
+  const balance = Math.max(income - expense, 0);
+  const chartTotal = income + expense + balance || 1;
   const { isDark } = useTheme();
   const [hovered, setHovered] = useState<HoveredSliceData | null>(null);
 
@@ -26,9 +24,9 @@ export default function ReportCard({ income, expense, savingsPct: _savingsPct }:
       iconBg: isDark ? "bg-blue-500/15 text-blue-400" : "bg-blue-50 text-blue-600",
       label: "Pemasukan",
       value: income,
-      color: isDark ? "text-emerald-400" : "text-emerald-600",
-      barColor: "from-cyan-400 to-emerald-400",
-      pct: incomePct,
+      color: isDark ? "text-blue-400" : "text-blue-600",
+      barColor: "from-blue-400 to-cyan-400",
+      pct: (income / chartTotal) * 100,
       dotColor: "bg-blue-500",
     },
     {
@@ -38,8 +36,18 @@ export default function ReportCard({ income, expense, savingsPct: _savingsPct }:
       value: expense,
       color: isDark ? "text-rose-400" : "text-rose-600",
       barColor: "from-rose-500 to-orange-400",
-      pct: expensePct,
+      pct: (expense / chartTotal) * 100,
       dotColor: "bg-rose-500",
+    },
+    {
+      icon: <IconWallet size={16} />,
+      iconBg: isDark ? "bg-emerald-500/15 text-emerald-400" : "bg-emerald-50 text-emerald-600",
+      label: "Sisa Saldo",
+      value: balance,
+      color: isDark ? "text-emerald-400" : "text-emerald-600",
+      barColor: "from-emerald-400 to-teal-400",
+      pct: (balance / chartTotal) * 100,
+      dotColor: "bg-emerald-500",
     },
   ];
 
@@ -50,9 +58,9 @@ export default function ReportCard({ income, expense, savingsPct: _savingsPct }:
         <div className="flex flex-col items-center gap-2">
           <PizzaChart
             slices={[
-              { value: incomePct, color: "#3b82f6", label: "Pemasukan", amount: income, formattedAmount: formatRupiah(income) },
-              { value: remainderPct, color: "#22c55e", label: "Selisih", amount: Math.max(income - expense, 0), formattedAmount: formatRupiah(Math.max(income - expense, 0)) },
-              { value: expensePct, color: "#fb7185", label: "Pengeluaran", amount: expense, formattedAmount: formatRupiah(expense) },
+              { value: income, color: "#3b82f6", label: "Pemasukan", amount: income, formattedAmount: formatRupiah(income) },
+              { value: expense, color: "#fb7185", label: "Pengeluaran", amount: expense, formattedAmount: formatRupiah(expense) },
+              { value: balance, color: "#10b981", label: "Sisa Saldo", amount: balance, formattedAmount: formatRupiah(balance) },
             ]}
             onHoverSlice={setHovered}
           />
