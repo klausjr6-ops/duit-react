@@ -9,10 +9,48 @@ interface SidebarProps {
 }
 
 const items = [
-  { key: "home", icon: "🏠", label: "Beranda" },
-  { key: "wallet", icon: "💰", label: "Keuangan" },
-  { key: "calendar", icon: "📅", label: "Jadwal" },
-  { key: "target", icon: "🎯", label: "Target" },
+  {
+    key: "home",
+    label: "Beranda",
+    icon: (
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M3 9.5L12 3l9 6.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1V9.5z" />
+      </svg>
+    ),
+  },
+  {
+    key: "wallet",
+    label: "Transaksi",
+    icon: (
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <rect x="2" y="5" width="20" height="14" rx="3" />
+        <path d="M16 12h.01" />
+        <path d="M2 10h20" />
+      </svg>
+    ),
+  },
+  {
+    key: "calendar",
+    label: "Jadwal",
+    icon: (
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <rect x="3" y="4" width="18" height="17" rx="2" />
+        <path d="M16 2v4M8 2v4M3 10h18" />
+        <path d="M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01" />
+      </svg>
+    ),
+  },
+  {
+    key: "target",
+    label: "Goals",
+    icon: (
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="12" cy="12" r="9" />
+        <circle cx="12" cy="12" r="5" />
+        <circle cx="12" cy="12" r="1" />
+      </svg>
+    ),
+  },
 ];
 
 function initials(name?: string) {
@@ -39,39 +77,51 @@ export default function Sidebar({ active, setActive, onAvatarClick }: SidebarPro
     <>
       {/* ═══════════════════ DESKTOP: Sidebar Kiri ═══════════════════ */}
       <aside className={asideClass}>
-        <div className="flex flex-col items-center gap-4">
-          <motion.div
-            className="mb-4 flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-teal-400 to-blue-500 text-lg font-bold text-zinc-900 shadow-lg shadow-teal-500/20"
-            whileHover={{ rotate: 12, scale: 1.08 }}
+        <div className="flex flex-col items-center gap-2">
+          {/* ── Logo D ── */}
+          <motion.button
+            onClick={() => setActive("home")}
+            whileHover={{ scale: 1.08 }}
+            whileTap={{ scale: 0.92 }}
+            title="DUIT"
+            className="mb-3 flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-teal-400 to-blue-500 text-lg font-bold text-zinc-900 shadow-lg shadow-teal-500/20"
           >
             D
-          </motion.div>
-          {items.map((item) => (
-            <motion.button
-              key={item.key}
-              onClick={() => setActive(item.key)}
-              whileHover={{ scale: 1.1 }}
-              whileTap={{ scale: 0.92 }}
-              title={item.label}
-              className={`relative flex h-12 w-12 items-center justify-center rounded-2xl text-xl transition-colors ${
-                active === item.key
-                  ? isDark
-                    ? "bg-white/10 text-white shadow-inner shadow-teal-400/20"
-                    : "bg-zinc-900 text-white shadow-md"
-                  : isDark
-                  ? "text-slate-400 hover:bg-white/5 hover:text-white"
-                  : "text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900"
-              }`}
-            >
-              {active === item.key && (
-                <motion.span
-                  layoutId="active-pill-desktop"
-                  className="absolute -left-2 h-6 w-1 rounded-full bg-teal-400"
-                />
-              )}
-              <span>{item.icon}</span>
-            </motion.button>
-          ))}
+          </motion.button>
+
+          {/* ── Divider ── */}
+          <div className={`w-8 h-px mb-1 ${isDark ? "bg-white/10" : "bg-zinc-200"}`} />
+
+          {items.map((item) => {
+            const isActive = active === item.key;
+            return (
+              <motion.button
+                key={item.key}
+                onClick={() => setActive(item.key)}
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.92 }}
+                title={item.label}
+                className={`relative flex h-11 w-11 items-center justify-center rounded-xl transition-all duration-200 ${
+                  isActive
+                    ? isDark
+                      ? "bg-teal-400/10 text-teal-400"
+                      : "bg-teal-50 text-teal-600"
+                    : isDark
+                      ? "text-slate-500 hover:text-slate-300 hover:bg-white/5"
+                      : "text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100"
+                }`}
+              >
+                {isActive && (
+                  <motion.span
+                    layoutId="active-pill-desktop"
+                    className={`absolute -left-[6px] h-5 w-[3px] rounded-full ${isDark ? "bg-teal-400" : "bg-teal-500"}`}
+                    transition={{ type: "spring", stiffness: 350, damping: 30 }}
+                  />
+                )}
+                {item.icon}
+              </motion.button>
+            );
+          })}
         </div>
         <motion.button
           onClick={onAvatarClick}
@@ -91,37 +141,43 @@ export default function Sidebar({ active, setActive, onAvatarClick }: SidebarPro
 
       {/* ═══════════════════ MOBILE: Bottom Navigation ═══════════════════ */}
       <nav className={navClass}>
-        {items.map((item) => (
-          <motion.button
-            key={item.key}
-            onClick={() => setActive(item.key)}
-            whileTap={{ scale: 0.9 }}
-            className="relative flex flex-1 flex-col items-center gap-1 py-2"
-          >
-            {active === item.key && (
-              <motion.span
-                layoutId="active-pill-mobile"
-                className="absolute -top-2 h-1 w-8 rounded-full bg-teal-400"
-              />
-            )}
-            <span
-              className={`text-2xl transition-transform ${
-                active === item.key ? "scale-110" : "opacity-60"
-              }`}
+        {items.map((item) => {
+          const isActive = active === item.key;
+          return (
+            <motion.button
+              key={item.key}
+              onClick={() => setActive(item.key)}
+              whileTap={{ scale: 0.9 }}
+              className="relative flex flex-1 flex-col items-center gap-1 py-2"
             >
-              {item.icon}
-            </span>
-            <span
-              className={`text-[10px] font-semibold ${
-                active === item.key
-                  ? isDark ? "text-teal-400" : "text-zinc-900"
-                  : isDark ? "text-slate-500" : "text-zinc-500"
-              }`}
-            >
-              {item.label}
-            </span>
-          </motion.button>
-        ))}
+              {isActive && (
+                <motion.span
+                  layoutId="active-pill-mobile"
+                  className={`absolute -top-2 h-[3px] w-8 rounded-full ${isDark ? "bg-teal-400" : "bg-teal-500"}`}
+                  transition={{ type: "spring", stiffness: 350, damping: 30 }}
+                />
+              )}
+              <span
+                className={`transition-all duration-200 ${
+                  isActive
+                    ? isDark ? "text-teal-400 scale-110" : "text-teal-600 scale-110"
+                    : isDark ? "text-slate-500" : "text-zinc-400"
+                }`}
+              >
+                {item.icon}
+              </span>
+              <span
+                className={`text-[10px] font-semibold transition-colors ${
+                  isActive
+                    ? isDark ? "text-teal-400" : "text-teal-600"
+                    : isDark ? "text-slate-500" : "text-zinc-400"
+                }`}
+              >
+                {item.label}
+              </span>
+            </motion.button>
+          );
+        })}
         <motion.button
           onClick={onAvatarClick}
           whileTap={{ scale: 0.9 }}
@@ -136,7 +192,7 @@ export default function Sidebar({ active, setActive, onAvatarClick }: SidebarPro
               </div>
             )}
           </div>
-          <span className={`text-[10px] font-semibold ${isDark ? "text-slate-500" : "text-zinc-500"}`}>Akun</span>
+          <span className={`text-[10px] font-semibold ${isDark ? "text-slate-500" : "text-zinc-400"}`}>Akun</span>
         </motion.button>
       </nav>
     </>
