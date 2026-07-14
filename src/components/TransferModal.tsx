@@ -114,7 +114,7 @@ export default function TransferModal({ fromWallet, onClose }: Props) {
               <option value="">-- Pilih Dompet --</option>
               {wallets.map((w) => (
                 <option key={w.id} value={w.id}>
-                  {w.icon} {w.name} — {formatRupiah(w.balance)}
+                  {w.name} — {formatRupiah(w.balance)}
                 </option>
               ))}
             </select>
@@ -158,7 +158,7 @@ export default function TransferModal({ fromWallet, onClose }: Props) {
                 .filter((w) => !fromId || w.id !== parseInt(fromId, 10))
                 .map((w) => (
                   <option key={w.id} value={w.id}>
-                    {w.icon} {w.name} — {formatRupiah(w.balance)}
+                    {w.name} — {formatRupiah(w.balance)}
                   </option>
                 ))}
             </select>

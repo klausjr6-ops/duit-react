@@ -6,8 +6,7 @@ import { useTheme } from "../lib/ThemeContext";
 import ConfirmDialog from "./ConfirmDialog";
 import EditTransactionModal from "./EditTransactionModal";
 import EmptyState from "./EmptyState";
-import { IconArrowUp, IconArrowDown, IconTarget, IconEdit, IconTrash, IconWallet, IconTransfer } from "../utils/icons";
-import { getWalletIcon } from "../utils/icons";
+import { IconArrowUp, IconArrowDown, IconTarget, IconEdit, IconTrash, IconTransfer, IconWallet } from "../utils/icons";
 
 interface Props {
   filterWallet?: string;
@@ -107,11 +106,7 @@ export default function TransactionList({ filterWallet = "all", onAddClick }: Pr
                   <div className="min-w-0 flex-1">
                     <p className={titleText}>{t.desc}</p>
                     <p className={subText}>
-                      {formatDate(t.date)} · {isGoal ? goalLabel : isTransfer ? transferLabel : t.cat} ·{" "}
-                      <span className="inline-flex items-center gap-0.5 align-middle">
-                        {getWalletIcon(wallets.find((w) => w.id === t.walletId)?.icon || "", 14)}
-                      </span>{" "}
-                      {getWalletName(t.walletId)}
+                      {formatDate(t.date)} · {isGoal ? goalLabel : isTransfer ? transferLabel : t.cat} · {getWalletName(t.walletId)}
                     </p>
                   </div>
                 </div>

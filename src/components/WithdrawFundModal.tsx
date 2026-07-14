@@ -136,7 +136,7 @@ export default function WithdrawFundModal({ goal, onClose }: Props) {
               <option value="">-- Pilih Dompet --</option>
               {wallets.map((wallet) => (
                 <option key={wallet.id} value={wallet.id}>
-                  {wallet.icon} {wallet.name} · {formatRupiah(wallet.balance)}
+                  {wallet.name} · {formatRupiah(wallet.balance)}
                 </option>
               ))}
             </select>

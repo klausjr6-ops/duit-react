@@ -1072,7 +1072,7 @@ function useDuitStoreInternal() {
     // ── Dompet ──
     lines.push("### Dompet");
     for (const w of walletsWithBalance) {
-      lines.push(`- ${w.icon} ${w.name}: ${fmt(w.balance)}`);
+      lines.push(`- ${w.name}: ${fmt(w.balance)}`);
     }
     lines.push(`Total saldo: ${fmt(balance)}`);
     lines.push("");
