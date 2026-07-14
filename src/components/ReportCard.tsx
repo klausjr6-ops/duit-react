@@ -9,10 +9,9 @@ import { IconArrowDown, IconArrowUp, IconWallet } from "../utils/icons";
 interface ReportCardProps {
   income: number;
   expense: number;
-  savingsPct: number;
 }
 
-export default function ReportCard({ income, expense, savingsPct: _savingsPct }: ReportCardProps) {
+export default function ReportCard({ income, expense }: ReportCardProps) {
   const balance = Math.max(income - expense, 0);
   const chartTotal = income + expense + balance || 1;
   const { isDark } = useTheme();
@@ -53,7 +52,7 @@ export default function ReportCard({ income, expense, savingsPct: _savingsPct }:
 
   return (
     <Card accent="linear-gradient(90deg,#60a5fa,#2dd4bf,#fb7185)" delay={0.2}>
-      <p className={`mb-6 text-xs font-semibold tracking-widest ${isDark ? "text-slate-400" : "text-zinc-500"}`}>LAPORAN HARIAN</p>
+      <p className={`mb-6 text-xs font-semibold tracking-widest ${isDark ? "text-slate-400" : "text-zinc-500"}`}>LAPORAN BULANAN</p>
       <div className="flex flex-col items-center gap-8 sm:flex-row sm:items-center">
         <div className="flex flex-col items-center gap-2">
           <PizzaChart

@@ -972,10 +972,18 @@ function useDuitStoreInternal() {
         walletId: toId,
         transferId,
       };
-      updateData((previous) => ({
-        ...previous,
-        txs: [outTx, inTx, ...previous.txs],
-      }));
+      updateData((previous) => {
+        // Validate source wallet balance inside the update to avoid stale reads
+        const sourceBalance = getWalletBalance(previous, fromId);
+        if (sourceBalance === null || sourceBalance < amount) {
+          // Silently skip — TransferModal already pre-validates, this is a safety net
+          return previous;
+        }
+        return {
+          ...previous,
+          txs: [outTx, inTx, ...previous.txs],
+        };
+      });
     },
     [updateData]
   );

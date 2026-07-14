@@ -27,7 +27,7 @@ export default function TransactionList({ filterWallet = "all", onAddClick }: Pr
   const getWalletName = (id?: number) => wallets.find((w) => w.id === id)?.name || "—";
 
   const formatDate = (d: string) => {
-    const date = new Date(d);
+    const date = new Date(d + "T12:00:00");
     return date.toLocaleDateString("id-ID", {
       day: "2-digit",
       month: "short",

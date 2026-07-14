@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useTheme } from "../lib/ThemeContext";
 
 interface Slice {
   value: number;
@@ -25,13 +26,16 @@ interface PizzaChartProps {
 export default function PizzaChart({ slices, size = 180, onHoverSlice }: PizzaChartProps) {
   const [animated, setAnimated] = useState(false);
   const [hoveredIdx, setHoveredIdx] = useState<number | null>(null);
+  const { isDark } = useTheme();
 
   useEffect(() => {
     const t = setTimeout(() => setAnimated(true), 100);
     return () => clearTimeout(t);
   }, []);
 
-  const total = slices.reduce((a, s) => a + s.value, 0) || 1;
+  // Only include slices with value > 0
+  const activeSlices = slices.filter((s) => s.value > 0);
+  const total = activeSlices.reduce((a, s) => a + s.value, 0) || 1;
   const cx = size / 2;
   const cy = size / 2;
   const r = size / 2 - 4;
@@ -40,7 +44,7 @@ export default function PizzaChart({ slices, size = 180, onHoverSlice }: PizzaCh
   const paths: { d: string; color: string; label?: string; amount?: number; formattedAmount?: string; fraction: number }[] = [];
   let startAngle = -Math.PI / 2;
 
-  for (const slice of slices) {
+  for (const slice of activeSlices) {
     const fraction = slice.value / total;
     const sweepAngle = fraction * 2 * Math.PI * (animated ? 1 : 0);
     const endAngle = startAngle + sweepAngle;
@@ -79,6 +83,9 @@ export default function PizzaChart({ slices, size = 180, onHoverSlice }: PizzaCh
     <div className="relative flex items-center justify-center" style={{ width: size, height: size }}>
       <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
         <circle cx={cx + 2} cy={cy + 2} r={r} fill="rgba(0,0,0,0.08)" />
+        {paths.length === 0 && (
+          <circle cx={cx} cy={cy} r={r} fill={isDark ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.05)"} />
+        )}
         {paths.map((p, i) => (
           <path
             key={i}

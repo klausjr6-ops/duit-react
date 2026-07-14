@@ -94,7 +94,6 @@ function DashboardApp() {
     todayExpense,
     todaySchedules,
     inMonth,
-    savingsPct,
     loading: storeLoading,
     loadedUserId,
     syncing,
@@ -249,10 +248,9 @@ function DashboardApp() {
                 <MoodCard />
               </div>
 
-              <ReportCard
+                <ReportCard
                 income={inMonth}
                 expense={outMonth}
-                savingsPct={savingsPct}
               />
             </>
           )}

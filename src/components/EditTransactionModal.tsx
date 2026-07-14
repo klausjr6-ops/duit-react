@@ -77,7 +77,7 @@ export default function EditTransactionModal({ tx, onClose }: Props) {
           <div><label className={labelCls}>Dompet</label>
             <select value={walletId} onChange={e=>setWalletId(e.target.value)} className={inputCls}>
               <option value="">-- Pilih --</option>
-              {wallets.map(w=><option key={w.id} value={w.id}>{w.icon} {w.name}</option>)}
+              {wallets.map(w=><option key={w.id} value={w.id}>{w.name}</option>)}
             </select>
           </div>
           <div><label className={labelCls}>Jumlah</label>
