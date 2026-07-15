@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import Card from "./Card";
 import { useStore } from "../lib/store";
 import { useTheme } from "../lib/ThemeContext";
+import { toast } from "../hooks/useToast";
 
 const moods = [
   { key: "😴", icon: "😴", label: "Ngantuk" },
@@ -34,6 +35,7 @@ export default function MoodCard() {
   const handleSave = () => {
     setTodayNote(note);
     setSaved(true);
+    toast.success("Catatan tersimpan");
     setTimeout(() => setSaved(false), 2000);
   };
 

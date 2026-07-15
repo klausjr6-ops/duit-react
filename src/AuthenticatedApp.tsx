@@ -10,6 +10,7 @@ import MoodCard from "./components/MoodCard";
 import ReportCard from "./components/ReportCard";
 import PullToRefreshIndicator from "./components/PullToRefreshIndicator";
 import DraggableFAB from "./components/DraggableFAB";
+import ToastContainer from "./components/ToastContainer";
 import { usePullToRefresh } from "./hooks/usePullToRefresh";
 import { useAutoLogout } from "./hooks/useAutoLogout";
 import { StoreProvider, useStore } from "./lib/store";
@@ -302,7 +303,8 @@ function DashboardApp() {
         </Suspense>
       )}
 
-
+      {/* ── Global Toast Notifications ── */}
+      <ToastContainer />
     </div>
   );
 }

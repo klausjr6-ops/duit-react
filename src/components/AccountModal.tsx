@@ -4,6 +4,7 @@ import { sanitizeImportedUserData, useStore, type UserData } from "../lib/store"
 import { useAuth } from "../lib/AuthContext";
 import { useTheme, type ThemeMode } from "../lib/ThemeContext";
 import { useModalDialog } from "../hooks/useModalDialog";
+import { toast } from "../hooks/useToast";
 import ConfirmDialog from "./ConfirmDialog";
 import { IconCamera, IconTrash, IconClose, IconArrowLeft, IconChevronRight, IconSun, IconSunMoon, IconMoon } from "../utils/icons";
 
@@ -157,6 +158,7 @@ export default function AccountModal({ open, onClose }: AccountModalProps) {
 
   const saveName = () => {
     updateSettings({ name: name.trim() || "Kamu" });
+    toast.success("Nama berhasil disimpan");
   };
 
   const copyCalendarFeedUrl = async () => {
@@ -268,6 +270,7 @@ export default function AccountModal({ open, onClose }: AccountModalProps) {
     replaceAll(pendingImport.data);
     setConfirmImport(false);
     setPendingImport(null);
+    toast.success("Backup berhasil diimport");
     showBackupNotice("Backup berhasil diimport. Data sedang disinkronkan ke cloud.");
   };
 
@@ -728,6 +731,7 @@ export default function AccountModal({ open, onClose }: AccountModalProps) {
         onClose={() => setConfirmReset(false)}
         onConfirm={() => {
           resetAll();
+          toast.success("Semua data berhasil direset");
           handleClose();
         }}
         isDark={isDark}

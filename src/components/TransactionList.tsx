@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { formatRupiah } from "../lib/format";
 import { useStore, type Transaction } from "../lib/store";
 import { useTheme } from "../lib/ThemeContext";
+import { toast } from "../hooks/useToast";
 import ConfirmDialog from "./ConfirmDialog";
 import EditTransactionModal from "./EditTransactionModal";
 import EmptyState from "./EmptyState";
@@ -157,7 +158,10 @@ export default function TransactionList({ filterWallet = "all", onAddClick }: Pr
         confirmLabel="Ya, Hapus"
         onClose={() => setTransactionToDelete(null)}
         onConfirm={() => {
-          if (transactionToDelete) delTx(transactionToDelete.id);
+          if (transactionToDelete) {
+            delTx(transactionToDelete.id);
+            toast.success("Transaksi dihapus");
+          }
           setTransactionToDelete(null);
         }}
         isDark={isDark}

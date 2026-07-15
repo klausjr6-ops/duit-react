@@ -4,6 +4,7 @@ import { useStore, type Wallet } from "../lib/store";
 import { formatRupiah } from "../lib/format";
 import { useTheme } from "../lib/ThemeContext";
 import { useModalDialog } from "../hooks/useModalDialog";
+import { toast } from "../hooks/useToast";
 import ConfirmDialog from "./ConfirmDialog";
 import EditWalletModal from "./EditWalletModal";
 import TransferModal from "./TransferModal";
@@ -44,6 +45,7 @@ export default function WalletManager({ onClose }: Props) {
       icon,
       color,
     });
+    toast.success(`Dompet "${name.trim()}" berhasil ditambahkan`);
     setName(""); setIcon(WALLET_ICONS[0].key); setColor(WALLET_COLORS[0].key); setInitBalance("");
   };
 
@@ -224,7 +226,10 @@ export default function WalletManager({ onClose }: Props) {
         confirmLabel="Ya, Hapus"
         onClose={() => setWalletToDelete(null)}
         onConfirm={() => {
-          if (walletToDelete) delWallet(walletToDelete.id);
+          if (walletToDelete) {
+            delWallet(walletToDelete.id);
+            toast.success(`Dompet "${walletToDelete.name}" dihapus`);
+          }
           setWalletToDelete(null);
         }}
         isDark={isDark}

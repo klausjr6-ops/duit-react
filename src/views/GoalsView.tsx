@@ -9,6 +9,7 @@ import { useStore } from "../lib/store";
 import { formatRupiah } from "../lib/format";
 import type { Goal } from "../lib/store";
 import { useTheme } from "../lib/ThemeContext";
+import { toast } from "../hooks/useToast";
 import ConfirmDialog from "../components/ConfirmDialog";
 import EmptyState from "../components/EmptyState";
 import { IconTarget, IconEdit, IconTrash, IconCalendar } from "../utils/icons";
@@ -148,7 +149,10 @@ export default function GoalsView() {
         confirmLabel="Ya, Hapus"
         onClose={() => setGoalToDelete(null)}
         onConfirm={() => {
-          if (goalToDelete) delGoal(goalToDelete.id);
+          if (goalToDelete) {
+            delGoal(goalToDelete.id);
+            toast.success(`Goal "${goalToDelete.name}" dihapus`);
+          }
           setGoalToDelete(null);
         }}
         isDark={isDark}

@@ -10,6 +10,7 @@ import { useStore, todayStr, type Wallet } from "../lib/store";
 import { useTheme } from "../lib/ThemeContext";
 import { walletCardStyle, walletCardHoverBorder, getWalletHex } from "../utils/walletColors";
 import { getWalletIcon } from "../utils/icons";
+import { toast } from "../hooks/useToast";
 
 const CATEGORIES: Record<"in" | "out", string[]> = {
   in: ["Gaji", "Bonus", "Hadiah", "Investasi", "Lainnya"],
@@ -82,8 +83,10 @@ export default function KeuanganView({ quickType, quickNonce, onQuickDone }: Keu
     });
     if (!result.ok) {
       setFormError(result.message || "Transaksi gagal.");
+      toast.error(result.message || "Transaksi gagal.");
       return;
     }
+    toast.success(type === "in" ? "Pemasukan berhasil ditambahkan" : "Pengeluaran berhasil ditambahkan");
     setType(""); setCat(""); setWalletId(""); setAmt(""); setDesc(""); setDate(todayStr());
     onQuickDone?.();
   };

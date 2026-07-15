@@ -4,6 +4,7 @@ import { useStore, type Wallet } from "../lib/store";
 import { formatRupiah } from "../lib/format";
 import { useTheme } from "../lib/ThemeContext";
 import { useModalDialog } from "../hooks/useModalDialog";
+import { toast } from "../hooks/useToast";
 
 interface Props {
   /** Pre-select source wallet. */
@@ -43,8 +44,10 @@ export default function TransferModal({ fromWallet, onClose }: Props) {
     const result = transferWallet(parseInt(fromId, 10), parseInt(toId, 10), numAmt);
     if (!result.ok) {
       setError(result.message || "Transfer gagal.");
+      toast.error(result.message || "Transfer gagal.");
       return;
     }
+    toast.success("Transfer berhasil");
     onClose();
   };
 
