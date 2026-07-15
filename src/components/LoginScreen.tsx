@@ -1,8 +1,9 @@
 // src/components/LoginScreen.tsx
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "../lib/AuthContext";
 import { useTheme } from "../lib/ThemeContext";
+import { consumeSessionExpired } from "../hooks/useAutoLogout";
 
 type Screen = "login" | "register";
 
@@ -12,7 +13,14 @@ function useThemeSafe() {
 
 export default function LoginScreen() {
   const [screen, setScreen] = useState<Screen>("login");
+  const [sessionExpired, setSessionExpired] = useState(false);
   const { isDark } = useThemeSafe();
+
+  useEffect(() => {
+    if (consumeSessionExpired()) {
+      setSessionExpired(true);
+    }
+  }, []);
 
   return (
     <div className={isDark
@@ -20,6 +28,33 @@ export default function LoginScreen() {
       : "min-h-screen bg-[#f5f5f7] text-zinc-900 flex items-center justify-center p-4 transition-colors"
     }>
       <div className="w-full max-w-md">
+        <AnimatePresence>
+          {sessionExpired && (
+            <motion.div
+              initial={{ opacity: 0, y: -12 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -12 }}
+              className={`mb-5 flex items-center gap-3 rounded-xl px-4 py-3 ${isDark ? "bg-amber-500/10 border border-amber-500/20 text-amber-400" : "bg-amber-50 border border-amber-200 text-amber-700"}`}
+            >
+              <svg className="w-5 h-5 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="10" />
+                <line x1="12" y1="8" x2="12" y2="12" />
+                <line x1="12" y1="16" x2="12.01" y2="16" />
+              </svg>
+              <span className="text-sm font-medium">Sesi telah berakhir. Login untuk melanjutkan.</span>
+              <button
+                type="button"
+                onClick={() => setSessionExpired(false)}
+                className={`ml-auto flex-shrink-0 p-0.5 rounded-full transition-colors ${isDark ? "hover:bg-amber-500/20" : "hover:bg-amber-100"}`}
+              >
+                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="18" y1="6" x2="6" y2="18" />
+                  <line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+              </button>
+            </motion.div>
+          )}
+        </AnimatePresence>
         <AnimatePresence mode="wait">
           {screen === "login" ? (
             <LoginForm key="login" onSwitchToRegister={() => setScreen("register")} />

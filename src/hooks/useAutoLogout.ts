@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef } from "react";
 
 const INACTIVITY_MS = 5 * 60 * 1000; // 5 menit
-const WARNING_MS = 30 * 1000; // 30 detik sebelum logout, tampilkan warning
+const SESSION_EXPIRED_KEY = "duit_session_expired";
 
 const EVENTS: (keyof WindowEventMap)[] = [
   "mousedown",
@@ -14,46 +14,35 @@ const EVENTS: (keyof WindowEventMap)[] = [
 
 /**
  * Hook auto-logout setelah 5 menit tidak ada aktivitas.
- * Menampilkan warning 30 detik sebelum logout.
- * User bisa klik "Tetap Masuk" untuk reset timer.
+ * Saat logout otomatis terjadi, flag disimpan di sessionStorage
+ * agar halaman login bisa menampilkan notifikasi "Sesi telah berakhir".
  */
 export function useAutoLogout(onLogout: () => Promise<void>) {
-  const [showWarning, setShowWarning] = useState(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const warningTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const logoutRef = useRef(onLogout);
   logoutRef.current = onLogout;
 
-  const resetTimers = useCallback(() => {
-    setShowWarning(false);
-
-    if (warningTimerRef.current) {
-      clearTimeout(warningTimerRef.current);
-    }
+  const resetTimer = useCallback(() => {
     if (timerRef.current) {
       clearTimeout(timerRef.current);
     }
 
-    // Warning muncul 30 detik sebelum logout
-    warningTimerRef.current = setTimeout(() => {
-      setShowWarning(true);
-    }, INACTIVITY_MS - WARNING_MS);
-
-    // Logout setelah 5 menit penuh
+    // Logout setelah 5 menit penuh tanpa warning
     timerRef.current = setTimeout(() => {
+      try {
+        sessionStorage.setItem(SESSION_EXPIRED_KEY, "1");
+      } catch {
+        // sessionStorage unavailable — non-critical
+      }
       logoutRef.current();
     }, INACTIVITY_MS);
   }, []);
 
-  const stayLoggedIn = useCallback(() => {
-    resetTimers();
-  }, [resetTimers]);
-
   useEffect(() => {
-    resetTimers();
+    resetTimer();
 
     const handleActivity = () => {
-      resetTimers();
+      resetTimer();
     };
 
     for (const event of EVENTS) {
@@ -61,13 +50,24 @@ export function useAutoLogout(onLogout: () => Promise<void>) {
     }
 
     return () => {
-      if (warningTimerRef.current) clearTimeout(warningTimerRef.current);
       if (timerRef.current) clearTimeout(timerRef.current);
       for (const event of EVENTS) {
         window.removeEventListener(event, handleActivity);
       }
     };
-  }, [resetTimers]);
+  }, [resetTimer]);
+}
 
-  return { showWarning, stayLoggedIn };
+/** Cek apakah sesi berakhir karena auto-logout, lalu hapus flag-nya. */
+export function consumeSessionExpired(): boolean {
+  try {
+    const val = sessionStorage.getItem(SESSION_EXPIRED_KEY);
+    if (val === "1") {
+      sessionStorage.removeItem(SESSION_EXPIRED_KEY);
+      return true;
+    }
+  } catch {
+    // sessionStorage unavailable
+  }
+  return false;
 }

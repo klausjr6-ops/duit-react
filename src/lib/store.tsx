@@ -58,6 +58,7 @@ export interface MoodEntry {
 }
 
 export type ThemeMode = "system" | "time" | "light" | "dark";
+export type FabCorner = "top-left" | "top-right" | "bottom-left" | "bottom-right";
 
 export interface Settings {
   name: string;
@@ -65,6 +66,8 @@ export interface Settings {
   themeMode?: ThemeMode;
   /** Secret capability used by the private iCalendar feed. */
   calendarToken?: string;
+  /** Preferred FAB corner position — synced to Firestore. */
+  fabCorner?: FabCorner;
 }
 
 export interface Wallet {
@@ -315,12 +318,17 @@ function sanitizeSettings(value: unknown): Partial<Settings> {
   const calendarToken = typeof value.calendarToken === "string" && value.calendarToken.length <= 200
     ? value.calendarToken
     : undefined;
+  const VALID_CORNERS: FabCorner[] = ["top-left", "top-right", "bottom-left", "bottom-right"];
+  const fabCorner = typeof value.fabCorner === "string" && VALID_CORNERS.includes(value.fabCorner as FabCorner)
+    ? (value.fabCorner as FabCorner)
+    : undefined;
 
   return {
     name: toStringValue(value.name, "Kamu").trim().slice(0, 80) || "Kamu",
     themeMode: themeMode ?? "time",
     ...(avatar ? { avatar } : {}),
     ...(calendarToken ? { calendarToken } : {}),
+    ...(fabCorner ? { fabCorner } : {}),
   };
 }
 

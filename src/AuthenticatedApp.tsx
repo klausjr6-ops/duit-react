@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useState, lazy, Suspense } from "react";
-import { motion } from "framer-motion";
 import Sidebar from "./components/Sidebar";
 import Header from "./components/Header";
 import ClockCard from "./components/ClockCard";
@@ -10,6 +9,7 @@ import TimelineCard from "./components/TimelineCard";
 import MoodCard from "./components/MoodCard";
 import ReportCard from "./components/ReportCard";
 import PullToRefreshIndicator from "./components/PullToRefreshIndicator";
+import DraggableFAB from "./components/DraggableFAB";
 import { usePullToRefresh } from "./hooks/usePullToRefresh";
 import { useAutoLogout } from "./hooks/useAutoLogout";
 import { StoreProvider, useStore } from "./lib/store";
@@ -85,7 +85,7 @@ function DashboardApp() {
   const [showAccount, setShowAccount] = useState(false);
   const [showChat, setShowChat] = useState(false);
 
-  const { showWarning, stayLoggedIn } = useAutoLogout(logout);
+  useAutoLogout(logout);
 
   const store = useStore();
   const {
@@ -280,73 +280,13 @@ function DashboardApp() {
         </div>
       </main>
 
-      {/* ── Floating Action Button (FAB) untuk buka Chat AI ── */}
-      {(() => {
-        const fabStatus = (outMonth > inMonth && inMonth > 0)
-          ? "danger"
-          : (outMonth > inMonth * 0.8 && inMonth > 0)
-            ? "warning"
-            : score >= 70
-              ? "good"
-              : "neutral";
-
-        const fabGlow = fabStatus === "danger"
-          ? "shadow-rose-500/40"
-          : fabStatus === "warning"
-            ? "shadow-amber-500/30"
-            : fabStatus === "good"
-              ? "shadow-emerald-500/30"
-              : "shadow-teal-500/25";
-
-        const fabGradient = fabStatus === "danger"
-          ? "from-rose-400 to-rose-600"
-          : fabStatus === "warning"
-            ? "from-amber-400 to-orange-500"
-            : fabStatus === "good"
-              ? "from-emerald-400 to-teal-500"
-              : "from-teal-400 to-blue-500";
-
-        const fabPulse = fabStatus === "danger" || fabStatus === "warning";
-
-        const tooltipText = fabStatus === "danger"
-          ? "⚠️ Overspend bulan ini!"
-          : fabStatus === "warning"
-            ? "⚡ Budget mulai ketat"
-            : fabStatus === "good"
-              ? "💚 Keuangan sehat!"
-              : "Tanya DUIT";
-
-        return (
-          <div className="fixed bottom-[5.5rem] right-[0.75rem] z-40 md:bottom-8 md:right-8">
-            {/* Tooltip */}
-            <div className={`mb-1.5 ml-auto mr-0 px-2.5 py-1 rounded-lg text-[10px] font-semibold whitespace-nowrap transition-opacity ${isDark ? "bg-slate-800 text-slate-200 border border-white/10" : "bg-white text-zinc-700 border border-zinc-200 shadow-lg"} opacity-0 group-hover/fab:opacity-100 pointer-events-none w-fit`}>
-              {tooltipText}
-            </div>
-            <motion.button
-              onClick={() => setShowChat(true)}
-              animate={fabPulse ? { scale: [1, 1.08, 1] } : {}}
-              transition={fabPulse ? { duration: 2, repeat: Infinity, ease: "easeInOut" } : {}}
-              whileHover={{ scale: 1.1 }}
-              whileTap={{ scale: 0.95 }}
-              className={`group/fab flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br ${fabGradient} text-zinc-900 shadow-lg ${fabGlow} transition-shadow md:h-14 md:w-14`}
-              aria-label="Buka Chat AI"
-            >
-              <svg
-                width="26"
-                height="26"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-              </svg>
-            </motion.button>
-          </div>
-        );
-      })()}
+      {/* ── Floating Action Button (FAB) — draggable, snaps to nearest corner ── */}
+      <DraggableFAB
+        onOpenChat={() => setShowChat(true)}
+        inMonth={inMonth}
+        outMonth={outMonth}
+        score={score}
+      />
 
       {/* ── Modal Chat AI (popup) ── */}
       {showChat && (
@@ -362,41 +302,7 @@ function DashboardApp() {
         </Suspense>
       )}
 
-      {/* ── Auto-Logout Warning ── */}
-      {showWarning && (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          className="fixed inset-0 z-[80] bg-black/50 backdrop-blur-sm flex items-center justify-center p-4"
-        >
-          <motion.div
-            initial={{ scale: 0.9, y: 20 }}
-            animate={{ scale: 1, y: 0 }}
-            exit={{ scale: 0.9, y: 20 }}
-            className={isDark
-              ? "bg-slate-900 border border-white/10 rounded-3xl p-6 max-w-sm w-full shadow-xl text-center"
-              : "bg-white border border-zinc-200 rounded-3xl p-6 max-w-sm w-full shadow-xl text-center"
-            }
-          >
-            <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-amber-400/15 text-3xl">
-              🔒
-            </div>
-            <h2 className={`text-lg font-bold mb-2 ${isDark ? "text-white" : "text-zinc-900"}`}>
-              Sesi Akan Berakhir
-            </h2>
-            <p className={`text-sm mb-6 ${isDark ? "text-slate-400" : "text-zinc-500"}`}>
-              Tidak ada aktivitas selama 5 menit. Anda akan otomatis logout dalam 30 detik untuk menjaga privasi.
-            </p>
-            <button
-              onClick={stayLoggedIn}
-              className="w-full bg-gradient-to-br from-teal-400 to-blue-500 text-zinc-900 font-bold py-3 rounded-xl hover:brightness-105 transition-all"
-            >
-              Tetap Masuk
-            </button>
-          </motion.div>
-        </motion.div>
-      )}
+
     </div>
   );
 }
