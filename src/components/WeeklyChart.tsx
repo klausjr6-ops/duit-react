@@ -50,11 +50,14 @@ export default function WeeklyChart() {
     return value.toString();
   };
 
-  const chartHeight = 240;
+  const chartPadTop = 16; // room for top Y-axis label
+  const chartPadBottom = 36; // room for bottom day labels
+  const chartPadLeft = 45;
+  const barAreaHeight = 240;
+  const svgHeight = chartPadTop + barAreaHeight + chartPadBottom;
   const barWidth = 14;
   const barGap = 4;
   const groupWidth = barWidth * 2 + barGap;
-  const chartPadLeft = 45;
   const groupGap = 40;
   const chartWidth = chartPadLeft + data.length * (groupWidth + groupGap);
   const gridLines = 5;
@@ -66,14 +69,14 @@ export default function WeeklyChart() {
     <div className="w-full">
       <div className="overflow-x-auto">
         <svg
-          viewBox={`0 0 ${chartWidth} ${chartHeight + 60}`}
+          viewBox={`0 0 ${chartWidth} ${svgHeight}`}
           className="w-full"
           style={{ minWidth: "500px" }}
           role="img"
           aria-label="Grafik pemasukan dan pengeluaran tujuh hari terakhir"
         >
           {Array.from({ length: gridLines + 1 }).map((_, index) => {
-            const y = (chartHeight / gridLines) * index;
+            const y = chartPadTop + (barAreaHeight / gridLines) * index;
             const value = niceMax - (niceMax / gridLines) * index;
             return (
               <g key={index}>
@@ -100,14 +103,15 @@ export default function WeeklyChart() {
 
           {data.map((day, index) => {
             const groupX = chartPadLeft + index * (groupWidth + groupGap) + groupGap / 2;
-            const incomeHeight = (day.in / niceMax) * chartHeight;
-            const expenseHeight = (day.out / niceMax) * chartHeight;
+            const incomeHeight = (day.in / niceMax) * barAreaHeight;
+            const expenseHeight = (day.out / niceMax) * barAreaHeight;
+            const barBottom = chartPadTop + barAreaHeight;
 
             return (
               <g key={day.date}>
                 <rect
                   x={groupX}
-                  y={chartHeight - incomeHeight}
+                  y={barBottom - incomeHeight}
                   width={barWidth}
                   height={incomeHeight}
                   fill="#10b981"
@@ -117,7 +121,7 @@ export default function WeeklyChart() {
                 </rect>
                 <rect
                   x={groupX + barWidth + barGap}
-                  y={chartHeight - expenseHeight}
+                  y={barBottom - expenseHeight}
                   width={barWidth}
                   height={expenseHeight}
                   fill="#f43f5e"
@@ -127,7 +131,7 @@ export default function WeeklyChart() {
                 </rect>
                 <text
                   x={groupX + groupWidth / 2}
-                  y={chartHeight + 20}
+                  y={barBottom + 20}
                   fill={axisColor}
                   fontSize="11"
                   textAnchor="middle"

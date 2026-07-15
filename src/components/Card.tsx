@@ -13,8 +13,8 @@ export default function Card({ children, className = "", accent, delay = 0 }: Ca
   const { isDark } = useTheme();
 
   const baseClasses = isDark
-    ? "group relative overflow-hidden rounded-3xl border border-white/10 bg-slate-900/60 p-6 pt-7 shadow-xl shadow-black/20 backdrop-blur-xl transition-shadow duration-300 hover:shadow-2xl hover:shadow-emerald-500/5"
-    : "group relative overflow-hidden rounded-3xl border border-zinc-200/80 bg-white p-6 pt-7 shadow-sm shadow-zinc-200/60 backdrop-blur-xl transition-shadow duration-300 hover:shadow-lg hover:shadow-zinc-200/80";
+    ? "group relative overflow-hidden rounded-3xl border border-white/10 bg-slate-900/60 p-6 shadow-xl shadow-black/20 backdrop-blur-xl transition-shadow duration-300 hover:shadow-2xl hover:shadow-emerald-500/5"
+    : "group relative overflow-hidden rounded-3xl border border-zinc-200/80 bg-white p-6 shadow-sm shadow-zinc-200/60 backdrop-blur-xl transition-shadow duration-300 hover:shadow-lg hover:shadow-zinc-200/80";
 
   return (
     <motion.div
