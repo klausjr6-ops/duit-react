@@ -93,7 +93,7 @@ export default function Sidebar({ active, setActive, onAvatarClick }: SidebarPro
           {settings.avatar ? (
             <img src={settings.avatar} alt="Avatar" className="h-full w-full object-cover" />
           ) : (
-            <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-fuchsia-500 to-indigo-500 text-sm font-semibold text-white">
+            <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-teal-400 to-blue-500 text-sm font-semibold text-zinc-900">
               {initials(settings.name)}
             </div>
           )}
@@ -148,7 +148,7 @@ export default function Sidebar({ active, setActive, onAvatarClick }: SidebarPro
             {settings.avatar ? (
               <img src={settings.avatar} alt="Avatar" className="h-full w-full object-cover" />
             ) : (
-              <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-fuchsia-500 to-indigo-500 text-[9px] font-semibold text-white">
+              <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-teal-400 to-blue-500 text-[9px] font-semibold text-zinc-900">
                 {initials(settings.name)}
               </div>
             )}

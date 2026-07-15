@@ -5,6 +5,7 @@ import { useAuth } from "../lib/AuthContext";
 import { useTheme, type ThemeMode } from "../lib/ThemeContext";
 import { useModalDialog } from "../hooks/useModalDialog";
 import ConfirmDialog from "./ConfirmDialog";
+import { IconCamera, IconTrash, IconClose, IconArrowLeft, IconChevronRight, IconSun, IconSunMoon, IconMoon } from "../utils/icons";
 
 interface AccountModalProps {
   open: boolean;
@@ -312,10 +313,10 @@ export default function AccountModal({ open, onClose }: AccountModalProps) {
     ? "flex w-full items-center justify-between rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-left transition-colors hover:bg-white/10"
     : "flex w-full items-center justify-between rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-3 text-left transition-colors hover:bg-zinc-100";
 
-  const themeOptions: { id: ThemeMode; label: string; icon: string }[] = [
-    { id: "light", label: "Pagi", icon: "🌤️" },
-    { id: "time", label: "Auto", icon: "🌓" },
-    { id: "dark", label: "Malam", icon: "🌙" },
+  const themeOptions: { id: ThemeMode; label: string; icon: React.ReactNode }[] = [
+    { id: "light", label: "Pagi", icon: <IconSun size={20} /> },
+    { id: "time", label: "Auto", icon: <IconSunMoon size={20} /> },
+    { id: "dark", label: "Malam", icon: <IconMoon size={20} /> },
   ];
 
   // Keep old users with the legacy system choice visually aligned with Auto.
@@ -353,7 +354,7 @@ export default function AccountModal({ open, onClose }: AccountModalProps) {
                     aria-label="Kembali ke pengaturan akun"
                     className={isDark ? "text-slate-400 hover:text-white -ml-1" : "text-zinc-500 hover:text-zinc-900 -ml-1"}
                   >
-                    ←
+                    <IconArrowLeft size={18} />
                   </button>
                 )}
                 <div>
@@ -368,7 +369,7 @@ export default function AccountModal({ open, onClose }: AccountModalProps) {
                 </div>
               </div>
               <button aria-label="Tutup pengaturan akun" onClick={handleClose} className={isDark ? "text-slate-400 hover:text-white" : "text-zinc-500 hover:text-zinc-900"}>
-                ✕
+                <IconClose size={18} />
               </button>
             </div>
 
@@ -394,12 +395,12 @@ export default function AccountModal({ open, onClose }: AccountModalProps) {
                       {settings.avatar ? (
                         <img src={settings.avatar} alt="Avatar" className="h-full w-full object-cover" />
                       ) : (
-                        <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-fuchsia-500 to-indigo-500 text-xl font-bold text-white">
+                        <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-teal-400 to-blue-500 text-xl font-bold text-zinc-900">
                           {name ? name[0].toUpperCase() : "?"}
                         </div>
                       )}
                       <div className={`absolute inset-0 flex items-center justify-center bg-black/40 text-lg transition-opacity ${avatarSaving ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}>
-                        {avatarSaving ? <span className="h-5 w-5 animate-spin rounded-full border-2 border-white/30 border-t-white" /> : "📷"}
+                        {avatarSaving ? <span className="h-5 w-5 animate-spin rounded-full border-2 border-white/30 border-t-white" /> : <IconCamera size={22} className="text-white" />}
                       </div>
                     </button>
                     <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={handleAvatarPick} />
@@ -452,7 +453,7 @@ export default function AccountModal({ open, onClose }: AccountModalProps) {
                             title={opt.label}
                             type="button"
                           >
-                            <span className="text-xl leading-none">{opt.icon}</span>
+                            <span className="text-xl leading-none flex items-center justify-center">{opt.icon}</span>
                             <span className="text-[11px] font-semibold">{opt.label}</span>
                           </button>
                         );
@@ -472,7 +473,7 @@ export default function AccountModal({ open, onClose }: AccountModalProps) {
                           Link pribadi jadwal DUIT
                         </p>
                       </div>
-                      <span className={isDark ? "text-slate-500" : "text-zinc-400"}>›</span>
+                      <span className={isDark ? "text-slate-500" : "text-zinc-400"}><IconChevronRight size={18} /></span>
                     </button>
 
                     <button
@@ -486,7 +487,7 @@ export default function AccountModal({ open, onClose }: AccountModalProps) {
                           Export / import JSON & CSV
                         </p>
                       </div>
-                      <span className={isDark ? "text-slate-500" : "text-zinc-400"}>›</span>
+                      <span className={isDark ? "text-slate-500" : "text-zinc-400"}><IconChevronRight size={18} /></span>
                     </button>
                   </div>
 
@@ -505,7 +506,7 @@ export default function AccountModal({ open, onClose }: AccountModalProps) {
                             {user?.email}
                           </p>
                         </div>
-                        <span className={isDark ? "text-slate-500" : "text-zinc-400"}>›</span>
+                        <span className={isDark ? "text-slate-500" : "text-zinc-400"}><IconChevronRight size={18} /></span>
                       </button>
 
                       <button
@@ -516,7 +517,7 @@ export default function AccountModal({ open, onClose }: AccountModalProps) {
                           <p className={`text-sm font-medium ${isDark ? "text-white" : "text-zinc-900"}`}>Ganti Password</p>
                           <p className={`text-xs ${isDark ? "text-slate-500" : "text-zinc-500"}`}>Ubah kata sandi akun</p>
                         </div>
-                        <span className={isDark ? "text-slate-500" : "text-zinc-400"}>›</span>
+                        <span className={isDark ? "text-slate-500" : "text-zinc-400"}><IconChevronRight size={18} /></span>
                       </button>
                     </div>
                   )}
@@ -581,9 +582,10 @@ export default function AccountModal({ open, onClose }: AccountModalProps) {
                   <button
                     type="button"
                     onClick={() => setConfirmReset(true)}
-                    className="mt-3 w-full rounded-xl border border-rose-400/30 bg-rose-400/10 py-2.5 text-sm font-semibold text-rose-500 hover:bg-rose-400/20"
+                    className="mt-3 w-full flex items-center justify-center gap-2 rounded-xl border border-rose-400/30 bg-rose-400/10 py-2.5 text-sm font-semibold text-rose-500 hover:bg-rose-400/20"
                   >
-                    🗑️ Hapus Semua Data
+                    <IconTrash size={16} />
+                    Hapus Semua Data
                   </button>
                 </motion.div>
               )}
