@@ -5,6 +5,8 @@ import { useTheme } from "../lib/ThemeContext";
 import { formatRupiah } from "../lib/format";
 import type { Goal } from "../lib/store";
 import { useModalDialog } from "../hooks/useModalDialog";
+import { toast } from "../hooks/useToast";
+import { IconClose } from "../utils/icons";
 
 interface Props {
   goal: Goal;
@@ -51,6 +53,7 @@ export default function AddFundModal({ goal, onClose }: Props) {
       return;
     }
 
+    toast.success("Dana berhasil ditabung ke goal");
     onClose();
   };
 
@@ -104,7 +107,7 @@ export default function AddFundModal({ goal, onClose }: Props) {
             disabled={saving}
             className={closeClass}
           >
-            ×
+            <IconClose size={20} />
           </button>
         </div>
 

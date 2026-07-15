@@ -60,9 +60,10 @@ interface Props {
   inMonth: number;
   outMonth: number;
   score: number;
+  hidden?: boolean;
 }
 
-export default function DraggableFAB({ onOpenChat, inMonth, outMonth, score }: Props) {
+export default function DraggableFAB({ onOpenChat, inMonth, outMonth, score, hidden }: Props) {
   const { isDark } = useTheme();
   const { settings } = useStore();
   const { user } = useAuth();
@@ -280,7 +281,7 @@ export default function DraggableFAB({ onOpenChat, inMonth, outMonth, score }: P
   return (
     <div
       ref={wrapperRef}
-      className="fixed left-0 top-0 z-40"
+      className={`fixed left-0 top-0 z-40 transition-opacity duration-200 ${hidden ? "opacity-0 pointer-events-none" : "opacity-100"}`}
       style={{ touchAction: "none", willChange: "transform" }}
     >
       {!dragging && (

@@ -3,6 +3,8 @@ import { motion } from "framer-motion";
 import { useStore, type Goal } from "../lib/store";
 import { useTheme } from "../lib/ThemeContext";
 import { useModalDialog } from "../hooks/useModalDialog";
+import { toast } from "../hooks/useToast";
+import { IconClose } from "../utils/icons";
 import { GOAL_ICONS } from "../utils/icons";
 
 interface Props { goal: Goal; onClose: () => void; }
@@ -26,6 +28,7 @@ export default function EditGoalModal({ goal, onClose }: Props) {
     if (Number.isNaN(targetNum) || targetNum <= 0) { setError("Target tidak valid."); return; }
     if (targetNum < goal.current) { setError(`Target tidak boleh kurang dari tabungan terkumpul (${goal.current.toLocaleString("id-ID")}).`); return; }
     updateGoal(goal.id, { name: name.trim(), target: targetNum, deadline: deadline || undefined, icon });
+    toast.success(`Goal "${name.trim()}" berhasil diperbarui`);
     onClose();
   };
 
@@ -33,11 +36,12 @@ export default function EditGoalModal({ goal, onClose }: Props) {
   const labelCls = isDark ? "text-[11px] font-bold text-slate-500 uppercase tracking-wider" : "text-[11px] font-bold text-zinc-500 uppercase tracking-wider";
   const inputCls = isDark ? "w-full mt-1 bg-slate-950 border border-white/10 rounded-lg p-3 text-sm text-white focus:outline-none focus:border-teal-400" : "w-full mt-1 bg-zinc-50 border border-zinc-300 rounded-lg p-3 text-sm text-zinc-900 focus:outline-none focus:border-teal-500";
   const titleCls = isDark ? "text-xl font-bold text-white" : "text-xl font-bold text-zinc-900";
+  const closeCls = isDark ? "text-slate-400 hover:text-white" : "text-zinc-500 hover:text-zinc-900";
 
   return (
     <motion.div initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}} onClick={onClose} className="fixed inset-0 z-[70] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
       <motion.div ref={dialogRef} role="dialog" aria-modal="true" onKeyDown={onDialogKeyDown} initial={{scale:0.95,y:20}} animate={{scale:1,y:0}} exit={{scale:0.95,y:20}} onClick={e=>e.stopPropagation()} className={panel}>
-        <div className="flex justify-between items-center mb-5"><h2 className={titleCls}>Edit Goal</h2><button onClick={onClose} className={isDark ? "text-slate-400 hover:text-white text-3xl":"text-zinc-500 hover:text-zinc-900 text-3xl"}>×</button></div>
+        <div className="flex justify-between items-center mb-5"><h2 className={titleCls}>Edit Goal</h2><button onClick={onClose} className={closeCls}><IconClose size={20} /></button></div>
         <div className="space-y-4">
           <div><label className={labelCls}>Nama Goal</label><input value={name} onChange={e=>setName(e.target.value)} className={inputCls} /></div>
           <div><label className={labelCls}>Target (Rp)</label><input type="text" inputMode="numeric" value={target ? `Rp ${formatInputRupiah(target)}` : ""} onChange={e=>setTarget(e.target.value.replace(/\D/g,""))} className={inputCls} /></div>

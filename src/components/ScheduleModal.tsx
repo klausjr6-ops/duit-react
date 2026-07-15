@@ -3,7 +3,9 @@ import { motion } from "framer-motion";
 import { useStore, todayStr } from "../lib/store";
 import { useTheme } from "../lib/ThemeContext";
 import { useModalDialog } from "../hooks/useModalDialog";
-import { IconRepeat } from "../utils/icons";
+import { toast } from "../hooks/useToast";
+import { IconRepeat, IconClose } from "../utils/icons";
+import { SCHEDULE_ICONS } from "../utils/icons";
 
 interface Props {
   onClose: () => void;
@@ -20,6 +22,7 @@ export default function ScheduleModal({ onClose }: Props) {
   const [end, setEnd] = useState("");
   const [recurring, setRecurring] = useState(false);
   const [untilDate, setUntilDate] = useState("");
+  const [icon, setIcon] = useState(SCHEDULE_ICONS[0].key);
   const [error, setError] = useState<string | null>(null);
   const { dialogRef, onDialogKeyDown } = useModalDialog(true, onClose);
 
@@ -45,7 +48,8 @@ export default function ScheduleModal({ onClose }: Props) {
       setError("Tanggal batas pengulangan tidak boleh sebelum tanggal mulai.");
       return;
     }
-    addSched({ name: name.trim(), desc: desc.trim() || undefined, date, start, end: end || undefined, recurring, untilDate: recurring ? untilDate : undefined });
+    addSched({ name: name.trim(), desc: desc.trim() || undefined, date, start, end: end || undefined, recurring, untilDate: recurring ? untilDate : undefined, icon });
+    toast.success(`Jadwal "${name.trim()}" berhasil ditambahkan`);
     onClose();
   };
 
@@ -57,7 +61,7 @@ export default function ScheduleModal({ onClose }: Props) {
     ? "w-full mt-1 bg-slate-950 border border-white/10 rounded-lg p-3 text-sm text-white focus:outline-none focus:border-teal-400"
     : "w-full mt-1 bg-zinc-50 border border-zinc-300 rounded-lg p-3 text-sm text-zinc-900 focus:outline-none focus:border-teal-500 focus:bg-white";
   const titleCls = isDark ? "text-xl font-bold text-white" : "text-xl font-bold text-zinc-900";
-  const closeCls = isDark ? "text-slate-400 hover:text-white text-3xl leading-none w-8 h-8 flex items-center justify-center" : "text-zinc-500 hover:text-zinc-900 text-3xl leading-none w-8 h-8 flex items-center justify-center";
+  const closeCls = isDark ? "text-slate-400 hover:text-white" : "text-zinc-500 hover:text-zinc-900";
   const checkWrap = isDark ? "flex items-center gap-3 cursor-pointer bg-white/5 rounded-xl p-3" : "flex items-center gap-3 cursor-pointer bg-zinc-50 border border-zinc-200 rounded-xl p-3";
   const checkText = isDark ? "text-sm text-white font-medium" : "text-sm text-zinc-900 font-medium";
 
@@ -77,12 +81,35 @@ export default function ScheduleModal({ onClose }: Props) {
       >
         <div className="flex justify-between items-center mb-6">
           <h2 id="schedule-dialog-title" className={titleCls}>Tambah Jadwal</h2>
-          <button aria-label="Tutup modal tambah jadwal" onClick={onClose} className={closeCls}>×</button>
+          <button aria-label="Tutup modal tambah jadwal" onClick={onClose} className={closeCls}><IconClose size={20} /></button>
         </div>
         <div className="space-y-4">
           <div>
             <label className={labelCls}>Nama Kegiatan</label>
             <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Misal: Meeting Tim" className={inputCls} />
+          </div>
+          <div>
+            <label className={labelCls}>Icon</label>
+            <div className="grid grid-cols-4 gap-2 mt-1">
+              {SCHEDULE_ICONS.map((ic) => (
+                <button
+                  key={ic.key}
+                  type="button"
+                  onClick={() => setIcon(ic.key)}
+                  title={ic.label}
+                  className={`flex flex-col items-center gap-1 p-2 rounded-lg border transition-all ${
+                    icon === ic.key
+                      ? "border-teal-400 bg-teal-500/10 text-teal-500"
+                      : isDark
+                        ? "border-white/10 text-slate-400 hover:border-white/30"
+                        : "border-zinc-200 text-zinc-500 hover:border-zinc-400 bg-white"
+                  }`}
+                >
+                  {ic.icon}
+                  <span className="text-[9px] font-semibold">{ic.label}</span>
+                </button>
+              ))}
+            </div>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>

@@ -1,4 +1,5 @@
 import { IconCalendar, IconClock, IconRepeat, IconEdit, IconTrash } from "../utils/icons";
+import { toast } from "../hooks/useToast";
 import { useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import Card from "../components/Card";
@@ -212,7 +213,10 @@ export default function JadwalView() {
         confirmLabel="Ya, Hapus"
         onClose={() => setScheduleToDelete(null)}
         onConfirm={() => {
-          if (scheduleToDelete) delSched(scheduleToDelete.id);
+          if (scheduleToDelete) {
+            delSched(scheduleToDelete.id);
+            toast.success(`Jadwal "${scheduleToDelete.name}" dihapus`);
+          }
           setScheduleToDelete(null);
         }}
         isDark={isDark}

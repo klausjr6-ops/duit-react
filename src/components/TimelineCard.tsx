@@ -2,7 +2,7 @@ import { motion } from "framer-motion";
 import Card from "./Card";
 import { useStore, type ScheduleItem } from "../lib/store";
 import { useTheme } from "../lib/ThemeContext";
-import { IconCalendar } from "../utils/icons";
+import { IconCalendar, getScheduleIcon } from "../utils/icons";
 
 function timeToHour(t?: string) {
   if (!t) return 0;
@@ -88,7 +88,7 @@ export default function TimelineCard() {
                 isActive ? "border-teal-400/40 bg-teal-400/10" : itemBorder
               }`}
             >
-              <span className="text-lg">{a.icon ?? <IconCalendar size={18} />}</span>
+              <span className="text-lg">{a.icon ? getScheduleIcon(a.icon, 18) : <IconCalendar size={18} />}</span>
               <div>
                 <p className={`text-sm font-medium ${textMain}`}>{a.name}</p>
                 <p className={`text-xs ${muted}`}>

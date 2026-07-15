@@ -5,6 +5,7 @@ import { formatRupiah } from "../lib/format";
 import { useTheme } from "../lib/ThemeContext";
 import { useModalDialog } from "../hooks/useModalDialog";
 import { toast } from "../hooks/useToast";
+import { IconClose } from "../utils/icons";
 
 interface Props {
   /** Pre-select source wallet. */
@@ -61,8 +62,8 @@ export default function TransferModal({ fromWallet, onClose }: Props) {
     : "bg-white border border-zinc-200 rounded-3xl p-6 max-w-md w-full shadow-xl";
   const titleCls = isDark ? "text-xl font-bold text-white" : "text-xl font-bold text-zinc-900";
   const closeCls = isDark
-    ? "text-slate-400 hover:text-white text-3xl leading-none w-8 h-8 flex items-center justify-center"
-    : "text-zinc-500 hover:text-zinc-900 text-3xl leading-none w-8 h-8 flex items-center justify-center";
+    ? "text-slate-400 hover:text-white"
+    : "text-zinc-500 hover:text-zinc-900";
   const inputCls = isDark
     ? "w-full mt-1 bg-slate-950 border border-white/10 rounded-lg p-3 text-sm text-white focus:outline-none focus:border-teal-400"
     : "w-full mt-1 bg-white border border-zinc-300 rounded-lg p-3 text-sm text-zinc-900 focus:outline-none focus:border-teal-500";
@@ -102,7 +103,7 @@ export default function TransferModal({ fromWallet, onClose }: Props) {
         <div className="flex justify-between items-center mb-6">
           <h2 className={titleCls}>Transfer Antar Dompet</h2>
           <button aria-label="Tutup" onClick={onClose} className={closeCls}>
-            ×
+            <IconClose size={20} />
           </button>
         </div>
 

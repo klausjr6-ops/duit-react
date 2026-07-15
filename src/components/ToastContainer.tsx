@@ -26,30 +26,34 @@ const ICON_MAP: Record<ToastType, React.ReactNode> = {
   ),
 };
 
-const STYLE_MAP: Record<ToastType, { bg: string; border: string; icon: string; text: string }> = {
+const STYLE_MAP: Record<ToastType, { bg: string; border: string; icon: string; textLight: string; textDark: string }> = {
   success: {
     bg: "bg-emerald-500/10",
     border: "border-emerald-400/30",
     icon: "text-emerald-500",
-    text: "text-emerald-600 dark:text-emerald-400",
+    textLight: "text-emerald-600",
+    textDark: "text-emerald-400",
   },
   error: {
     bg: "bg-rose-500/10",
     border: "border-rose-400/30",
     icon: "text-rose-500",
-    text: "text-rose-600 dark:text-rose-400",
+    textLight: "text-rose-600",
+    textDark: "text-rose-400",
   },
   warning: {
     bg: "bg-amber-500/10",
     border: "border-amber-400/30",
     icon: "text-amber-500",
-    text: "text-amber-600 dark:text-amber-400",
+    textLight: "text-amber-600",
+    textDark: "text-amber-400",
   },
   info: {
     bg: "bg-blue-500/10",
     border: "border-blue-400/30",
     icon: "text-blue-500",
-    text: "text-blue-600 dark:text-blue-400",
+    textLight: "text-blue-600",
+    textDark: "text-blue-400",
   },
 };
 
@@ -69,14 +73,10 @@ export default function ToastContainer() {
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: -8, scale: 0.95 }}
               transition={{ duration: 0.2 }}
-              className={`pointer-events-auto flex items-center gap-3 rounded-xl border px-4 py-3 shadow-lg backdrop-blur-xl ${
-                isDark
-                  ? `${s.bg} ${s.border}`
-                  : `${s.bg} ${s.border} bg-opacity-80`
-              }`}
+              className={`pointer-events-auto flex items-center gap-3 rounded-xl border px-4 py-3 shadow-lg backdrop-blur-xl ${s.bg} ${s.border}`}
             >
               <span className={s.icon}>{ICON_MAP[t.type]}</span>
-              <span className={`text-sm font-medium flex-1 ${isDark ? s.text.replace("dark:", "") : s.text.split(" ")[0]}`}>
+              <span className={`text-sm font-medium flex-1 ${isDark ? s.textDark : s.textLight}`}>
                 {t.message}
               </span>
               <button

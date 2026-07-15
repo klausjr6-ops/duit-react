@@ -3,8 +3,9 @@ import { motion } from "framer-motion";
 import { useStore, type Wallet } from "../lib/store";
 import { useTheme } from "../lib/ThemeContext";
 import { useModalDialog } from "../hooks/useModalDialog";
+import { toast } from "../hooks/useToast";
 import { WALLET_COLORS, resolveColorKey } from "../utils/walletColors";
-import { WALLET_ICONS } from "../utils/icons";
+import { WALLET_ICONS, IconClose } from "../utils/icons";
 
 interface Props { wallet: Wallet; onClose: () => void; }
 
@@ -14,31 +15,33 @@ export default function EditWalletModal({ wallet, onClose }: Props) {
   const [name, setName] = useState(wallet.name);
   const [icon, setIcon] = useState(wallet.icon);
   const [colorKey, setColorKey] = useState(resolveColorKey(wallet.color));
-  const [initialBalance, setInitialBalance] = useState(String(wallet.balance - txs.filter(t=>t.walletId===wallet.id).reduce((s,t)=> s + (t.type==="in"?t.amt:-t.amt),0)));
-  const [error, setError] = useState<string|null>(null);
+  const [initialBalance, setInitialBalance] = useState(String(wallet.balance - txs.filter(t => t.walletId === wallet.id && !t.transferId).reduce((s, t) => s + (t.type === "in" ? t.amt : -t.amt), 0)));
+  const [error, setError] = useState<string | null>(null);
   const { dialogRef, onDialogKeyDown } = useModalDialog(true, onClose);
 
   const handleSubmit = () => {
     setError(null);
     if (!name.trim()) { setError("Nama dompet harus diisi."); return; }
-    const bal = parseInt(initialBalance.replace(/\D/g,"")||"0",10);
+    const bal = parseInt(initialBalance.replace(/\D/g, "") || "0", 10);
     if (Number.isNaN(bal) || bal < 0) { setError("Saldo awal tidak valid."); return; }
     updateWallet(wallet.id, { name: name.trim(), icon, color: colorKey, balance: bal });
+    toast.success(`Dompet "${name.trim()}" berhasil diperbarui`);
     onClose();
   };
 
   const inputCls = isDark ? "w-full mt-1 bg-slate-950 border border-white/10 rounded-lg p-3 text-sm text-white focus:outline-none focus:border-teal-400" : "w-full mt-1 bg-zinc-50 border border-zinc-300 rounded-lg p-3 text-sm text-zinc-900 focus:outline-none focus:border-teal-500";
   const labelCls = isDark ? "text-[11px] font-bold text-slate-500 uppercase tracking-wider" : "text-[11px] font-bold text-zinc-500 uppercase tracking-wider";
   const panel = isDark ? "bg-slate-900 border border-white/10 rounded-3xl p-6 max-w-md w-full" : "bg-white border border-zinc-200 rounded-3xl p-6 max-w-md w-full shadow-xl";
+  const closeCls = isDark ? "text-slate-400 hover:text-white" : "text-zinc-500 hover:text-zinc-900";
 
-  const formatRp = (v:string)=>{ const n=v.replace(/\D/g,""); return n?parseInt(n).toLocaleString("id-ID"):""; };
+  const formatRp = (v: string) => { const n = v.replace(/\D/g, ""); return n ? parseInt(n).toLocaleString("id-ID") : ""; };
 
   return (
-    <motion.div initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}} onClick={onClose} className="fixed inset-0 z-[70] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-      <motion.div ref={dialogRef} role="dialog" aria-modal="true" onKeyDown={onDialogKeyDown} initial={{scale:0.95,y:20}} animate={{scale:1,y:0}} exit={{scale:0.95,y:20}} onClick={e=>e.stopPropagation()} className={panel}>
-        <div className="flex justify-between items-center mb-5"><h2 className={isDark?"text-xl font-bold text-white":"text-xl font-bold text-zinc-900"}>Edit Dompet</h2><button onClick={onClose} className={isDark?"text-slate-400 hover:text-white text-3xl":"text-zinc-500 hover:text-zinc-900 text-3xl"}>×</button></div>
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={onClose} className="fixed inset-0 z-[70] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+      <motion.div ref={dialogRef} role="dialog" aria-modal="true" onKeyDown={onDialogKeyDown} initial={{ scale: 0.95, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.95, y: 20 }} onClick={e => e.stopPropagation()} className={panel}>
+        <div className="flex justify-between items-center mb-5"><h2 className={isDark ? "text-xl font-bold text-white" : "text-xl font-bold text-zinc-900"}>Edit Dompet</h2><button onClick={onClose} className={closeCls}><IconClose size={20} /></button></div>
         <div className="space-y-4">
-          <div><label className={labelCls}>Nama Dompet</label><input value={name} onChange={e=>setName(e.target.value)} className={inputCls} /></div>
+          <div><label className={labelCls}>Nama Dompet</label><input value={name} onChange={e => setName(e.target.value)} className={inputCls} /></div>
           <div><label className={labelCls}>Icon</label>
             <div className="grid grid-cols-4 gap-2 mt-2">
               {WALLET_ICONS.map((ic) => (
@@ -76,31 +79,36 @@ export default function EditWalletModal({ wallet, onClose }: Props) {
             )}
           </div>
           <div><label className={labelCls}>Warna</label>
-            <div className="mt-2 grid grid-cols-4 gap-2">
+            <div className="flex flex-wrap gap-2 mt-2">
               {WALLET_COLORS.map((c) => {
-                const active = colorKey === c.key;
+                const hex = c.hex;
+                const isActive = colorKey === c.key;
                 return (
                   <button
-                    type="button"
                     key={c.key}
+                    type="button"
+                    title={c.label}
                     onClick={() => setColorKey(c.key)}
-                    className="h-10 rounded-xl border-2 transition-all flex items-center justify-center gap-1.5"
-                    style={{
-                      background: `linear-gradient(135deg, ${c.hex}20, ${c.hex}08)`,
-                      borderColor: active ? c.hex : (isDark ? "rgba(255,255,255,0.1)" : "#e4e4e7"),
-                      boxShadow: active ? `0 0 0 3px ${c.hex}30` : "none",
-                    }}
+                    className={`h-8 w-8 rounded-full transition-all flex items-center justify-center ${
+                      isActive
+                        ? "ring-2 ring-offset-2 scale-110"
+                        : "hover:scale-110 opacity-60 hover:opacity-100"
+                    } ${isDark ? "ring-offset-slate-900" : "ring-offset-white"}`}
+                    style={{ backgroundColor: hex }}
                   >
-                    <span className="w-3 h-3 rounded-full" style={{ background: c.hex }} />
-                    <span className={`text-[10px] font-bold ${active ? "" : isDark ? "text-slate-400" : "text-zinc-500"}`} style={active ? { color: c.hex } : {}}>{c.label}</span>
+                    {isActive && (
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                        <polyline points="20 6 9 17 4 12" />
+                      </svg>
+                    )}
                   </button>
                 );
               })}
             </div>
           </div>
           <div><label className={labelCls}>Saldo Awal</label>
-            <input type="text" inputMode="numeric" value={initialBalance ? `Rp ${formatRp(initialBalance)}`:""} onChange={e=>setInitialBalance(e.target.value.replace(/\D/g,""))} className={inputCls} />
-            <p className={isDark?"text-xs text-slate-500 mt-1":"text-xs text-zinc-500 mt-1"}>Mengubah saldo awal akan mempengaruhi Total Saldo historis.</p>
+            <input type="text" inputMode="numeric" value={initialBalance ? `Rp ${formatRp(initialBalance)}` : ""} onChange={e => setInitialBalance(e.target.value.replace(/\D/g, ""))} className={inputCls} />
+            <p className={isDark ? "text-xs text-slate-500 mt-1" : "text-xs text-zinc-500 mt-1"}>Mengubah saldo awal akan mempengaruhi Total Saldo historis.</p>
           </div>
           {error && <p role="alert" className="rounded-lg border border-rose-400/30 bg-rose-400/10 px-3 py-2 text-xs text-rose-500">{error}</p>}
           <button onClick={handleSubmit} className="w-full bg-gradient-to-br from-teal-400 to-blue-500 text-zinc-900 font-bold py-3 rounded-xl hover:brightness-105">Simpan Perubahan</button>

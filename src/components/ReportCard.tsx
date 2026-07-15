@@ -4,7 +4,7 @@ import Card from "./Card";
 import PizzaChart, { HoveredSliceData } from "./PizzaChart";
 import { formatRupiah } from "../lib/format";
 import { useTheme } from "../lib/ThemeContext";
-import { IconArrowDown, IconArrowUp, IconWallet, IconTrendingDown } from "../utils/icons";
+import { IconArrowDown, IconArrowUp, IconWallet, IconTrendingDown, IconAlertTriangle } from "../utils/icons";
 
 interface ReportCardProps {
   income: number;
@@ -101,8 +101,8 @@ export default function ReportCard({ income, expense }: ReportCardProps) {
       <div className="flex items-center justify-between mb-6">
         <p className={`text-xs font-semibold tracking-widest ${isDark ? "text-slate-400" : "text-zinc-500"}`}>LAPORAN BULANAN</p>
         {isOverspend && (
-          <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full ${isDark ? "bg-amber-500/15 text-amber-400 border border-amber-400/30" : "bg-amber-50 text-amber-600 border border-amber-200"}`}>
-            ⚠️ Overspend
+          <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full inline-flex items-center gap-1 ${isDark ? "bg-amber-500/15 text-amber-400 border border-amber-400/30" : "bg-amber-50 text-amber-600 border border-amber-200"}`}>
+            <IconAlertTriangle size={12} /> Overspend
           </span>
         )}
       </div>

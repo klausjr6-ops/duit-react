@@ -287,6 +287,7 @@ function DashboardApp() {
         inMonth={inMonth}
         outMonth={outMonth}
         score={score}
+        hidden={showChat}
       />
 
       {/* ── Modal Chat AI (popup) ── */}

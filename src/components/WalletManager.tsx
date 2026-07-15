@@ -9,7 +9,7 @@ import ConfirmDialog from "./ConfirmDialog";
 import EditWalletModal from "./EditWalletModal";
 import TransferModal from "./TransferModal";
 import { getWalletHex, WALLET_COLORS } from "../utils/walletColors";
-import { WALLET_ICONS, getWalletIcon, IconTransfer, IconTrash } from "../utils/icons";
+import { WALLET_ICONS, getWalletIcon, IconTransfer, IconTrash, IconClose } from "../utils/icons";
 
 interface Props {
   onClose: () => void;
@@ -83,7 +83,7 @@ export default function WalletManager({ onClose }: Props) {
       >
         <div className="flex justify-between items-center mb-4">
           <h2 id="wallet-dialog-title" className={titleCls}>Dompet</h2>
-          <button aria-label="Tutup dompet" onClick={onClose} className={closeCls}>×</button>
+          <button aria-label="Tutup dompet" onClick={onClose} className={closeCls}><IconClose size={20} /></button>
         </div>
 
         {wallets.length >= 2 && (

@@ -3,7 +3,8 @@ import { motion } from "framer-motion";
 import { useStore } from "../lib/store";
 import { useTheme } from "../lib/ThemeContext";
 import { useModalDialog } from "../hooks/useModalDialog";
-import { GOAL_ICONS } from "../utils/icons";
+import { toast } from "../hooks/useToast";
+import { IconClose, GOAL_ICONS } from "../utils/icons";
 
 interface Props {
   onClose: () => void;
@@ -51,6 +52,7 @@ export default function GoalModal({ onClose }: Props) {
       icon,
     });
 
+    toast.success(`Goal "${name.trim()}" berhasil ditambahkan`);
     onClose();
   };
 
@@ -86,7 +88,7 @@ export default function GoalModal({ onClose }: Props) {
       >
         <div className="flex justify-between items-center mb-6">
           <h2 id="goal-dialog-title" className={titleCls}>Tambah Goal</h2>
-          <button aria-label="Tutup modal tambah goal" onClick={onClose} className={closeCls}>×</button>
+          <button aria-label="Tutup modal tambah goal" onClick={onClose} className={closeCls}><IconClose size={20} /></button>
         </div>
 
         <div className="space-y-4">
