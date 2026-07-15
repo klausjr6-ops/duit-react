@@ -1,5 +1,5 @@
 // src/components/DraggableFAB.tsx
-// v3 — native DOM events for drag, CSS for animation, no setPointerCapture
+// v4 — debounced Firestore write (3 s), local state instant
 
 import { useEffect, useRef, useState } from "react";
 import { useStore, type FabCorner } from "../lib/store";
@@ -12,6 +12,7 @@ const TOP_PAD_MOBILE = 24;
 const TOP_PAD_DESKTOP = 32;
 const BOT_PAD_MOBILE = 88;
 const BOT_PAD_DESKTOP = 32;
+const DEBOUNCE_MS = 3000; // delay before writing to Firestore
 
 function getFabSize(): number {
   return window.innerWidth >= 768 ? 56 : 48;
@@ -78,6 +79,10 @@ export default function DraggableFAB({ onOpenChat, inMonth, outMonth, score }: P
   const onOpenChatRef = useRef(onOpenChat);
   onOpenChatRef.current = onOpenChat;
 
+  // Debounce timer for Firestore write
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastSavedCornerRef = useRef<FabCorner>(storeCorner);
+
   /* ── Apply position directly to DOM ── */
   const applyPosRef = useRef((x: number, y: number, transition = false) => {
     const el = wrapperRef.current;
@@ -88,9 +93,35 @@ export default function DraggableFAB({ onOpenChat, inMonth, outMonth, score }: P
     el.style.transform = `translate(${x}px, ${y}px)`;
   });
 
+  /* ── Debounced save: write fabCorner to Firestore after 3 s of inactivity ── */
+  const scheduleSaveRef = useRef((nc: FabCorner) => {
+    // Clear any pending save
+    if (saveTimerRef.current) {
+      clearTimeout(saveTimerRef.current);
+    }
+    // If already saved to this corner, skip
+    if (nc === lastSavedCornerRef.current) return;
+
+    saveTimerRef.current = setTimeout(() => {
+      if (nc !== lastSavedCornerRef.current) {
+        lastSavedCornerRef.current = nc;
+        updateSettingsRef.current({ fabCorner: nc });
+      }
+      saveTimerRef.current = null;
+    }, DEBOUNCE_MS);
+  });
+
+  // Cleanup timer on unmount
+  useEffect(() => {
+    return () => {
+      if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    };
+  }, []);
+
   /* ── Sync corner from Firestore ── */
   useEffect(() => {
     setCorner(storeCorner);
+    lastSavedCornerRef.current = storeCorner;
     const p = getCornerXY(storeCorner);
     applyPosRef.current(p.x, p.y);
   }, [storeCorner]);
@@ -108,9 +139,6 @@ export default function DraggableFAB({ onOpenChat, inMonth, outMonth, score }: P
 
   /* ═══════════════════════════════════════════════════════════
      DRAG LOGIC — native DOM events, window-level move/up
-     - No setPointerCapture (causes stuck states)
-     - pointerdown on button → attach pointermove/pointerup to window
-     - On up/cancel → detach window listeners, snap to corner or open chat
      ═══════════════════════════════════════════════════════════ */
   useEffect(() => {
     const btn = btnRef.current;
@@ -126,9 +154,8 @@ export default function DraggableFAB({ onOpenChat, inMonth, outMonth, score }: P
       currentY: number;
     } | null = null;
 
-    /* ── pointerdown: start potential drag ── */
     const handleDown = (e: PointerEvent) => {
-      if (e.button !== 0) return; // only primary button
+      if (e.button !== 0) return;
       e.preventDefault();
       e.stopPropagation();
 
@@ -146,13 +173,11 @@ export default function DraggableFAB({ onOpenChat, inMonth, outMonth, score }: P
         currentY: rect.top,
       };
 
-      // Attach move + up to window so we always capture them
       window.addEventListener("pointermove", handleMove, { passive: false });
       window.addEventListener("pointerup", handleUp);
       window.addEventListener("pointercancel", handleUp);
     };
 
-    /* ── pointermove: update position if dragging ── */
     const handleMove = (e: PointerEvent) => {
       if (!dragInfo) return;
       e.preventDefault();
@@ -176,14 +201,12 @@ export default function DraggableFAB({ onOpenChat, inMonth, outMonth, score }: P
       }
     };
 
-    /* ── pointerup / pointercancel: snap or tap ── */
     const handleUp = () => {
       if (!dragInfo) return;
 
       const info = dragInfo;
       dragInfo = null;
 
-      // Always detach window listeners
       window.removeEventListener("pointermove", handleMove);
       window.removeEventListener("pointerup", handleUp);
       window.removeEventListener("pointercancel", handleUp);
@@ -191,7 +214,6 @@ export default function DraggableFAB({ onOpenChat, inMonth, outMonth, score }: P
       setDragging(false);
 
       if (info.moved) {
-        // Snap to nearest corner
         const s = getFabSize();
         const cx = info.currentX + s / 2;
         const cy = info.currentY + s / 2;
@@ -199,16 +221,13 @@ export default function DraggableFAB({ onOpenChat, inMonth, outMonth, score }: P
         const tp = getCornerXY(nc);
         setCorner(nc);
         applyPosRef.current(tp.x, tp.y, true);
-        if (nc !== cornerRef.current) {
-          updateSettingsRef.current({ fabCorner: nc });
-        }
+        // Debounced save — won't show "Menyimpan perubahan…" immediately
+        scheduleSaveRef.current(nc);
       } else {
-        // Tap → open chat
         onOpenChatRef.current();
       }
     };
 
-    /* ── Also stop touchstart from bubbling to pull-to-refresh ── */
     const handleTouchStart = (e: TouchEvent) => {
       e.stopPropagation();
     };
@@ -219,13 +238,11 @@ export default function DraggableFAB({ onOpenChat, inMonth, outMonth, score }: P
     return () => {
       btn.removeEventListener("pointerdown", handleDown);
       btn.removeEventListener("touchstart", handleTouchStart);
-      // Safety: clean up any orphaned window listeners
       window.removeEventListener("pointermove", handleMove);
       window.removeEventListener("pointerup", handleUp);
       window.removeEventListener("pointercancel", handleUp);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // Intentionally empty — all values via refs
+  }, []);
 
   /* ── Visual style based on financial status ── */
   const status =
@@ -296,7 +313,6 @@ export default function DraggableFAB({ onOpenChat, inMonth, outMonth, score }: P
         </svg>
       </button>
 
-      {/* Inline keyframes for pulse + drag scale */}
       <style>{`
         @keyframes fab-pulse {
           0%, 100% { transform: scale(1); }
