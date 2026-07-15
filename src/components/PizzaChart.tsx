@@ -38,7 +38,7 @@ export default function PizzaChart({ slices, size = 180, onHoverSlice }: PizzaCh
   const total = activeSlices.reduce((a, s) => a + s.value, 0) || 1;
   const cx = size / 2;
   const cy = size / 2;
-  const r = size / 2 - 4;
+  const r = size / 2 - 8; // more padding so scaled slices don't clip
 
   // Build SVG path arcs for each slice
   const paths: { d: string; color: string; label?: string; amount?: number; formattedAmount?: string; fraction: number }[] = [];
@@ -81,7 +81,7 @@ export default function PizzaChart({ slices, size = 180, onHoverSlice }: PizzaCh
 
   return (
     <div className="relative flex items-center justify-center" style={{ width: size, height: size }}>
-      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} overflow="visible">
         <circle cx={cx + 2} cy={cy + 2} r={r} fill="rgba(0,0,0,0.08)" />
         {paths.length === 0 && (
           <circle cx={cx} cy={cy} r={r} fill={isDark ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.05)"} />
@@ -97,7 +97,7 @@ export default function PizzaChart({ slices, size = 180, onHoverSlice }: PizzaCh
             onMouseLeave={() => handleHover(null)}
             style={{
               transition: `d 1s cubic-bezier(0.22,1,0.36,1) ${i * 0.1}s, opacity 0.2s, transform 0.2s`,
-              transform: hoveredIdx === i ? "scale(1.03)" : hoveredIdx !== null ? "scale(0.97)" : "scale(1)",
+              transform: hoveredIdx === i ? "scale(1.02)" : hoveredIdx !== null ? "scale(0.98)" : "scale(1)",
               transformOrigin: `${cx}px ${cy}px`,
               opacity: hoveredIdx !== null && hoveredIdx !== i ? 0.55 : 1,
               cursor: "pointer",
