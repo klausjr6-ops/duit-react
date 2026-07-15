@@ -11,6 +11,7 @@ import MoodCard from "./components/MoodCard";
 import ReportCard from "./components/ReportCard";
 import PullToRefreshIndicator from "./components/PullToRefreshIndicator";
 import { usePullToRefresh } from "./hooks/usePullToRefresh";
+import { useAutoLogout } from "./hooks/useAutoLogout";
 import { StoreProvider, useStore } from "./lib/store";
 import { useAuth } from "./lib/AuthContext";
 import { useTheme } from "./lib/ThemeContext";
@@ -76,13 +77,15 @@ export default function AuthenticatedApp() {
 }
 
 function DashboardApp() {
-  const { user, loading: authLoading } = useAuth();
+  const { user, loading: authLoading, logout } = useAuth();
   const { isDark } = useTheme();
   const [now, setNow] = useState(new Date());
   const [active, setActive] = useState("home");
   const [quickTransaction, setQuickTransaction] = useState<{ type: "in" | "out"; nonce: number } | null>(null);
   const [showAccount, setShowAccount] = useState(false);
   const [showChat, setShowChat] = useState(false);
+
+  const { showWarning, stayLoggedIn } = useAutoLogout(logout);
 
   const store = useStore();
   const {
@@ -357,6 +360,42 @@ function DashboardApp() {
         <Suspense fallback={null}>
           <AccountModal open={showAccount} onClose={() => setShowAccount(false)} />
         </Suspense>
+      )}
+
+      {/* ── Auto-Logout Warning ── */}
+      {showWarning && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="fixed inset-0 z-[80] bg-black/50 backdrop-blur-sm flex items-center justify-center p-4"
+        >
+          <motion.div
+            initial={{ scale: 0.9, y: 20 }}
+            animate={{ scale: 1, y: 0 }}
+            exit={{ scale: 0.9, y: 20 }}
+            className={isDark
+              ? "bg-slate-900 border border-white/10 rounded-3xl p-6 max-w-sm w-full shadow-xl text-center"
+              : "bg-white border border-zinc-200 rounded-3xl p-6 max-w-sm w-full shadow-xl text-center"
+            }
+          >
+            <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-amber-400/15 text-3xl">
+              🔒
+            </div>
+            <h2 className={`text-lg font-bold mb-2 ${isDark ? "text-white" : "text-zinc-900"}`}>
+              Sesi Akan Berakhir
+            </h2>
+            <p className={`text-sm mb-6 ${isDark ? "text-slate-400" : "text-zinc-500"}`}>
+              Tidak ada aktivitas selama 5 menit. Anda akan otomatis logout dalam 30 detik untuk menjaga privasi.
+            </p>
+            <button
+              onClick={stayLoggedIn}
+              className="w-full bg-gradient-to-br from-teal-400 to-blue-500 text-zinc-900 font-bold py-3 rounded-xl hover:brightness-105 transition-all"
+            >
+              Tetap Masuk
+            </button>
+          </motion.div>
+        </motion.div>
       )}
     </div>
   );
