@@ -1,7 +1,10 @@
 // src/components/DraggableFAB.tsx
-// v4 — debounced Firestore write (3 s), local state instant
+// v5 — bypass store queue for position save (no sync indicator)
 
 import { useEffect, useRef, useState } from "react";
+import { doc, updateDoc } from "firebase/firestore";
+import { db } from "../lib/firebaseDb";
+import { useAuth } from "../lib/AuthContext";
 import { useStore, type FabCorner } from "../lib/store";
 import { useTheme } from "../lib/ThemeContext";
 
@@ -12,7 +15,7 @@ const TOP_PAD_MOBILE = 24;
 const TOP_PAD_DESKTOP = 32;
 const BOT_PAD_MOBILE = 88;
 const BOT_PAD_DESKTOP = 32;
-const DEBOUNCE_MS = 3000; // delay before writing to Firestore
+const DEBOUNCE_MS = 3000;
 
 function getFabSize(): number {
   return window.innerWidth >= 768 ? 56 : 48;
@@ -61,7 +64,8 @@ interface Props {
 
 export default function DraggableFAB({ onOpenChat, inMonth, outMonth, score }: Props) {
   const { isDark } = useTheme();
-  const { settings, updateSettings } = useStore();
+  const { settings } = useStore();
+  const { user } = useAuth();
   const storeCorner: FabCorner = (settings.fabCorner as FabCorner) || "bottom-right";
 
   const [corner, setCorner] = useState<FabCorner>(storeCorner);
@@ -73,15 +77,14 @@ export default function DraggableFAB({ onOpenChat, inMonth, outMonth, score }: P
   const cornerRef = useRef(corner);
   cornerRef.current = corner;
 
-  // Stable refs for callbacks used inside native event handlers
-  const updateSettingsRef = useRef(updateSettings);
-  updateSettingsRef.current = updateSettings;
   const onOpenChatRef = useRef(onOpenChat);
   onOpenChatRef.current = onOpenChat;
+  const uidRef = useRef(user?.uid);
+  uidRef.current = user?.uid;
 
-  // Debounce timer for Firestore write
+  // Debounce timer + last-saved tracker
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const lastSavedCornerRef = useRef<FabCorner>(storeCorner);
+  const lastSavedRef = useRef<FabCorner>(storeCorner);
 
   /* ── Apply position directly to DOM ── */
   const applyPosRef = useRef((x: number, y: number, transition = false) => {
@@ -93,35 +96,37 @@ export default function DraggableFAB({ onOpenChat, inMonth, outMonth, score }: P
     el.style.transform = `translate(${x}px, ${y}px)`;
   });
 
-  /* ── Debounced save: write fabCorner to Firestore after 3 s of inactivity ── */
-  const scheduleSaveRef = useRef((nc: FabCorner) => {
-    // Clear any pending save
-    if (saveTimerRef.current) {
-      clearTimeout(saveTimerRef.current);
-    }
-    // If already saved to this corner, skip
-    if (nc === lastSavedCornerRef.current) return;
+  /* ── Write fabCorner directly to Firestore (bypasses store queue) ── */
+  const saveCornerDirectRef = useRef((nc: FabCorner) => {
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    if (nc === lastSavedRef.current) return;
 
-    saveTimerRef.current = setTimeout(() => {
-      if (nc !== lastSavedCornerRef.current) {
-        lastSavedCornerRef.current = nc;
-        updateSettingsRef.current({ fabCorner: nc });
+    saveTimerRef.current = setTimeout(async () => {
+      if (nc === lastSavedRef.current) return;
+      const uid = uidRef.current;
+      if (!uid) return;
+      try {
+        const ref = doc(db, "users", uid, "data", "main");
+        // updateDoc with dot-notation only patches the nested field
+        await updateDoc(ref, { "settings.fabCorner": nc });
+        lastSavedRef.current = nc;
+      } catch (err) {
+        console.warn("FAB corner save failed:", err);
       }
       saveTimerRef.current = null;
     }, DEBOUNCE_MS);
   });
 
-  // Cleanup timer on unmount
   useEffect(() => {
     return () => {
       if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
     };
   }, []);
 
-  /* ── Sync corner from Firestore ── */
+  /* ── Sync corner from Firestore (via onSnapshot) ── */
   useEffect(() => {
     setCorner(storeCorner);
-    lastSavedCornerRef.current = storeCorner;
+    lastSavedRef.current = storeCorner;
     const p = getCornerXY(storeCorner);
     applyPosRef.current(p.x, p.y);
   }, [storeCorner]);
@@ -221,8 +226,8 @@ export default function DraggableFAB({ onOpenChat, inMonth, outMonth, score }: P
         const tp = getCornerXY(nc);
         setCorner(nc);
         applyPosRef.current(tp.x, tp.y, true);
-        // Debounced save — won't show "Menyimpan perubahan…" immediately
-        scheduleSaveRef.current(nc);
+        // Direct Firestore write — bypasses store syncing indicator
+        saveCornerDirectRef.current(nc);
       } else {
         onOpenChatRef.current();
       }
@@ -278,7 +283,6 @@ export default function DraggableFAB({ onOpenChat, inMonth, outMonth, score }: P
       className="fixed left-0 top-0 z-40"
       style={{ touchAction: "none", willChange: "transform" }}
     >
-      {/* Tooltip — hidden during drag */}
       {!dragging && (
         <div
           className={`absolute ${tooltipCls(corner)} px-2.5 py-1 rounded-lg text-[10px] font-semibold whitespace-nowrap opacity-0 group/fab:opacity-100 pointer-events-none w-fit transition-opacity ${
