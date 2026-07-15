@@ -1,6 +1,7 @@
 // src/components/DraggableFAB.tsx
-import { useCallback, useEffect, useRef, useState } from "react";
-import { motion } from "framer-motion";
+// v3 — native DOM events for drag, CSS for animation, no setPointerCapture
+
+import { useEffect, useRef, useState } from "react";
 import { useStore, type FabCorner } from "../lib/store";
 import { useTheme } from "../lib/ThemeContext";
 
@@ -42,10 +43,10 @@ function nearestCorner(cx: number, cy: number): FabCorner {
 
 function tooltipCls(c: FabCorner): string {
   switch (c) {
-    case "top-left":     return "top-full left-0 mt-1.5";
-    case "top-right":    return "top-full right-0 mt-1.5";
-    case "bottom-left":  return "bottom-full left-0 mb-1.5";
-    case "bottom-right": return "bottom-full right-0 mb-1.5";
+    case "top-left":     return "top-full left-0 mt-2";
+    case "top-right":    return "top-full right-0 mt-2";
+    case "bottom-left":  return "bottom-full left-0 mb-2";
+    case "bottom-right": return "bottom-full right-0 mb-2";
   }
 }
 
@@ -66,160 +67,165 @@ export default function DraggableFAB({ onOpenChat, inMonth, outMonth, score }: P
   const [dragging, setDragging] = useState(false);
   const [desk, setDesk] = useState(() => window.innerWidth >= 768);
 
-  /* ── Refs for drag logic (bypass React re-renders for perf) ── */
   const wrapperRef = useRef<HTMLDivElement>(null);
+  const btnRef = useRef<HTMLButtonElement>(null);
   const cornerRef = useRef(corner);
   cornerRef.current = corner;
-  const storeCornerRef = useRef(storeCorner);
-  storeCornerRef.current = storeCorner;
 
-  const dragState = useRef<{
-    active: boolean;
-    moved: boolean;
-    startRectX: number;
-    startRectY: number;
-    startPointerX: number;
-    startPointerY: number;
-    currentX: number;
-    currentY: number;
-  } | null>(null);
+  // Stable refs for callbacks used inside native event handlers
+  const updateSettingsRef = useRef(updateSettings);
+  updateSettingsRef.current = updateSettings;
+  const onOpenChatRef = useRef(onOpenChat);
+  onOpenChatRef.current = onOpenChat;
 
   /* ── Apply position directly to DOM ── */
-  const applyPos = useCallback((x: number, y: number, transition = false) => {
+  const applyPosRef = useRef((x: number, y: number, transition = false) => {
     const el = wrapperRef.current;
     if (!el) return;
+    el.style.transition = transition
+      ? "transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1)"
+      : "none";
     el.style.transform = `translate(${x}px, ${y}px)`;
-    el.style.transition = transition ? "transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1)" : "none";
-  }, []);
+  });
 
-  /* ── Sync corner from Firestore (only when not dragging) ── */
+  /* ── Sync corner from Firestore ── */
   useEffect(() => {
-    if (!dragState.current?.active) {
-      setCorner(storeCorner);
-      const p = getCornerXY(storeCorner);
-      applyPos(p.x, p.y);
-    }
-  }, [storeCorner, applyPos]);
+    setCorner(storeCorner);
+    const p = getCornerXY(storeCorner);
+    applyPosRef.current(p.x, p.y);
+  }, [storeCorner]);
 
-  /* ── Recalculate on viewport resize ── */
+  /* ── Viewport resize ── */
   useEffect(() => {
     const fn = () => {
       setDesk(window.innerWidth >= 768);
-      if (!dragState.current?.active) {
-        const p = getCornerXY(cornerRef.current);
-        applyPos(p.x, p.y);
-      }
+      const p = getCornerXY(cornerRef.current);
+      applyPosRef.current(p.x, p.y, true);
     };
     window.addEventListener("resize", fn);
     return () => window.removeEventListener("resize", fn);
-  }, [applyPos]);
-
-  /* ── Initial position ── */
-  useEffect(() => {
-    const p = getCornerXY(storeCorner);
-    applyPos(p.x, p.y);
-  }, [applyPos, storeCorner]);
-
-  /* ── Pointer handlers ── */
-  const onPointerDown = useCallback((e: React.PointerEvent) => {
-    // Prevent pull-to-refresh and other parent handlers
-    e.stopPropagation();
-    e.preventDefault();
-
-    const el = wrapperRef.current;
-    if (!el) return;
-
-    try { el.setPointerCapture(e.pointerId); } catch { /* ignore */ }
-
-    const rect = el.getBoundingClientRect();
-    dragState.current = {
-      active: true,
-      moved: false,
-      startRectX: rect.left,
-      startRectY: rect.top,
-      startPointerX: e.clientX,
-      startPointerY: e.clientY,
-      currentX: rect.left,
-      currentY: rect.top,
-    };
-    setDragging(false);
   }, []);
 
-  const onPointerMove = useCallback((e: React.PointerEvent) => {
-    const d = dragState.current;
-    if (!d || !d.active) return;
+  /* ═══════════════════════════════════════════════════════════
+     DRAG LOGIC — native DOM events, window-level move/up
+     - No setPointerCapture (causes stuck states)
+     - pointerdown on button → attach pointermove/pointerup to window
+     - On up/cancel → detach window listeners, snap to corner or open chat
+     ═══════════════════════════════════════════════════════════ */
+  useEffect(() => {
+    const btn = btnRef.current;
+    if (!btn) return;
 
-    e.stopPropagation();
-    e.preventDefault();
+    let dragInfo: {
+      startPointerX: number;
+      startPointerY: number;
+      startRectX: number;
+      startRectY: number;
+      moved: boolean;
+      currentX: number;
+      currentY: number;
+    } | null = null;
 
-    const dx = e.clientX - d.startPointerX;
-    const dy = e.clientY - d.startPointerY;
+    /* ── pointerdown: start potential drag ── */
+    const handleDown = (e: PointerEvent) => {
+      if (e.button !== 0) return; // only primary button
+      e.preventDefault();
+      e.stopPropagation();
 
-    if (!d.moved && Math.hypot(dx, dy) > DRAG_THRESHOLD) {
-      d.moved = true;
-      setDragging(true);
-    }
+      const wrapper = wrapperRef.current;
+      if (!wrapper) return;
+      const rect = wrapper.getBoundingClientRect();
 
-    if (d.moved) {
-      const s = getFabSize();
-      const nx = Math.max(0, Math.min(window.innerWidth - s, d.startRectX + dx));
-      const ny = Math.max(0, Math.min(window.innerHeight - s, d.startRectY + dy));
-      d.currentX = nx;
-      d.currentY = ny;
-      applyPos(nx, ny);
-    }
-  }, [applyPos]);
+      dragInfo = {
+        startPointerX: e.clientX,
+        startPointerY: e.clientY,
+        startRectX: rect.left,
+        startRectY: rect.top,
+        moved: false,
+        currentX: rect.left,
+        currentY: rect.top,
+      };
 
-  const onPointerUp = useCallback((e: React.PointerEvent) => {
-    const el = wrapperRef.current;
-    const d = dragState.current;
-    if (!d || !d.active) return;
+      // Attach move + up to window so we always capture them
+      window.addEventListener("pointermove", handleMove, { passive: false });
+      window.addEventListener("pointerup", handleUp);
+      window.addEventListener("pointercancel", handleUp);
+    };
 
-    e.stopPropagation();
-    e.preventDefault();
+    /* ── pointermove: update position if dragging ── */
+    const handleMove = (e: PointerEvent) => {
+      if (!dragInfo) return;
+      e.preventDefault();
+      e.stopPropagation();
 
-    try { el?.releasePointerCapture(e.pointerId); } catch { /* ignore */ }
+      const dx = e.clientX - dragInfo.startPointerX;
+      const dy = e.clientY - dragInfo.startPointerY;
 
-    dragState.current = null;
-
-    if (d.moved) {
-      // Snap to nearest corner
-      const s = getFabSize();
-      const cx = d.currentX + s / 2;
-      const cy = d.currentY + s / 2;
-      const nc = nearestCorner(cx, cy);
-      const tp = getCornerXY(nc);
-      setCorner(nc);
-      setDragging(false);
-      applyPos(tp.x, tp.y, true); // spring-like transition
-      if (nc !== cornerRef.current) {
-        updateSettings({ fabCorner: nc });
+      if (!dragInfo.moved && Math.hypot(dx, dy) > DRAG_THRESHOLD) {
+        dragInfo.moved = true;
+        setDragging(true);
       }
-    } else {
+
+      if (dragInfo.moved) {
+        const s = getFabSize();
+        const nx = Math.max(0, Math.min(window.innerWidth - s, dragInfo.startRectX + dx));
+        const ny = Math.max(0, Math.min(window.innerHeight - s, dragInfo.startRectY + dy));
+        dragInfo.currentX = nx;
+        dragInfo.currentY = ny;
+        applyPosRef.current(nx, ny);
+      }
+    };
+
+    /* ── pointerup / pointercancel: snap or tap ── */
+    const handleUp = () => {
+      if (!dragInfo) return;
+
+      const info = dragInfo;
+      dragInfo = null;
+
+      // Always detach window listeners
+      window.removeEventListener("pointermove", handleMove);
+      window.removeEventListener("pointerup", handleUp);
+      window.removeEventListener("pointercancel", handleUp);
+
       setDragging(false);
-      onOpenChat();
-    }
-  }, [applyPos, updateSettings, onOpenChat]);
 
-  const onPointerCancel = useCallback((e: React.PointerEvent) => {
-    const d = dragState.current;
-    if (!d || !d.active) return;
+      if (info.moved) {
+        // Snap to nearest corner
+        const s = getFabSize();
+        const cx = info.currentX + s / 2;
+        const cy = info.currentY + s / 2;
+        const nc = nearestCorner(cx, cy);
+        const tp = getCornerXY(nc);
+        setCorner(nc);
+        applyPosRef.current(tp.x, tp.y, true);
+        if (nc !== cornerRef.current) {
+          updateSettingsRef.current({ fabCorner: nc });
+        }
+      } else {
+        // Tap → open chat
+        onOpenChatRef.current();
+      }
+    };
 
-    e.stopPropagation();
-    dragState.current = null;
+    /* ── Also stop touchstart from bubbling to pull-to-refresh ── */
+    const handleTouchStart = (e: TouchEvent) => {
+      e.stopPropagation();
+    };
 
-    if (d.moved) {
-      const s = getFabSize();
-      const nc = nearestCorner(d.currentX + s / 2, d.currentY + s / 2);
-      const tp = getCornerXY(nc);
-      setCorner(nc);
-      applyPos(tp.x, tp.y, true);
-      if (nc !== cornerRef.current) updateSettings({ fabCorner: nc });
-    } else {
-      applyPos(getCornerXY(cornerRef.current).x, getCornerXY(cornerRef.current).y);
-    }
-    setDragging(false);
-  }, [applyPos, updateSettings]);
+    btn.addEventListener("pointerdown", handleDown);
+    btn.addEventListener("touchstart", handleTouchStart, { passive: true });
+
+    return () => {
+      btn.removeEventListener("pointerdown", handleDown);
+      btn.removeEventListener("touchstart", handleTouchStart);
+      // Safety: clean up any orphaned window listeners
+      window.removeEventListener("pointermove", handleMove);
+      window.removeEventListener("pointerup", handleUp);
+      window.removeEventListener("pointercancel", handleUp);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Intentionally empty — all values via refs
 
   /* ── Visual style based on financial status ── */
   const status =
@@ -227,10 +233,27 @@ export default function DraggableFAB({ onOpenChat, inMonth, outMonth, score }: P
     (outMonth > inMonth * 0.8 && inMonth > 0) ? "warning" :
     score >= 70 ? "good" : "neutral";
 
-  const glow = { danger: "shadow-rose-500/40", warning: "shadow-amber-500/30", good: "shadow-emerald-500/30", neutral: "shadow-teal-500/25" }[status];
-  const gradient = { danger: "from-rose-400 to-rose-600", warning: "from-amber-400 to-orange-500", good: "from-emerald-400 to-teal-500", neutral: "from-teal-400 to-blue-500" }[status];
-  const pulse = status === "danger" || status === "warning";
-  const tip = { danger: "⚠️ Overspend bulan ini!", warning: "⚡ Budget mulai ketat", good: "💚 Keuangan sehat!", neutral: "Tanya DUIT" }[status];
+  const glow = {
+    danger: "shadow-rose-500/40",
+    warning: "shadow-amber-500/30",
+    good: "shadow-emerald-500/30",
+    neutral: "shadow-teal-500/25",
+  }[status];
+
+  const gradient = {
+    danger: "from-rose-400 to-rose-600",
+    warning: "from-amber-400 to-orange-500",
+    good: "from-emerald-400 to-teal-500",
+    neutral: "from-teal-400 to-blue-500",
+  }[status];
+
+  const shouldPulse = (status === "danger" || status === "warning") && !dragging;
+  const tip = {
+    danger: "⚠️ Overspend bulan ini!",
+    warning: "⚡ Budget mulai ketat",
+    good: "💚 Keuangan sehat!",
+    neutral: "Tanya DUIT",
+  }[status];
 
   return (
     <div
@@ -242,55 +265,21 @@ export default function DraggableFAB({ onOpenChat, inMonth, outMonth, score }: P
       {!dragging && (
         <div
           className={`absolute ${tooltipCls(corner)} px-2.5 py-1 rounded-lg text-[10px] font-semibold whitespace-nowrap opacity-0 group/fab:opacity-100 pointer-events-none w-fit transition-opacity ${
-            isDark ? "bg-slate-800 text-slate-200 border border-white/10" : "bg-white text-zinc-700 border border-zinc-200 shadow-lg"
+            isDark
+              ? "bg-slate-800 text-slate-200 border border-white/10"
+              : "bg-white text-zinc-700 border border-zinc-200 shadow-lg"
           }`}
         >
           {tip}
         </div>
       )}
 
-      <motion.button
-        onPointerDown={onPointerDown}
-        onPointerMove={onPointerMove}
-        onPointerUp={onPointerUp}
-        onPointerCancel={onPointerCancel}
-        onLostPointerCapture={() => {
-          // If we lost capture unexpectedly, cancel drag
-          if (dragState.current?.active) {
-            const d = dragState.current;
-            dragState.current = null;
-            if (d.moved) {
-              const s = getFabSize();
-              const nc = nearestCorner(d.currentX + s / 2, d.currentY + s / 2);
-              setCorner(nc);
-              applyPos(getCornerXY(nc).x, getCornerXY(nc).y, true);
-              if (nc !== cornerRef.current) updateSettings({ fabCorner: nc });
-            } else {
-              applyPos(getCornerXY(cornerRef.current).x, getCornerXY(cornerRef.current).y);
-            }
-            setDragging(false);
-          }
-        }}
-        animate={
-          dragging
-            ? { scale: 1.12 }
-            : pulse
-              ? { scale: [1, 1.08, 1] }
-              : { scale: 1 }
-        }
-        transition={
-          dragging
-            ? { duration: 0 }
-            : pulse
-              ? { duration: 2, repeat: Infinity, ease: "easeInOut" }
-              : { type: "spring", stiffness: 500, damping: 30 }
-        }
-        whileHover={!dragging ? { scale: 1.1 } : undefined}
-        whileTap={!dragging ? { scale: 0.95 } : undefined}
-        className={`group/fab flex ${desk ? "h-14 w-14" : "h-12 w-12"} items-center justify-center rounded-full bg-gradient-to-br ${gradient} text-zinc-900 shadow-lg ${glow} transition-shadow select-none ${
-          dragging ? "cursor-grabbing" : "cursor-grab"
-        }`}
-        style={{ touchAction: "none" }}
+      <button
+        ref={btnRef}
+        className={`group/fab fab-btn flex ${desk ? "h-14 w-14" : "h-12 w-12"} items-center justify-center rounded-full bg-gradient-to-br ${gradient} text-zinc-900 shadow-lg ${glow} transition-shadow select-none outline-none ${
+          dragging ? "cursor-grabbing fab-dragging" : "cursor-grab"
+        } ${shouldPulse ? "fab-pulse" : ""}`}
+        style={{ touchAction: "none", WebkitTouchCallout: "none" }}
         aria-label="Buka Chat AI"
       >
         <svg
@@ -305,7 +294,27 @@ export default function DraggableFAB({ onOpenChat, inMonth, outMonth, score }: P
         >
           <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
         </svg>
-      </motion.button>
+      </button>
+
+      {/* Inline keyframes for pulse + drag scale */}
+      <style>{`
+        @keyframes fab-pulse {
+          0%, 100% { transform: scale(1); }
+          50% { transform: scale(1.08); }
+        }
+        .fab-pulse {
+          animation: fab-pulse 2s ease-in-out infinite;
+        }
+        .fab-dragging {
+          transform: scale(1.12) !important;
+        }
+        .fab-btn:hover:not(.fab-dragging):not(.fab-pulse) {
+          transform: scale(1.1);
+        }
+        .fab-btn:active:not(.fab-dragging) {
+          transform: scale(0.95);
+        }
+      `}</style>
     </div>
   );
 }
