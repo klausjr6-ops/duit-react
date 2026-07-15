@@ -7,7 +7,7 @@ import { useModalDialog } from "../hooks/useModalDialog";
 import ConfirmDialog from "./ConfirmDialog";
 import EditWalletModal from "./EditWalletModal";
 import TransferModal from "./TransferModal";
-import { getWalletHex } from "../utils/walletColors";
+import { getWalletHex, WALLET_COLORS } from "../utils/walletColors";
 import { WALLET_ICONS, getWalletIcon, IconTransfer, IconTrash } from "../utils/icons";
 
 interface Props {
@@ -19,6 +19,7 @@ export default function WalletManager({ onClose }: Props) {
   const { isDark } = useTheme();
   const [name, setName] = useState("");
   const [icon, setIcon] = useState(WALLET_ICONS[0].key);
+  const [color, setColor] = useState<string>(WALLET_COLORS[0].key);
   const [initBalance, setInitBalance] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [walletToDelete, setWalletToDelete] = useState<Wallet | null>(null);
@@ -41,9 +42,9 @@ export default function WalletManager({ onClose }: Props) {
       name: name.trim(),
       balance: parseInt(initBalance.replace(/\D/g, "") || "0"),
       icon,
-      color: "emerald",
+      color,
     });
-    setName(""); setIcon(WALLET_ICONS[0].key); setInitBalance("");
+    setName(""); setIcon(WALLET_ICONS[0].key); setColor(WALLET_COLORS[0].key); setInitBalance("");
   };
 
   const openTransfer = (from?: Wallet) => {
@@ -170,6 +171,35 @@ export default function WalletManager({ onClose }: Props) {
                   <span className="text-[9px] font-semibold">{ic.label}</span>
                 </button>
               ))}
+            </div>
+          </div>
+          <div>
+            <label className={labelCls}>Warna</label>
+            <div className="flex flex-wrap gap-2 mt-1">
+              {WALLET_COLORS.map((c) => {
+                const hex = c.hex;
+                const isActive = color === c.key;
+                return (
+                  <button
+                    key={c.key}
+                    type="button"
+                    title={c.label}
+                    onClick={() => setColor(c.key)}
+                    className={`h-8 w-8 rounded-full transition-all flex items-center justify-center ${
+                      isActive
+                        ? "ring-2 ring-offset-2 scale-110"
+                        : "hover:scale-110 opacity-60 hover:opacity-100"
+                    } ${isDark ? "ring-offset-slate-900" : "ring-offset-white"}`}
+                    style={{ backgroundColor: hex }}
+                  >
+                    {isActive && (
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                        <polyline points="20 6 9 17 4 12" />
+                      </svg>
+                    )}
+                  </button>
+                );
+              })}
             </div>
           </div>
           <div>

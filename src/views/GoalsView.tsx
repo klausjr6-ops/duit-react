@@ -23,8 +23,13 @@ export default function GoalsView() {
   const [goalToDelete, setGoalToDelete] = useState<Goal | null>(null);
 
   const formatDeadline = (d: string) => {
-    const date = new Date(d + "T00:00:00");
-    return date.toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric" });
+    const [year, month, day] = d.split("-").map(Number);
+    return new Intl.DateTimeFormat("id-ID", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+      timeZone: "Asia/Jakarta",
+    }).format(new Date(Date.UTC(year, month - 1, day, 12)));
   };
 
   const titleCls = isDark ? "text-3xl font-bold text-white" : "text-3xl font-bold text-zinc-900";

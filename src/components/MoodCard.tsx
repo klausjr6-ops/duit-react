@@ -24,8 +24,7 @@ export default function MoodCard() {
       setSelected(todayMood.mood);
       setNote(todayMood.note);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [todayMood]);
 
   const pickMood = (key: string, label: string) => {
     setSelected(key);
