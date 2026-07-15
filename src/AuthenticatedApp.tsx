@@ -314,7 +314,7 @@ function DashboardApp() {
               : "Tanya DUIT";
 
         return (
-          <div className="fixed bottom-[5.5rem] right-2 z-40 md:bottom-8 md:right-8">
+          <div className="fixed bottom-[5.5rem] right-[0.75rem] z-40 md:bottom-8 md:right-8">
             {/* Tooltip */}
             <div className={`mb-1.5 ml-auto mr-0 px-2.5 py-1 rounded-lg text-[10px] font-semibold whitespace-nowrap transition-opacity ${isDark ? "bg-slate-800 text-slate-200 border border-white/10" : "bg-white text-zinc-700 border border-zinc-200 shadow-lg"} opacity-0 group-hover/fab:opacity-100 pointer-events-none w-fit`}>
               {tooltipText}
