@@ -372,8 +372,12 @@ export function sanitizeImportedUserData(value: unknown): UserData {
 function normalizeUserData(remote?: Partial<UserData>): UserData {
   return {
     txs: Array.isArray(remote?.txs) ? remote.txs : [],
-    scheds: Array.isArray(remote?.scheds) ? remote.scheds : [],
-    goals: Array.isArray(remote?.goals) ? remote.goals : [],
+    scheds: Array.isArray(remote?.scheds)
+      ? remote.scheds.map(sanitizeSchedule).filter((item): item is ScheduleItem => Boolean(item))
+      : [],
+    goals: Array.isArray(remote?.goals)
+      ? remote.goals.map(sanitizeGoal).filter((item): item is Goal => Boolean(item))
+      : [],
     moods: remote?.moods && typeof remote.moods === "object" ? remote.moods : {},
     settings: {
       name: "Kamu",
@@ -381,7 +385,7 @@ function normalizeUserData(remote?: Partial<UserData>): UserData {
       ...(remote?.settings && typeof remote.settings === "object" ? remote.settings : {}),
     },
     wallets: Array.isArray(remote?.wallets)
-      ? remote.wallets
+      ? remote.wallets.map(sanitizeWallet).filter((item): item is Wallet => Boolean(item))
       : DEFAULT_WALLETS.map((wallet) => ({ ...wallet })),
   };
 }

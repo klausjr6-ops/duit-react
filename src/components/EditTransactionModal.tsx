@@ -30,6 +30,7 @@ export default function EditTransactionModal({ tx, onClose }: Props) {
   const { dialogRef, onDialogKeyDown } = useModalDialog(true, onClose, inputRef);
 
   const isGoalTx = Boolean(tx.goalId);
+  const isTransferTx = Boolean(tx.transferId);
 
   const formatInputRupiah = (val: string) => {
     const num = val.replace(/\D/g, "");
@@ -40,6 +41,7 @@ export default function EditTransactionModal({ tx, onClose }: Props) {
     e.preventDefault();
     setError(null);
     if (isGoalTx) { setError("Transaksi Goal tidak bisa diedit di sini. Gunakan menu Tarik/Nabung Goal."); return; }
+    if (isTransferTx) { setError("Transaksi Transfer tidak bisa diedit. Transfer antar dompet tidak dapat diubah manual."); return; }
     if (!type || !cat || !walletId || !amt) { setError("Lengkapi semua field."); return; }
     const numAmt = parseInt(amt.replace(/\D/g, ""), 10);
     if (Number.isNaN(numAmt) || numAmt <= 0) { setError("Jumlah tidak valid."); return; }
@@ -61,6 +63,10 @@ export default function EditTransactionModal({ tx, onClose }: Props) {
         {isGoalTx ? (
           <div className="rounded-xl border border-amber-400/30 bg-amber-400/10 p-4 text-sm text-amber-700 dark:text-amber-300">
             Transaksi Goal ({tx.desc}) tidak bisa diedit manual.<br/>Gunakan menu Nabung / Tarik Goal untuk koreksi.
+          </div>
+        ) : isTransferTx ? (
+          <div className="rounded-xl border border-blue-400/30 bg-blue-400/10 p-4 text-sm text-blue-700 dark:text-blue-300">
+            Transaksi Transfer tidak bisa diedit manual.<br/>Transfer antar dompet tidak dapat diubah satu per satu.
           </div>
         ) : (
         <form onSubmit={handleSubmit} className="space-y-4">

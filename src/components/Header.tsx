@@ -1,6 +1,14 @@
 import { motion } from "framer-motion";
 import { formatDayDate, getGreeting } from "../lib/format";
 import { useTheme } from "../lib/ThemeContext";
+import { IconSunrise, IconSun, IconSunset, IconMoon } from "../utils/icons";
+
+const GREETING_ICONS: Record<string, React.FC<{ size?: number; className?: string }>> = {
+  sunrise: IconSunrise,
+  sun: IconSun,
+  sunset: IconSunset,
+  moon: IconMoon,
+};
 
 interface HeaderProps {
   now: Date;
@@ -16,6 +24,7 @@ function scoreLabel(score: number) {
 
 export default function Header({ now, score }: HeaderProps) {
   const greeting = getGreeting(now);
+  const GreetingIcon = GREETING_ICONS[greeting.iconKey];
   const { day, full } = formatDayDate(now);
   const badge = scoreLabel(score);
   const { isDark } = useTheme();
@@ -30,7 +39,7 @@ export default function Header({ now, score }: HeaderProps) {
             transition={{ duration: 2, repeat: Infinity, repeatDelay: 3 }}
             className="inline-block"
           >
-            {greeting.icon}
+            {GreetingIcon && <GreetingIcon size={28} />}
           </motion.span>
         </h1>
         <p className={isDark ? "mt-1 text-slate-400" : "mt-1 text-zinc-500"}>

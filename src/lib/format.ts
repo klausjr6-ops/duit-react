@@ -21,10 +21,10 @@ export function formatDayDate(date: Date): { day: string; full: string } {
   return { day, full };
 }
 
-export function getGreeting(date: Date): { text: string; icon: string } {
+export function getGreeting(date: Date): { text: string; iconKey: "sunrise" | "sun" | "sunset" | "moon" } {
   const h = date.getHours();
-  if (h >= 4 && h < 11) return { text: "Selamat pagi", icon: "🌤️" };
-  if (h >= 11 && h < 15) return { text: "Selamat siang", icon: "☀️" };
-  if (h >= 15 && h < 18) return { text: "Selamat sore", icon: "🌇" };
-  return { text: "Selamat malam", icon: "🌙" };
+  if (h >= 4 && h < 11) return { text: "Selamat pagi", iconKey: "sunrise" };
+  if (h >= 11 && h < 15) return { text: "Selamat siang", iconKey: "sun" };
+  if (h >= 15 && h < 18) return { text: "Selamat sore", iconKey: "sunset" };
+  return { text: "Selamat malam", iconKey: "moon" };
 }

@@ -32,13 +32,9 @@ export default function Card({ children, className = "", accent, delay = 0 }: Ca
         />
       )}
       <div
-        className="pointer-events-none absolute -right-16 -top-16 h-40 w-40 rounded-full opacity-0 blur-3xl transition-opacity duration-500 group-hover:opacity-20"
-        style={{ background: accent || "#2dd4bf", opacity: 0 }}
+        className="card-glow pointer-events-none absolute -right-16 -top-16 h-40 w-40 rounded-full blur-3xl"
+        style={{ background: accent || "#2dd4bf" }}
       />
-      {/* hover glow – use CSS, not tailwind dynamic */}
-      <style>{`
-        .group:hover > div[style*="blur-3xl"] { opacity: ${isDark ? 0.2 : 0.1} !important; }
-      `}</style>
       {children}
     </motion.div>
   );

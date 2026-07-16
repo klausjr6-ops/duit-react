@@ -1,4 +1,4 @@
-import { IconCalendar, IconClock, IconRepeat, IconEdit, IconTrash } from "../utils/icons";
+import { IconCalendar, IconClock, IconRepeat, IconEdit, IconTrash, getScheduleIcon } from "../utils/icons";
 import { toast } from "../hooks/useToast";
 import { useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -154,6 +154,7 @@ export default function JadwalView() {
 
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-2">
+                        <span className={mutedClass}>{getScheduleIcon(schedule.icon ?? "pin", 16)}</span>
                         <span className={`font-bold ${mainTextClass}`}>{schedule.name}</span>
                       </div>
                       <div className="mt-1.5 flex flex-wrap items-center gap-2">

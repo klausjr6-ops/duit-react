@@ -43,7 +43,7 @@ export default function EmptyState({
         initial={{ scale: 0.8, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
         transition={{ type: "spring", stiffness: 220, damping: 16 }}
-        className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-3xl bg-gradient-to-br from-teal-400/15 to-blue-500/15 text-4xl"
+        className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-3xl bg-gradient-to-br from-teal-400/15 to-blue-500/15"
       >
         {icon}
       </motion.div>

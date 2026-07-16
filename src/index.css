@@ -46,3 +46,17 @@ body {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* Card hover glow — single global rule replaces per-instance <style> tags */
+.group:hover > .card-glow {
+  opacity: 0.15 !important;
+}
+@media (prefers-color-scheme: dark) {
+  .group:hover > .card-glow {
+    opacity: 0.2 !important;
+  }
+}
+.card-glow {
+  opacity: 0 !important;
+  transition: opacity 0.5s;
+}

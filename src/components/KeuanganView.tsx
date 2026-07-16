@@ -9,7 +9,7 @@ import { formatRupiah } from "../lib/format";
 import { useStore, todayStr, type Wallet } from "../lib/store";
 import { useTheme } from "../lib/ThemeContext";
 import { walletCardStyle, walletCardHoverBorder, getWalletHex } from "../utils/walletColors";
-import { getWalletIcon } from "../utils/icons";
+import { getWalletIcon, IconPlus } from "../utils/icons";
 import { toast } from "../hooks/useToast";
 
 const CATEGORIES: Record<"in" | "out", string[]> = {
@@ -170,13 +170,7 @@ export default function KeuanganView({ quickType, quickNonce, onQuickDone }: Keu
           }
         >
           <div className="w-7 h-7 mb-1 group-hover:scale-110 transition-transform flex items-center justify-center">
-            <svg viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full h-full text-teal-500 group-hover:text-emerald-500 transition-colors">
-              <rect x="2" y="10" width="36" height="24" rx="5" className="fill-current" />
-              <rect x="2" y="10" width="36" height="24" rx="5" stroke="currentColor" strokeWidth="1.5" className="stroke-teal-700 group-hover:stroke-emerald-700 transition-colors" />
-              <rect x="4" y="6" width="32" height="8" rx="3" className="fill-current opacity-50" />
-              <circle cx="31" cy="22" r="3.5" fill="#fff" />
-              <circle cx="31" cy="22" r="2" className="fill-teal-700 group-hover:fill-emerald-700 transition-colors" />
-            </svg>
+            <IconPlus size={28} className="text-teal-500 group-hover:text-emerald-500 transition-colors" />
           </div>
           <p className={`text-xs font-semibold ${isDark ? "text-slate-400 group-hover:text-emerald-400" : "text-zinc-500 group-hover:text-emerald-600"}`}>Dompet</p>
         </button>

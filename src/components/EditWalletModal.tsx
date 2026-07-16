@@ -15,7 +15,11 @@ export default function EditWalletModal({ wallet, onClose }: Props) {
   const [name, setName] = useState(wallet.name);
   const [icon, setIcon] = useState(wallet.icon);
   const [colorKey, setColorKey] = useState(resolveColorKey(wallet.color));
-  const [initialBalance, setInitialBalance] = useState(String(wallet.balance - txs.filter(t => t.walletId === wallet.id && !t.transferId).reduce((s, t) => s + (t.type === "in" ? t.amt : -t.amt), 0)));
+  // NOTE: wallet.balance is derived (from walletsWithBalance: base balance + net tx amount).
+  // To recover the original "initial balance", we subtract net tx amount.
+  // This works but is fragile — if walletsWithBalance calculation ever changes, this breaks.
+  const netTxAmount = txs.filter(t => t.walletId === wallet.id && !t.transferId).reduce((s, t) => s + (t.type === "in" ? t.amt : -t.amt), 0);
+  const [initialBalance, setInitialBalance] = useState(String(wallet.balance - netTxAmount));
   const [error, setError] = useState<string | null>(null);
   const { dialogRef, onDialogKeyDown } = useModalDialog(true, onClose);
 
