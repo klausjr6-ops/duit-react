@@ -72,8 +72,8 @@ function DuitLogo() {
   const { isDark } = useThemeSafe();
   return (
     <div className="flex items-center justify-center gap-3 mb-8">
-      <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-teal-400 to-blue-500 flex items-center justify-center shadow-lg shadow-teal-500/20">
-        <span className="text-2xl font-black text-zinc-900">D</span>
+      <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-teal-400 to-blue-500 flex items-center justify-center shadow-lg shadow-teal-500/20 overflow-hidden">
+        <img src="/logo-D.svg" alt="DUIT" className="h-full w-full object-cover" />
       </div>
       <span className={`text-4xl font-black tracking-tight ${isDark ? "text-white" : "text-zinc-900"}`}>DUIT</span>
     </div>
