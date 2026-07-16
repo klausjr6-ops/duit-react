@@ -45,7 +45,7 @@ function DashboardLoader() {
     }>
       <div className="flex flex-col items-center gap-4">
         <div className="h-12 w-12 rounded-2xl bg-gradient-to-br from-teal-400 to-blue-500 flex items-center justify-center animate-pulse shadow-lg overflow-hidden">
-          <img src="/logo-D.svg" alt="DUIT" className="h-full w-full object-cover" />
+          <img src="/logo_d_ukuran_disesuaikan.svg" alt="DUIT" className="h-full w-full object-cover" />
         </div>
         <p className={isDark ? "text-slate-400 text-sm" : "text-slate-500 text-sm"}>Memuat...</p>
       </div>

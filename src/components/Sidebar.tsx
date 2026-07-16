@@ -48,7 +48,7 @@ export default function Sidebar({ active, setActive, onAvatarClick }: SidebarPro
             title="DUIT"
             className="mb-3 flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-teal-400 to-blue-500 shadow-lg shadow-teal-500/20 overflow-hidden"
           >
-            <img src="/logo-D.svg" alt="DUIT" className="h-full w-full object-cover" />
+            <img src="/logo_d_ukuran_disesuaikan.svg" alt="DUIT" className="h-full w-full object-cover" />
           </motion.button>
 
           <div className={`w-8 h-px mb-1 ${isDark ? "bg-white/10" : "bg-zinc-200"}`} />
