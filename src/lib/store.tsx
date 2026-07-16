@@ -370,7 +370,7 @@ export function sanitizeImportedUserData(value: unknown): UserData {
 }
 
 function normalizeUserData(remote?: Partial<UserData>): UserData {
-  return {
+  const result: UserData = {
     txs: Array.isArray(remote?.txs)
       ? remote.txs.map(sanitizeTransaction).filter((item): item is Transaction => Boolean(item))
       : [],
@@ -400,6 +400,13 @@ function normalizeUserData(remote?: Partial<UserData>): UserData {
       ? remote.wallets.map(sanitizeWallet).filter((item): item is Wallet => Boolean(item))
       : DEFAULT_WALLETS.map((wallet) => ({ ...wallet })),
   };
+
+  // Fallback: if all wallets were invalid, provide defaults
+  if (result.wallets.length === 0) {
+    result.wallets = DEFAULT_WALLETS.map((wallet) => ({ ...wallet }));
+  }
+
+  return result;
 }
 
 function createId(): number {
@@ -743,12 +750,11 @@ function useDuitStoreInternal() {
           const walletId = patch.walletId ?? existing.walletId;
           if (walletId) {
             const sourceBalance = getWalletBalance(previous, walletId);
+            if (sourceBalance === null) return previous;
             const oldAmt = existing.amt;
-            if (sourceBalance !== null && sourceBalance < (sourceBalance + oldAmt - patch.amt)) {
-              // new balance = old balance + oldAmt - newAmt; if negative, reject
-              const newBalance = sourceBalance + oldAmt - patch.amt;
-              if (newBalance < 0) return previous;
-            }
+            // New balance = current balance + oldAmt (undo old tx) - patch.amt (apply new tx)
+            const newBalance = sourceBalance + oldAmt - patch.amt;
+            if (newBalance < 0) return previous;
           }
         }
 
@@ -1181,7 +1187,10 @@ function useDuitStoreInternal() {
 
   const todaySchedules = scheds
     .filter((schedule) => scheduleOccursOnDate(schedule, today))
-    .sort((a, b) => (a.start > b.start ? 1 : -1));
+    .sort((a, b) => {
+      if (a.start !== b.start) return a.start < b.start ? -1 : 1;
+      return 0;
+    });
 
   const savingsRate = totalIn > 0 ? Math.max(0, (totalIn - totalOut) / totalIn) : 0;
   const overspend = inMonth > 0 && outMonth > inMonth;
