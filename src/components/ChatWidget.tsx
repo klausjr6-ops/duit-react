@@ -366,17 +366,9 @@ export default function ChatWidget({ open, onClose }: ChatWidgetProps) {
                           ? "shadow-emerald-500/20"
                           : "shadow-teal-500/20";
 
-                    const dEmoji = dStatus === "danger"
-                      ? "😰"
-                      : dStatus === "warning"
-                        ? "😅"
-                        : dStatus === "good"
-                          ? "😊"
-                          : "👋";
-
                     return (
-                      <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${dGradient} flex items-center justify-center shadow-lg ${dGlow} transition-all duration-500`}>
-                        <span className="text-zinc-900 font-black text-lg">{dEmoji}</span>
+                      <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${dGradient} flex items-center justify-center shadow-lg ${dGlow} transition-all duration-500 overflow-hidden`}>
+                        <img src="/logo-D.png" alt="DUIT" className="h-full w-full object-cover" />
                       </div>
                     );
                   })()}

@@ -46,9 +46,9 @@ export default function Sidebar({ active, setActive, onAvatarClick }: SidebarPro
             whileHover={{ scale: 1.08 }}
             whileTap={{ scale: 0.92 }}
             title="DUIT"
-            className="mb-3 flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-teal-400 to-blue-500 text-lg font-bold text-zinc-900 shadow-lg shadow-teal-500/20"
+            className="mb-3 flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-teal-400 to-blue-500 shadow-lg shadow-teal-500/20 overflow-hidden"
           >
-            D
+            <img src="/logo-D.png" alt="DUIT" className="h-full w-full object-cover" />
           </motion.button>
 
           <div className={`w-8 h-px mb-1 ${isDark ? "bg-white/10" : "bg-zinc-200"}`} />
