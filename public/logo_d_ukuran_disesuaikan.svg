@@ -1,0 +1,14 @@
+<svg width="100%" viewBox="0 0 680 440" role="img" xmlns="http://www.w3.org/2000/svg" style="">
+<title style="fill:rgb(0, 0, 0);stroke:none;color:rgb(11, 11, 11);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto">Logo huruf D ukuran disesuaikan</title>
+<desc style="fill:rgb(0, 0, 0);stroke:none;color:rgb(11, 11, 11);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto">Ikon persegi membulat dengan gradien hijau, toska, biru, dan ungu sebagai latar, serta huruf D berwarna putih berukuran lebih proporsional dengan ruang kosong di sekelilingnya.</desc>
+<defs>
+<linearGradient id="dGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+<stop offset="0%" stop-color="#059669"/>
+<stop offset="33%" stop-color="#0891B2"/>
+<stop offset="66%" stop-color="#2563EB"/>
+<stop offset="100%" stop-color="#7C3AED"/>
+</linearGradient>
+</defs>
+<rect x="160" y="40" width="360" height="360" rx="80" fill="url(#dGrad)" style="stroke:none;color:rgb(11, 11, 11);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
+<path d="M265,115 L330,115 A105,105 0 0 1 330,325 L265,325 A20,20 0 0 1 245,305 L245,135 A20,20 0 0 1 265,115 Z M315,177 L330,177 A43,43 0 0 1 330,263 L315,263 A8,8 0 0 1 307,255 L307,185 A8,8 0 0 1 315,177 Z" fill="#FFFFFF" fill-rule="evenodd" style="fill:rgb(255, 255, 255);stroke:none;color:rgb(11, 11, 11);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
+</svg>
