@@ -350,14 +350,6 @@ export default function ChatWidget({ open, onClose }: ChatWidgetProps) {
                           ? "good"
                           : "neutral";
 
-                    const dGradient = dStatus === "danger"
-                      ? "from-rose-400 to-rose-600"
-                      : dStatus === "warning"
-                        ? "from-amber-400 to-orange-500"
-                        : dStatus === "good"
-                          ? "from-emerald-400 to-teal-500"
-                          : "from-teal-400 to-blue-500";
-
                     const dGlow = dStatus === "danger"
                       ? "shadow-rose-500/30"
                       : dStatus === "warning"
@@ -367,7 +359,7 @@ export default function ChatWidget({ open, onClose }: ChatWidgetProps) {
                           : "shadow-teal-500/20";
 
                     return (
-                      <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${dGradient} flex items-center justify-center shadow-lg ${dGlow} transition-all duration-500 overflow-hidden`}>
+                      <div className={`w-10 h-10 rounded-xl shadow-lg ${dGlow} transition-all duration-500 overflow-hidden`}>
                         <img src="/logo_d_ukuran_disesuaikan.svg" alt="DUIT" className="h-full w-full object-cover" />
                       </div>
                     );

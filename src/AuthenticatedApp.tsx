@@ -44,7 +44,7 @@ function DashboardLoader() {
       : "min-h-screen bg-[#f5f5f7] flex items-center justify-center"
     }>
       <div className="flex flex-col items-center gap-4">
-        <div className="h-12 w-12 rounded-2xl bg-gradient-to-br from-teal-400 to-blue-500 flex items-center justify-center animate-pulse shadow-lg overflow-hidden">
+        <div className="h-12 w-12 rounded-2xl animate-pulse shadow-lg shadow-teal-500/20 overflow-hidden">
           <img src="/logo_d_ukuran_disesuaikan.svg" alt="DUIT" className="h-full w-full object-cover" />
         </div>
         <p className={isDark ? "text-slate-400 text-sm" : "text-slate-500 text-sm"}>Memuat...</p>
