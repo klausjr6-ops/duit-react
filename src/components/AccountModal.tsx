@@ -6,7 +6,7 @@ import { useTheme, type ThemeMode } from "../lib/ThemeContext";
 import { useModalDialog } from "../hooks/useModalDialog";
 import { toast } from "../hooks/useToast";
 import ConfirmDialog from "./ConfirmDialog";
-import { IconCamera, IconTrash, IconClose, IconArrowLeft, IconChevronRight, IconSun, IconSunMoon, IconMoon } from "../utils/icons";
+import { IconCamera, IconTrash, IconClose, IconArrowLeft, IconChevronRight, IconSun, IconSunMoon, IconMoon, IconLogout } from "../utils/icons";
 
 interface AccountModalProps {
   open: boolean;
@@ -544,7 +544,7 @@ export default function AccountModal({ open, onClose }: AccountModalProps) {
                         onClick={() => setConfirmLogout(true)}
                         className="flex w-full items-center justify-center gap-2 rounded-xl border border-amber-400/30 bg-amber-400/10 py-2.5 text-sm font-semibold text-amber-600 hover:bg-amber-400/20 transition-colors"
                       >
-                        <LogoutIcon />
+                        <IconLogout size={16} />
                         <span>Keluar dari Akun</span>
                       </button>
                     ) : (
@@ -1031,15 +1031,6 @@ function ChangePasswordForm({
 }
 
 /* ─── Icons & Helpers ────────────────────────────────────────── */
-function LogoutIcon() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-      <polyline points="16 17 21 12 16 7" />
-      <line x1="21" y1="12" x2="9" y2="12" />
-    </svg>
-  );
-}
 
 function mapAuthError(code: string): string {
   const map: Record<string, string> = {

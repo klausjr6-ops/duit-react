@@ -1,5 +1,6 @@
 import { AnimatePresence, motion } from "framer-motion";
 import { useModalDialog } from "../hooks/useModalDialog";
+import { IconAlertTriangle, IconTrash2 } from "../utils/icons";
 
 interface ConfirmDialogProps {
   open: boolean;
@@ -61,8 +62,8 @@ export default function ConfirmDialog({
             onClick={(event) => event.stopPropagation()}
             className={panelClass}
           >
-            <div className={`mb-4 flex h-11 w-11 items-center justify-center rounded-2xl text-xl ${iconClass}`}>
-              {tone === "warning" ? "⚠️" : "🗑️"}
+            <div className={`mb-4 flex h-11 w-11 items-center justify-center rounded-2xl ${iconClass}`}>
+              {tone === "warning" ? <IconAlertTriangle size={20} /> : <IconTrash2 size={20} />}
             </div>
             <h2 id="confirm-dialog-title" className={`text-lg font-bold ${titleClass}`}>{title}</h2>
             <p id="confirm-dialog-message" className={`mt-2 text-sm leading-relaxed ${textClass}`}>{message}</p>

@@ -12,7 +12,7 @@ import { useTheme } from "../lib/ThemeContext";
 import { toast } from "../hooks/useToast";
 import ConfirmDialog from "../components/ConfirmDialog";
 import EmptyState from "../components/EmptyState";
-import { IconTarget, IconEdit, IconTrash, IconCalendar } from "../utils/icons";
+import { IconTarget, IconEdit, IconTrash, IconCalendar, getGoalIcon } from "../utils/icons";
 
 export default function GoalsView() {
   const { goals, delGoal } = useStore();
@@ -74,7 +74,8 @@ export default function GoalsView() {
                 <motion.div key={g.id} layout initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, scale: 0.9 }}>
                   <Card accent={isDone ? "linear-gradient(90deg,#10b981,#059669)" : "linear-gradient(90deg,#3b82f6,#2563eb)"}>
                     <div className="flex justify-between items-start mb-4">
-                      <div className="min-w-0">
+                      <div className="min-w-0 flex items-center gap-2">
+                        <span className={`shrink-0 ${isDark ? "text-slate-300" : "text-zinc-600"}`}>{getGoalIcon(g.icon, 20)}</span>
                         <p className={`font-bold truncate ${mainText}`}>{g.name}</p>
                         {g.deadline && (<p className={`text-xs mt-1 flex items-center gap-1 ${muted2}`}><IconCalendar size={12} />{formatDeadline(g.deadline)}</p>)}
                       </div>

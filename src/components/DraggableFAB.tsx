@@ -272,9 +272,9 @@ export default function DraggableFAB({ onOpenChat, inMonth, outMonth, score, hid
 
   const shouldPulse = (status === "danger" || status === "warning") && !dragging;
   const tip = {
-    danger: "⚠️ Overspend bulan ini!",
-    warning: "⚡ Budget mulai ketat",
-    good: "💚 Keuangan sehat!",
+    danger: "Overspend bulan ini!",
+    warning: "Budget mulai ketat",
+    good: "Keuangan sehat!",
     neutral: "Tanya DUIT",
   }[status];
 

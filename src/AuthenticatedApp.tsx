@@ -16,6 +16,7 @@ import { useAutoLogout } from "./hooks/useAutoLogout";
 import { StoreProvider, useStore } from "./lib/store";
 import { useAuth } from "./lib/AuthContext";
 import { useTheme } from "./lib/ThemeContext";
+import { IconAlertTriangle } from "./utils/icons";
 
 // Heavy views – lazy loaded for faster initial paint
 const KeuanganView = lazy(() => import("./components/KeuanganView"));
@@ -196,7 +197,7 @@ function DashboardApp() {
                     : "rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700"
                   }
                 >
-                  ⚠️ {syncError}
+                  <IconAlertTriangle size={14} className="shrink-0" /> {syncError}
                 </div>
               ) : (
                 <p className={isDark ? "text-right text-xs text-slate-500" : "text-right text-xs text-zinc-500"}>

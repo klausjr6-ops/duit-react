@@ -6,7 +6,7 @@ import { formatRupiah } from "../lib/format";
 import type { Goal } from "../lib/store";
 import { useModalDialog } from "../hooks/useModalDialog";
 import { toast } from "../hooks/useToast";
-import { IconClose } from "../utils/icons";
+import { IconClose, getGoalIcon } from "../utils/icons";
 
 interface Props {
   goal: Goal;
@@ -116,7 +116,7 @@ export default function WithdrawFundModal({ goal, onClose }: Props) {
         </div>
 
         <div className={infoClass}>
-          <p className="font-semibold">🎯 {goal.name}</p>
+          <p className="font-semibold">{getGoalIcon(goal.icon, 16)} {goal.name}</p>
           <p className="mt-1">
             Tersedia {formatRupiah(available)} · target {formatRupiah(goal.target)}
           </p>

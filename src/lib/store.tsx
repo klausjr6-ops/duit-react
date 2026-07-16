@@ -270,7 +270,7 @@ function sanitizeSchedule(value: unknown): ScheduleItem | null {
     ...(date ? { date } : {}),
     start: toTimeValue(value.start),
     ...(end ? { end } : {}),
-    icon: toStringValue(value.icon, "📌").slice(0, 12),
+    icon: toStringValue(value.icon, "pin").slice(0, 12),
     recurring: Boolean(value.recurring),
     ...(untilDate ? { untilDate } : {}),
   };
@@ -290,7 +290,7 @@ function sanitizeGoal(value: unknown): Goal | null {
     target,
     current: Math.min(toPositiveNumber(value.current), target),
     ...(deadline ? { deadline } : {}),
-    icon: toStringValue(value.icon, "🎯").slice(0, 12),
+    icon: toStringValue(value.icon, "target").slice(0, 12),
   };
 }
 
@@ -303,7 +303,7 @@ function sanitizeWallet(value: unknown): Wallet | null {
     id: toFiniteNumber(value.id, createId()),
     name: name.slice(0, 80),
     balance: toFiniteNumber(value.balance),
-    icon: toStringValue(value.icon, "💳").slice(0, 12),
+    icon: toStringValue(value.icon, "card").slice(0, 12),
     color: toStringValue(value.color, "emerald").slice(0, 120),
   };
 }
@@ -387,9 +387,13 @@ function normalizeUserData(remote?: Partial<UserData>): UserData {
 }
 
 function createId(): number {
-  // Numeric IDs retain compatibility with existing Firestore data while avoiding
-  // a collision for quick successive actions in the same millisecond.
-  return Date.now() * 1000 + Math.floor(Math.random() * 1000);
+  // Numeric IDs retain compatibility with existing Firestore data.
+  // Use crypto.randomUUID() when available for near-zero collision risk.
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    const hex = crypto.randomUUID().replace(/-/g, "");
+    return parseInt(hex.slice(0, 13), 16);
+  }
+  return Date.now() * 10000 + Math.floor(Math.random() * 10000);
 }
 
 function getWalletBalance(data: UserData, walletId: number): number | null {
@@ -470,6 +474,8 @@ function useDuitStoreInternal() {
   const [syncing, setSyncing] = useState(false);
   const [syncError, setSyncError] = useState<string | null>(null);
   const writeQueueRef = useRef<Promise<void>>(Promise.resolve());
+  const dataRef = useRef(data);
+  dataRef.current = data;
   const pendingWriteCountRef = useRef(0);
   const initializingUidRef = useRef<string | null>(null);
 
@@ -634,9 +640,9 @@ function useDuitStoreInternal() {
      ══════════════════════════════════════════════════════════ */
   const addTx = useCallback(
     (tx: Omit<Transaction, "id">): { ok: boolean; message?: string } => {
-      // Validate balance for outgoing transactions
+      // Validate balance for outgoing transactions using latest data
       if (tx.type === "out" && tx.walletId) {
-        const sourceBalance = getWalletBalance(data, tx.walletId);
+        const sourceBalance = getWalletBalance(dataRef.current, tx.walletId);
         if (sourceBalance !== null && sourceBalance < tx.amt) {
           return { ok: false, message: "Saldo dompet tidak mencukupi untuk pengeluaran ini." };
         }
@@ -655,7 +661,7 @@ function useDuitStoreInternal() {
       });
       return { ok: true };
     },
-    [updateData, data]
+    [updateData]
   );
 
   const delTx = useCallback(
@@ -1005,8 +1011,8 @@ function useDuitStoreInternal() {
 
   const transferWallet = useCallback(
     (fromId: number, toId: number, amount: number): { ok: boolean; message?: string } => {
-      // Pre-validate using current data
-      const sourceBalance = getWalletBalance(data, fromId);
+      // Pre-validate using latest data
+      const sourceBalance = getWalletBalance(dataRef.current, fromId);
       if (sourceBalance === null) {
         return { ok: false, message: "Dompet asal tidak ditemukan." };
       }
@@ -1047,7 +1053,7 @@ function useDuitStoreInternal() {
       });
       return { ok: true };
     },
-    [updateData, data]
+    [updateData]
   );
 
   /* ══════════════════════════════════════════════════════════
@@ -1195,6 +1201,17 @@ function useDuitStoreInternal() {
 
   const buildAIContext = () => {
     const fmt = (n: number) => `Rp${Math.round(n).toLocaleString("id-ID")}`;
+
+    // Map SVG icon keys to human-readable labels for AI context
+    const goalIconLabel = (icon: string): string => {
+      const map: Record<string, string> = { target: "🎯", home: "🏠", plane: "✈️", laptop: "💻", car: "🚗", emergency: "🛡️", graduation: "🎓", ring: "💍" };
+      return map[icon] || icon;
+    };
+    const schedIconLabel = (icon: string): string => {
+      const map: Record<string, string> = { pin: "📌", meeting: "👥", workout: "🏋️", food: "🍽️", bill: "📋", study: "📖", medicine: "💊", alarm: "⏰" };
+      return map[icon] || icon;
+    };
+
     const lines: string[] = [];
 
     lines.push(`Hari ini: ${today}`);
@@ -1271,7 +1288,7 @@ function useDuitStoreInternal() {
       for (const g of goals) {
         const pct = Math.round((g.current / (g.target || 1)) * 100);
         const dl = g.deadline ? ` (target: ${g.deadline})` : "";
-        lines.push(`- ${g.icon} ${g.name}: ${fmt(g.current)} / ${fmt(g.target)} (${pct}%)${dl}`);
+        lines.push(`- ${goalIconLabel(g.icon)} ${g.name}: ${fmt(g.current)} / ${fmt(g.target)} (${pct}%)${dl}`);
       }
       lines.push(`Total ditabung: ${fmt(totalSaved)}`);
       lines.push("");
@@ -1281,7 +1298,7 @@ function useDuitStoreInternal() {
     if (todaySchedules.length > 0) {
       lines.push("### Jadwal Hari Ini");
       for (const s of todaySchedules) {
-        lines.push(`- ${s.start}${s.end ? `–${s.end}` : ""} ${s.icon} ${s.name}${s.desc ? ` — ${s.desc}` : ""}`);
+        lines.push(`- ${s.start}${s.end ? `–${s.end}` : ""} ${schedIconLabel(s.icon || "")} ${s.name}${s.desc ? ` — ${s.desc}` : ""}`);
       }
       lines.push("");
     }
@@ -1298,7 +1315,7 @@ function useDuitStoreInternal() {
     if (upcoming.length > 0) {
       lines.push("### Jadwal Terdekat");
       for (const { s, date } of upcoming) {
-        lines.push(`- ${date}: ${s.start}${s.end ? `–${s.end}` : ""} ${s.icon} ${s.name}`);
+        lines.push(`- ${date}: ${s.start}${s.end ? `–${s.end}` : ""} ${schedIconLabel(s.icon || "")} ${s.name}`);
       }
       lines.push("");
     }

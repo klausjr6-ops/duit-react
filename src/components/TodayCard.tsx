@@ -2,7 +2,7 @@ import { motion } from "framer-motion";
 import Card from "./Card";
 import { formatRupiah } from "../lib/format";
 import { useTheme } from "../lib/ThemeContext";
-import { IconArrowDown, IconArrowUp, IconCalendar } from "../utils/icons";
+import { IconArrowDown, IconArrowUp, IconCalendar, IconChevronRight } from "../utils/icons";
 
 interface TodayCardProps {
   income: number;
@@ -84,8 +84,8 @@ export default function TodayCard({
             <div className="flex items-center gap-2">
               <span className={`font-bold ${row.valueColor}`}>{row.value}</span>
               {row.onClick && (
-                <span className={`text-lg leading-none ${isDark ? "text-slate-500 group-hover:text-slate-300" : "text-zinc-400 group-hover:text-zinc-600"}`}>
-                  ›
+                <span className={`leading-none ${isDark ? "text-slate-500 group-hover:text-slate-300" : "text-zinc-400 group-hover:text-zinc-600"}`}>
+                  <IconChevronRight size={18} />
                 </span>
               )}
             </div>

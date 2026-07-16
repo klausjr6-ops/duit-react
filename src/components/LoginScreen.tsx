@@ -7,14 +7,10 @@ import { consumeSessionExpired } from "../hooks/useAutoLogout";
 
 type Screen = "login" | "register";
 
-function useThemeSafe() {
-  try { return useTheme(); } catch { return { isDark: true } as any; }
-}
-
 export default function LoginScreen() {
   const [screen, setScreen] = useState<Screen>("login");
   const [sessionExpired, setSessionExpired] = useState(false);
-  const { isDark } = useThemeSafe();
+  const { isDark } = useTheme();
 
   useEffect(() => {
     if (consumeSessionExpired()) {
@@ -69,7 +65,7 @@ export default function LoginScreen() {
 
 /* ═══════════════════ LOGO DUIT ═══════════════════ */
 function DuitLogo() {
-  const { isDark } = useThemeSafe();
+  const { isDark } = useTheme();
   return (
     <div className="flex items-center justify-center gap-3 mb-8">
       <div className="w-14 h-14 rounded-2xl shadow-lg shadow-teal-500/20 overflow-hidden">
@@ -83,7 +79,7 @@ function DuitLogo() {
 /* ═══════════════════ LOGIN FORM ═══════════════════ */
 function LoginForm({ onSwitchToRegister }: { onSwitchToRegister: () => void }) {
   const { loginEmail, loginGoogle, resetPassword } = useAuth();
-  const { isDark } = useThemeSafe();
+  const { isDark } = useTheme();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPass, setShowPass] = useState(false);
@@ -190,7 +186,7 @@ function LoginForm({ onSwitchToRegister }: { onSwitchToRegister: () => void }) {
 /* ═══════════════════ REGISTER FORM ═══════════════════ */
 function RegisterForm({ onSwitchToLogin }: { onSwitchToLogin: () => void }) {
   const { registerEmail, loginGoogle } = useAuth();
-  const { isDark } = useThemeSafe();
+  const { isDark } = useTheme();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -283,7 +279,7 @@ function RegisterForm({ onSwitchToLogin }: { onSwitchToLogin: () => void }) {
 function Input({ label, type, value, onChange, placeholder, autoComplete }: {
   label: string; type: string; value: string; onChange: (v: string) => void; placeholder?: string; autoComplete?: string;
 }) {
-  const { isDark } = useThemeSafe();
+  const { isDark } = useTheme();
   return (
     <div>
       <label className={`text-xs font-medium mb-1.5 block ${isDark ? "text-zinc-400" : "text-zinc-600"}`}>{label}</label>
@@ -305,7 +301,7 @@ function Input({ label, type, value, onChange, placeholder, autoComplete }: {
 function PasswordInput({ value, onChange, show, onToggleShow, placeholder, autoComplete }: {
   value: string; onChange: (v: string) => void; show: boolean; onToggleShow: () => void; placeholder?: string; autoComplete?: string;
 }) {
-  const { isDark } = useThemeSafe();
+  const { isDark } = useTheme();
   return (
     <div className="relative">
       <input
