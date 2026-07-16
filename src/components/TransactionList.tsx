@@ -23,7 +23,12 @@ export default function TransactionList({ filterWallet = "all", onAddClick }: Pr
   const filtered =
     filterWallet === "all" ? txs : txs.filter((t) => t.walletId === parseInt(filterWallet));
 
-  const sorted = [...filtered].sort((a, b) => (a.date < b.date ? 1 : -1));
+  const sorted = [...filtered].sort((a, b) => {
+    // Tanggal terbaru di atas; untuk tanggal sama, pertahankan urutan array
+    // (addTx prepend = transaksi baru di awal = paling atas)
+    if (a.date !== b.date) return a.date < b.date ? 1 : -1;
+    return 0;
+  });
 
   const getWalletName = (id?: number) => wallets.find((w) => w.id === id)?.name || "—";
 
