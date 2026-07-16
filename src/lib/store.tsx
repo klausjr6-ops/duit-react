@@ -371,19 +371,31 @@ export function sanitizeImportedUserData(value: unknown): UserData {
 
 function normalizeUserData(remote?: Partial<UserData>): UserData {
   return {
-    txs: Array.isArray(remote?.txs) ? remote.txs : [],
+    txs: Array.isArray(remote?.txs)
+      ? remote.txs.map(sanitizeTransaction).filter((item): item is Transaction => Boolean(item))
+      : [],
     scheds: Array.isArray(remote?.scheds)
       ? remote.scheds.map(sanitizeSchedule).filter((item): item is ScheduleItem => Boolean(item))
       : [],
     goals: Array.isArray(remote?.goals)
       ? remote.goals.map(sanitizeGoal).filter((item): item is Goal => Boolean(item))
       : [],
-    moods: remote?.moods && typeof remote.moods === "object" ? remote.moods : {},
-    settings: {
-      name: "Kamu",
-      themeMode: "time",
-      ...(remote?.settings && typeof remote.settings === "object" ? remote.settings : {}),
-    },
+    moods: isRecord(remote?.moods)
+      ? Object.fromEntries(
+          Object.entries(remote!.moods as Record<string, unknown>).flatMap(([date, mood]) => {
+            if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !isRecord(mood)) return [];
+            return [[
+              date,
+              {
+                mood: toStringValue(mood.mood, "🙂").slice(0, 12),
+                label: toStringValue(mood.label, "Biasa").slice(0, 80),
+                note: toStringValue(mood.note, "").slice(0, 500),
+              },
+            ]];
+          })
+        )
+      : {},
+    settings: sanitizeSettings(remote?.settings),
     wallets: Array.isArray(remote?.wallets)
       ? remote.wallets.map(sanitizeWallet).filter((item): item is Wallet => Boolean(item))
       : DEFAULT_WALLETS.map((wallet) => ({ ...wallet })),
