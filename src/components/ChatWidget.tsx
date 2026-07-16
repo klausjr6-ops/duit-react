@@ -360,7 +360,7 @@ export default function ChatWidget({ open, onClose }: ChatWidgetProps) {
 
                     return (
                       <div className={`w-10 h-10 rounded-xl shadow-lg ${dGlow} transition-all duration-500 overflow-hidden`}>
-                        <img src="/logo_d_ukuran_disesuaikan.svg" alt="DUIT" className="h-full w-full object-cover" />
+                        <img src="/logo_d_ukuran_disesuaikan.svg" alt="DUIT" className="h-full w-full object-contain" />
                       </div>
                     );
                   })()}
