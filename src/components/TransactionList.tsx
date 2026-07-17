@@ -153,10 +153,10 @@ export default function TransactionList({ filterWallet = "all", onAddClick }: Pr
                   <button
                     type="button"
                     onClick={() => setTransactionToDelete(t)}
-                    disabled={isCF}
+                    disabled={isCF || isTransfer}
                     className={isDark ? "text-slate-500 hover:text-rose-400 transition-colors p-1 disabled:opacity-30 disabled:cursor-not-allowed" : "text-zinc-400 hover:text-rose-500 transition-colors p-1 disabled:opacity-30 disabled:cursor-not-allowed"}
                     aria-label={`Hapus transaksi ${t.desc}`}
-                    title={isCF ? "Transaksi ini tidak bisa dihapus" : "Hapus"}
+                    title={isCF ? "Transaksi ini tidak bisa dihapus" : isTransfer ? "Transfer tidak bisa dihapus per transaksi" : "Hapus"}
                   >
                     <IconTrash size={16} />
                   </button>
@@ -188,6 +188,8 @@ export default function TransactionList({ filterWallet = "all", onAddClick }: Pr
           if (transactionToDelete) {
             if (transactionToDelete.isCarryForward) {
               toast.error("Transaksi Saldo Bulan Lalu tidak bisa dihapus. Entri ini dibuat otomatis.");
+            } else if (transactionToDelete.transferId) {
+              toast.error("Transfer tidak bisa dihapus per transaksi. Hapus melalui pengaturan dompet.");
             } else {
               delTx(transactionToDelete.id);
               toast.success("Transaksi dihapus");

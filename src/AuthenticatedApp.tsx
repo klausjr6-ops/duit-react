@@ -30,7 +30,7 @@ function ViewLoader() {
   return (
     <div className={`py-16 flex items-center justify-center ${isDark ? "text-slate-400" : "text-zinc-500"}`}>
       <div className="flex items-center gap-3 text-sm">
-        <span className="h-4 w-4 animate-spin rounded-full border-2 border current border-t-transparent opacity-60" />
+        <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent opacity-60" />
         Memuat…
       </div>
     </div>

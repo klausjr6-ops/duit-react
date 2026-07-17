@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef } from "react";
 const INACTIVITY_MS = 5 * 60 * 1000; // 5 menit
 const SESSION_EXPIRED_KEY = "duit_session_expired";
 const LAST_ACTIVITY_KEY = "duit_last_activity";
+const STAMP_THROTTLE_MS = 10_000; // max 1 localStorage write per 10s
 
 const EVENTS: (keyof WindowEventMap)[] = [
   "mousedown",
@@ -13,10 +14,18 @@ const EVENTS: (keyof WindowEventMap)[] = [
   "click",
 ];
 
-/** Update last activity timestamp in localStorage (persists across browser restarts). */
+/** Timestamp of last successful localStorage write (module-level for throttle). */
+let lastStampTime = 0;
+
+/** Update last activity timestamp in localStorage (persists across browser restarts).
+ *  Throttled: only writes if the last write was more than STAMP_THROTTLE_MS ago.
+ *  This avoids excessive synchronous I/O on high-frequency events like mousemove. */
 export function stampActivity(): void {
+  const now = Date.now();
+  if (now - lastStampTime < STAMP_THROTTLE_MS) return;
+  lastStampTime = now;
   try {
-    localStorage.setItem(LAST_ACTIVITY_KEY, Date.now().toString());
+    localStorage.setItem(LAST_ACTIVITY_KEY, now.toString());
   } catch {
     // localStorage unavailable — non-critical
   }
@@ -60,7 +69,7 @@ export function useAutoLogout(onLogout: () => Promise<void>) {
       clearTimeout(timerRef.current);
     }
 
-    // Stamp activity to localStorage for cross-session detection
+    // Stamp activity to localStorage for cross-session detection (throttled)
     stampActivity();
 
     // Logout setelah 5 menit penuh tanpa warning
@@ -70,6 +79,9 @@ export function useAutoLogout(onLogout: () => Promise<void>) {
       } catch {
         // sessionStorage unavailable — non-critical
       }
+      // Force a final stamp so the timestamp is accurate at logout time
+      lastStampTime = 0; // reset throttle to force write
+      stampActivity();
       logoutRef.current();
     }, INACTIVITY_MS);
   }, []);

@@ -123,7 +123,7 @@ export default function WithdrawFundModal({ goal, onClose }: Props) {
         </div>
 
         <p className={`mb-4 mt-4 ${mutedClass}`}>
-          Dana akan dikembalikan ke dompet pilihanmu. Saldo Goal berkurang dan tidak dihitung sebagai pemasukan.
+          Dana akan dikembalikan ke dompet pilihanmu. Saldo Goal berkurang dan dicatat sebagai pemasukan di dompet.
         </p>
 
         <form onSubmit={handleSubmit} className="space-y-4">

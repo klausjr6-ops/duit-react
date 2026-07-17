@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import LoginScreen from "./components/LoginScreen";
 import { useAuth } from "./lib/AuthContext";
 import { useTheme } from "./lib/ThemeContext";
@@ -25,15 +25,25 @@ function FullScreenLoader() {
 
 export default function App() {
   const { user, loading, logout } = useAuth();
+  // Prevent dashboard flicker: wait until the cross-session stale check
+  // completes before rendering AuthenticatedApp. Without this guard,
+  // the user briefly sees the dashboard (1 frame) before being logged out.
+  const [sessionReady, setSessionReady] = useState(false);
 
-  // ── Cross-session stale check ──────────────────────────────
-  // Firebase Auth persists across browser restarts. On mobile,
-  // closing the browser kills JS but the session token survives.
-  // When the app reopens, we check if the last activity timestamp
-  // in localStorage is older than 5 min → force logout.
   useEffect(() => {
-    if (loading || !user) return;
+    if (loading) return;
 
+    if (!user) {
+      // No user → login screen, no stale check needed
+      setSessionReady(true);
+      return;
+    }
+
+    // ── Cross-session stale check ──────────────────────────────
+    // Firebase Auth persists across browser restarts. On mobile,
+    // closing the browser kills JS but the session token survives.
+    // When the app reopens, we check if the last activity timestamp
+    // in localStorage is older than 5 min → force logout.
     if (isSessionStale()) {
       // Session expired while app was closed — force logout
       try {
@@ -45,9 +55,10 @@ export default function App() {
 
     // Session is fresh (user reopened within 5 min) — stamp current time
     stampActivity();
+    setSessionReady(true);
   }, [loading, user, logout]);
 
-  if (loading) return <FullScreenLoader />;
+  if (loading || !sessionReady) return <FullScreenLoader />;
   if (!user) return <LoginScreen />;
 
   return (

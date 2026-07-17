@@ -834,6 +834,13 @@ function useDuitStoreInternal() {
      ══════════════════════════════════════════════════════════ */
   const addTx = useCallback(
     (tx: Omit<Transaction, "id">): { ok: boolean; message?: string } => {
+      // Validate wallet exists for any transaction with walletId
+      if (tx.walletId) {
+        const walletExists = dataRef.current.wallets.some((w) => w.id === tx.walletId);
+        if (!walletExists) {
+          return { ok: false, message: "Dompet tidak ditemukan." };
+        }
+      }
       // Validate balance for outgoing transactions using latest data
       if (tx.type === "out" && tx.walletId) {
         const sourceBalance = getWalletBalance(dataRef.current, tx.walletId);
@@ -1237,10 +1244,30 @@ function useDuitStoreInternal() {
           );
         }
 
+        // For orphaned transfer "in" tx on surviving wallets (partner deleted):
+        // The money legitimately arrived in that wallet, so keep the transaction
+        // but remove the transferId so it no longer looks like a paired transfer.
+        // It will render as a regular income transaction instead.
+        const orphanedTransferIds = new Set<number>();
+        for (const t of previous.txs) {
+          if (t.transferId && !idsToRemove.has(t.id) && idsToRemove.has(
+            previous.txs.find((p) => p.transferId === t.transferId && p.id !== t.id)?.id ?? -1
+          )) {
+            orphanedTransferIds.add(t.id);
+          }
+        }
+
+        const txs = previous.txs
+          .filter((t) => !idsToRemove.has(t.id))
+          .map((t) => orphanedTransferIds.has(t.id)
+            ? { ...t, transferId: undefined }
+            : t
+          );
+
         return {
           ...previous,
           wallets: previous.wallets.filter((w) => w.id !== id),
-          txs: previous.txs.filter((t) => !idsToRemove.has(t.id)),
+          txs,
           goals,
         };
       }),

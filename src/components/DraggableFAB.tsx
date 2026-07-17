@@ -252,8 +252,8 @@ export default function DraggableFAB({ onOpenChat, inMonth, outMonth, score, hid
 
   /* ── Visual style based on financial status ── */
   const status =
-    (outMonth > inMonth && inMonth > 0) ? "danger" :
-    (outMonth > inMonth * 0.8 && inMonth > 0) ? "warning" :
+    outMonth > inMonth ? "danger" :
+    (inMonth > 0 && outMonth > inMonth * 0.8) ? "warning" :
     score >= 70 ? "good" : "neutral";
 
   const glow = {
