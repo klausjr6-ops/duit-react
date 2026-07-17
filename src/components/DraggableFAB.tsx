@@ -309,6 +309,7 @@ export default function DraggableFAB({ onOpenChat, inMonth, outMonth, score, hid
           alt="Chat"
           className="w-11 h-11 md:w-[52px] md:h-[52px] object-contain pointer-events-none"
           draggable={false}
+          style={{ filter: "brightness(0)" }}
         />
       </button>
     </div>

@@ -279,34 +279,6 @@ export function IconTrash2({ size = 18, className }: IconProps) {
   );
 }
 
-/* ─── Chat FAB: Speechless Stickman ("Can't Argue With That" meme) ─── */
-export function IconSpeechlessStickman({ size = 22, className }: IconProps) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className={className}>
-      {/* Head */}
-      <circle cx="10.5" cy="5" r="2.8" />
-      {/* ಠ_ಠ Left eye */}
-      <line x1="9" y1="4" x2="9" y2="5.5" strokeWidth="2" />
-      {/* ಠ_ಠ Right eye */}
-      <line x1="12" y1="4" x2="12" y2="5.5" strokeWidth="2" />
-      {/* Flat unimpressed mouth */}
-      <line x1="9.5" y1="6.5" x2="11.5" y2="6.5" strokeWidth="1.2" />
-      {/* Body */}
-      <line x1="10.5" y1="7.8" x2="11" y2="14.5" />
-      {/* Right arm — raised (about to object) */}
-      <path d="M11 9.5 L15 8" />
-      {/* The iconic raised finger */}
-      <line x1="15" y1="8" x2="16" y2="4.5" strokeWidth="2" />
-      {/* Left arm — lowered, defeated */}
-      <path d="M10.5 9.5 L7.5 13" />
-      {/* Left leg */}
-      <path d="M11 14.5 L8 20" />
-      {/* Right leg */}
-      <path d="M11 14.5 L14 20" />
-    </svg>
-  );
-}
-
 export const WALLET_ICONS: { key: string; label: string; icon: ReactNode }[] = [
   {
     key: "card",
