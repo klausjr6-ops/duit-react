@@ -218,7 +218,12 @@ export default function AccountModal({ open, onClose }: AccountModalProps) {
     const header = ["Tanggal", "Jenis", "Nominal", "Kategori", "Deskripsi", "Dompet", "Goal ID", "Transaction ID"];
     const rows = backupData.txs.map((transaction) => [
       transaction.date,
-      transaction.type === "in" ? "Pemasukan" : transaction.goalId ? "Transfer Goal" : "Pengeluaran",
+      transaction.isCarryForward ? "Saldo Bulan Lalu"
+        : transaction.transferId ? "Transfer"
+        : transaction.goalId && transaction.type === "in" ? "Penarikan Goal"
+        : transaction.goalId && transaction.type === "out" ? "Nabung Goal"
+        : transaction.type === "in" ? "Pemasukan"
+        : "Pengeluaran",
       String(transaction.amt),
       transaction.cat,
       transaction.desc,

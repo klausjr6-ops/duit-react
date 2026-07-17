@@ -342,9 +342,9 @@ export default function ChatWidget({ open, onClose }: ChatWidgetProps) {
               <div className={`flex items-center justify-between px-5 py-4 border-b ${headerBorder} shrink-0`}>
                 <div className="flex items-center gap-3">
                   {(() => {
-                    const dStatus = (outMonth > inMonth && inMonth > 0)
+                    const dStatus = outMonth > inMonth
                       ? "danger"
-                      : (outMonth > inMonth * 0.8 && inMonth > 0)
+                      : (inMonth > 0 && outMonth > inMonth * 0.8)
                         ? "warning"
                         : score >= 70
                           ? "good"

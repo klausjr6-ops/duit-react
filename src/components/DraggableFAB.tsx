@@ -317,25 +317,6 @@ export default function DraggableFAB({ onOpenChat, inMonth, outMonth, score, hid
           <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
         </svg>
       </button>
-
-      <style>{`
-        @keyframes fab-pulse {
-          0%, 100% { transform: scale(1); }
-          50% { transform: scale(1.08); }
-        }
-        .fab-pulse {
-          animation: fab-pulse 2s ease-in-out infinite;
-        }
-        .fab-dragging {
-          transform: scale(1.12) !important;
-        }
-        .fab-btn:hover:not(.fab-dragging):not(.fab-pulse) {
-          transform: scale(1.1);
-        }
-        .fab-btn:active:not(.fab-dragging) {
-          transform: scale(0.95);
-        }
-      `}</style>
     </div>
   );
 }
