@@ -24,8 +24,14 @@ interface KeuanganViewProps {
 }
 
 export default function KeuanganView({ quickType, quickNonce, onQuickDone }: KeuanganViewProps) {
-  const { wallets, addTx, inMonth, outMonth, balance } = useStore();
+  const { wallets, addTx, inMonth, outMonth, balance, txs } = useStore();
   const { isDark } = useTheme();
+
+  // Calculate "Saldo Bulan Lalu" for current month display
+  const thisMonth = todayStr().slice(0, 7);
+  const currentCF = txs.find(
+    (t) => t.isCarryForward && t.date === `${thisMonth}-01`
+  );
 
   const [type, setType] = useState<"" | "in" | "out">("");
   const [cat, setCat] = useState("");
@@ -112,6 +118,27 @@ export default function KeuanganView({ quickType, quickNonce, onQuickDone }: Keu
           <p className={subCls}>Lacak setiap rupiah</p>
         </div>
       </div>
+
+      {currentCF && (
+        <motion.div
+          initial={{ opacity: 0, y: -8 }}
+          animate={{ opacity: 1, y: 0 }}
+          className={`flex items-center gap-3 rounded-2xl px-4 py-3 ${
+            isDark
+              ? "bg-teal-500/10 border border-teal-400/20 text-teal-300"
+              : "bg-teal-50 border border-teal-200 text-teal-700"
+          }`}
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+          </svg>
+          <span className="text-sm font-semibold">Saldo Bulan Lalu:</span>
+          <span className="text-sm font-bold">{formatRupiah(currentCF.amt)}</span>
+          <span className={`text-xs ${isDark ? "text-slate-500" : "text-zinc-400"}`}>
+            (sisa saldo bulan sebelumnya)
+          </span>
+        </motion.div>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <Card accent="linear-gradient(90deg,#10b981,#059669)">

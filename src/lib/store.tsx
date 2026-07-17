@@ -658,10 +658,11 @@ function useDuitStoreInternal() {
   //
   // Example: July ending balance = Rp50.000 → on August 1st an
   // automatic "Saldo Bulan Lalu" transaction of Rp50.000 appears.
-  const cfRunCountRef = useRef(0);
+  const cfProcessingRef = useRef(false);
 
   useEffect(() => {
     if (!uid || loadedUserId !== uid || loading) return;
+    if (cfProcessingRef.current) return; // prevent re-entrancy
 
     const currentData = dataRef.current;
     const currentMonth = todayStr().slice(0, 7);
@@ -688,9 +689,8 @@ function useDuitStoreInternal() {
       walletMonths.get(String(wallet.id))?.add(currentMonth);
     }
 
-    // Also fill gaps: from last active month up to current month,
-    // so CF entries are created for months with zero transactions
-    // in between.
+    // Fill gaps: from first active month to current month, so CF entries
+    // are created for months with zero transactions in between.
     for (const wallet of currentData.wallets) {
       const activeMonths = walletMonths.get(String(wallet.id));
       if (!activeMonths || activeMonths.size === 0) continue;
@@ -698,7 +698,6 @@ function useDuitStoreInternal() {
       const sortedMonths = [...activeMonths].sort();
       const firstActive = sortedMonths[0];
 
-      // Fill all months from first activity to current month
       let cursor = firstActive;
       while (cursor <= currentMonth) {
         activeMonths.add(cursor);
@@ -714,23 +713,19 @@ function useDuitStoreInternal() {
       const months = walletMonths.get(String(wallet.id));
       if (!months) continue;
 
-      // Find the very first month this wallet has any non-CF transaction
-      const sortedMonths = [...months].sort();
-      const firstActiveMonth = sortedMonths[0];
-
-      for (const month of sortedMonths) {
-        // Don't create CF for the very first month of activity —
-        // there's no "bulan lalu" to carry forward from.
-        if (month === firstActiveMonth && !currentData.txs.some(
-          (t) => !t.isCarryForward && t.walletId === wallet.id && t.date < `${month}-01`
-        )) continue;
-
+      for (const month of months) {
         const firstOfMonth = `${month}-01`;
 
         // Calculate expected CF amount = balance at end of previous month
+        // (base + all non-CF income - all non-CF expense, before 1st of this month)
         const prevTxs = currentData.txs.filter(
           (t) => !t.isCarryForward && t.walletId === wallet.id && t.date < firstOfMonth
         );
+
+        // Skip if no prior transactions AND wallet has no base balance.
+        // A wallet with base balance but no transactions still has a "bulan lalu" balance.
+        if (prevTxs.length === 0 && wallet.balance <= 0) continue;
+
         const income = prevTxs.filter((t) => t.type === "in").reduce((s, t) => s + t.amt, 0);
         const expense = prevTxs.filter((t) => t.type === "out").reduce((s, t) => s + t.amt, 0);
         const expectedAmt = wallet.balance + income - expense;
@@ -742,7 +737,6 @@ function useDuitStoreInternal() {
 
         if (expectedAmt > 0) {
           if (!existingCF) {
-            // Create new CF entry
             toCreate.push({
               id: createId(),
               type: "in",
@@ -754,7 +748,6 @@ function useDuitStoreInternal() {
               isCarryForward: true,
             });
           } else if (existingCF.amt !== expectedAmt) {
-            // Update existing CF entry with correct amount
             toUpdateById.set(existingCF.id, expectedAmt);
           }
         } else if (existingCF) {
@@ -776,20 +769,16 @@ function useDuitStoreInternal() {
 
     if (toCreate.length === 0 && toUpdateById.size === 0 && toDeleteIds.size === 0) return;
 
-    // Guard against infinite loops: if the effect keeps finding work to do
-    // on every run, something is wrong. Bail after 3 consecutive writes.
-    cfRunCountRef.current += 1;
-    if (cfRunCountRef.current > 3) return;
+    // Set processing flag to prevent re-entrancy while Firestore writes
+    cfProcessingRef.current = true;
 
     updateData((previous) => {
       let txs = previous.txs;
 
-      // Delete orphaned or zero-balance CF entries
       if (toDeleteIds.size > 0) {
         txs = txs.filter((t) => !(t.isCarryForward && toDeleteIds.has(t.id)));
       }
 
-      // Update stale CF entries with correct amounts
       if (toUpdateById.size > 0) {
         txs = txs.map((t) => {
           if (t.isCarryForward && toUpdateById.has(t.id)) {
@@ -799,7 +788,6 @@ function useDuitStoreInternal() {
         });
       }
 
-      // Create new CF entries (double-check inside updater to prevent duplicates)
       if (toCreate.length > 0) {
         const filtered = toCreate.filter(
           (cf) =>
@@ -815,12 +803,11 @@ function useDuitStoreInternal() {
       if (txs === previous.txs) return previous;
       return { ...previous, txs };
     });
-  }, [loadedUserId, uid, loading, data.txs, data.wallets]);
 
-  // Reset loop guard when data stabilizes
-  useEffect(() => {
-    cfRunCountRef.current = 0;
-  }, [loadedUserId, uid, loading]);
+    // Release processing flag after Firestore write settles
+    // (setTimeout ensures the flag is held through the current React render cycle)
+    setTimeout(() => { cfProcessingRef.current = false; }, 2000);
+  }, [loadedUserId, uid, loading, data.txs, data.wallets]);
 
   /* ─── Derived: settings dengan default ─────────────────────── */
   const settings: Settings = useMemo(
