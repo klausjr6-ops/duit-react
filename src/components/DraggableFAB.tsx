@@ -307,7 +307,7 @@ export default function DraggableFAB({ onOpenChat, inMonth, outMonth, score, hid
         <img
           src="/wallet-logo.svg"
           alt="Chat"
-          className="w-6 h-6 object-contain pointer-events-none"
+          className="w-9 h-9 md:w-10 md:h-10 object-contain pointer-events-none"
           draggable={false}
         />
       </button>
