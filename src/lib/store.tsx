@@ -651,21 +651,28 @@ function useDuitStoreInternal() {
   );
 
   /* ─── Ensure "Saldo Bulan Lalu" carry-forward entries ─────── */
-  // On data load, check if carry-forward transactions exist for
-  // each wallet for every month with activity. Creates missing entries,
-  // updates stale amounts, and removes orphaned/zero-balance entries.
+  // On data load (and when data changes), check if carry-forward
+  // transactions exist for each wallet for every month with activity.
+  // Creates missing entries, updates stale amounts, and removes
+  // orphaned/zero-balance entries.
+  //
+  // Example: July ending balance = Rp50.000 → on August 1st an
+  // automatic "Saldo Bulan Lalu" transaction of Rp50.000 appears.
+  const cfRunCountRef = useRef(0);
+
   useEffect(() => {
     if (!uid || loadedUserId !== uid || loading) return;
 
     const currentData = dataRef.current;
     const currentMonth = todayStr().slice(0, 7);
 
-    // Collect all months that should have CF entries (from first tx to current month)
+    // Collect all months that should have CF entries
     const walletMonths = new Map<string, Set<string>>(); // walletId → Set of months
     for (const wallet of currentData.wallets) {
       walletMonths.set(String(wallet.id), new Set());
     }
 
+    // Months with real (non-CF) transactions
     for (const tx of currentData.txs) {
       if (!tx.isCarryForward && tx.walletId && tx.date) {
         const month = tx.date.slice(0, 7);
@@ -675,22 +682,27 @@ function useDuitStoreInternal() {
       }
     }
 
-    // Include the month AFTER the last activity month, up to current month,
-    // so the carry-forward balance still appears even when no new txs exist.
-    // (But NOT for wallets with zero prior transactions — no "bulan lalu" to carry.)
+    // Always include current month for every wallet so CF appears even
+    // when current month has no new transactions yet.
+    for (const wallet of currentData.wallets) {
+      walletMonths.get(String(wallet.id))?.add(currentMonth);
+    }
+
+    // Also fill gaps: from last active month up to current month,
+    // so CF entries are created for months with zero transactions
+    // in between.
     for (const wallet of currentData.wallets) {
       const activeMonths = walletMonths.get(String(wallet.id));
       if (!activeMonths || activeMonths.size === 0) continue;
 
-      // Find the latest month with activity
       const sortedMonths = [...activeMonths].sort();
-      const lastActive = sortedMonths[sortedMonths.length - 1];
+      const firstActive = sortedMonths[0];
 
-      // Add every month from lastActive+1 up to currentMonth (inclusive)
-      let next = nextMonth(lastActive);
-      while (next <= currentMonth) {
-        activeMonths.add(next);
-        next = nextMonth(next);
+      // Fill all months from first activity to current month
+      let cursor = firstActive;
+      while (cursor <= currentMonth) {
+        activeMonths.add(cursor);
+        cursor = nextMonth(cursor);
       }
     }
 
@@ -702,17 +714,23 @@ function useDuitStoreInternal() {
       const months = walletMonths.get(String(wallet.id));
       if (!months) continue;
 
-      for (const month of months) {
+      // Find the very first month this wallet has any non-CF transaction
+      const sortedMonths = [...months].sort();
+      const firstActiveMonth = sortedMonths[0];
+
+      for (const month of sortedMonths) {
+        // Don't create CF for the very first month of activity —
+        // there's no "bulan lalu" to carry forward from.
+        if (month === firstActiveMonth && !currentData.txs.some(
+          (t) => !t.isCarryForward && t.walletId === wallet.id && t.date < `${month}-01`
+        )) continue;
+
         const firstOfMonth = `${month}-01`;
 
-        // Calculate expected CF amount (balance at end of previous month)
+        // Calculate expected CF amount = balance at end of previous month
         const prevTxs = currentData.txs.filter(
           (t) => !t.isCarryForward && t.walletId === wallet.id && t.date < firstOfMonth
         );
-
-        // Skip if no prior transactions — there is no "bulan lalu" balance to carry
-        if (prevTxs.length === 0) continue;
-
         const income = prevTxs.filter((t) => t.type === "in").reduce((s, t) => s + t.amt, 0);
         const expense = prevTxs.filter((t) => t.type === "out").reduce((s, t) => s + t.amt, 0);
         const expectedAmt = wallet.balance + income - expense;
@@ -746,19 +764,22 @@ function useDuitStoreInternal() {
       }
     }
 
-    // Remove CF entries for wallets that no longer exist or months with no activity
+    // Remove CF entries for wallets that no longer exist
     for (const tx of currentData.txs) {
       if (!tx.isCarryForward) continue;
-      const month = tx.date.slice(0, 7);
-      const walletMonthsSet = walletMonths.get(String(tx.walletId));
-      if (!walletMonthsSet || !walletMonthsSet.has(month)) {
+      const walletExists = currentData.wallets.some((w) => w.id === tx.walletId);
+      if (!walletExists) {
         toDeleteIds.add(tx.id);
-        // Don't update an entry we're about to delete
         toUpdateById.delete(tx.id);
       }
     }
 
     if (toCreate.length === 0 && toUpdateById.size === 0 && toDeleteIds.size === 0) return;
+
+    // Guard against infinite loops: if the effect keeps finding work to do
+    // on every run, something is wrong. Bail after 3 consecutive writes.
+    cfRunCountRef.current += 1;
+    if (cfRunCountRef.current > 3) return;
 
     updateData((previous) => {
       let txs = previous.txs;
@@ -795,6 +816,11 @@ function useDuitStoreInternal() {
       return { ...previous, txs };
     });
   }, [loadedUserId, uid, loading, data.txs, data.wallets]);
+
+  // Reset loop guard when data stabilizes
+  useEffect(() => {
+    cfRunCountRef.current = 0;
+  }, [loadedUserId, uid, loading]);
 
   /* ─── Derived: settings dengan default ─────────────────────── */
   const settings: Settings = useMemo(
