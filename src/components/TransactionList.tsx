@@ -7,7 +7,7 @@ import { toast } from "../hooks/useToast";
 import ConfirmDialog from "./ConfirmDialog";
 import EditTransactionModal from "./EditTransactionModal";
 import EmptyState from "./EmptyState";
-import { IconArrowUp, IconArrowDown, IconTarget, IconEdit, IconTrash, IconTransfer, IconWallet } from "../utils/icons";
+import { IconArrowUp, IconArrowDown, IconTarget, IconEdit, IconTrash, IconTransfer, IconWallet, IconCalendar } from "../utils/icons";
 
 interface Props {
   filterWallet?: string;
@@ -74,30 +74,46 @@ export default function TransactionList({ filterWallet = "all", onAddClick }: Pr
           <AnimatePresence>
             {sorted.map((t) => {
               const isGoal = Boolean(t.goalId);
+              const isGoalWithdrawal = Boolean(t.goalId && t.type === "in");
+              const isGoalFunding = Boolean(t.goalId && t.type === "out");
               const isTransfer = Boolean(t.transferId);
-              const goalLabel = t.type === "in" ? "Transfer dari Goal" : "Transfer ke Goal";
+              const isCF = Boolean(t.isCarryForward);
+              const goalLabel = t.type === "in" ? "Tarik dari Goal" : "Nabung Goal";
               const transferLabel = t.type === "in" ? "Transfer masuk" : "Transfer keluar";
-              const typeIcon = isGoal
+              const cfLabel = "Saldo Bulan Lalu";
+              const typeIcon = isGoalFunding
                 ? <IconTarget size={18} />
-                : isTransfer
-                  ? <IconTransfer size={18} />
-                  : t.type === "in"
-                    ? <IconArrowUp size={18} />
-                    : <IconArrowDown size={18} />;
-              const typeClass = isGoal
+                : isGoalWithdrawal
+                  ? <IconArrowUp size={18} />
+                  : isTransfer
+                    ? <IconTransfer size={18} />
+                    : isCF
+                      ? <IconCalendar size={18} />
+                      : t.type === "in"
+                        ? <IconArrowUp size={18} />
+                        : <IconArrowDown size={18} />;
+              const typeClass = isGoalFunding
                 ? isDark ? "bg-blue-500/20 text-blue-400" : "bg-blue-50 text-blue-600"
-                : isTransfer
-                  ? isDark ? "bg-violet-500/20 text-violet-400" : "bg-violet-50 text-violet-600"
-                  : t.type === "in"
-                    ? isDark ? "bg-emerald-500/20 text-emerald-400" : "bg-emerald-50 text-emerald-600"
-                    : isDark ? "bg-rose-500/20 text-rose-400" : "bg-rose-50 text-rose-600";
-              const amountClass = isGoal
+                : isGoalWithdrawal
+                  ? isDark ? "bg-emerald-500/20 text-emerald-400" : "bg-emerald-50 text-emerald-600"
+                  : isTransfer
+                    ? isDark ? "bg-violet-500/20 text-violet-400" : "bg-violet-50 text-violet-600"
+                    : isCF
+                      ? isDark ? "bg-teal-500/20 text-teal-400" : "bg-teal-50 text-teal-600"
+                      : t.type === "in"
+                        ? isDark ? "bg-emerald-500/20 text-emerald-400" : "bg-emerald-50 text-emerald-600"
+                        : isDark ? "bg-rose-500/20 text-rose-400" : "bg-rose-50 text-rose-600";
+              const amountClass = isGoalFunding
                 ? isDark ? "text-blue-400" : "text-blue-600"
-                : isTransfer
-                  ? isDark ? "text-violet-400" : "text-violet-600"
-                  : t.type === "in"
-                    ? isDark ? "text-emerald-400" : "text-emerald-600"
-                    : isDark ? "text-rose-400" : "text-rose-600";
+                : isGoalWithdrawal
+                  ? isDark ? "text-emerald-400" : "text-emerald-600"
+                  : isTransfer
+                    ? isDark ? "text-violet-400" : "text-violet-600"
+                    : isCF
+                      ? isDark ? "text-teal-400" : "text-teal-600"
+                      : t.type === "in"
+                        ? isDark ? "text-emerald-400" : "text-emerald-600"
+                        : isDark ? "text-rose-400" : "text-rose-600";
 
               return (
               <motion.div
@@ -115,31 +131,32 @@ export default function TransactionList({ filterWallet = "all", onAddClick }: Pr
                   <div className="min-w-0 flex-1">
                     <p className={titleText}>{t.desc}</p>
                     <p className={subText}>
-                      {formatDate(t.date)} · {isGoal ? goalLabel : isTransfer ? transferLabel : t.cat} · {getWalletName(t.walletId)}
+                      {formatDate(t.date)} · {isGoal ? goalLabel : isTransfer ? transferLabel : isCF ? cfLabel : t.cat} · {getWalletName(t.walletId)}
                     </p>
                   </div>
                 </div>
                 <div className="flex items-center gap-3 shrink-0">
                   <span className={`font-bold text-sm ${amountClass}`}>
-                    {isGoal ? (t.type === "in" ? "← " : "→ ") : isTransfer ? (t.type === "in" ? "← " : "→ ") : t.type === "in" ? "+" : "-"}
+                    {isGoalFunding ? "→ " : isGoalWithdrawal ? "+" : isTransfer ? (t.type === "in" ? "← " : "→ ") : isCF ? "↗ " : t.type === "in" ? "+" : "-"}
                     {formatRupiah(t.amt)}
                   </span>
                   <button
                     type="button"
                     onClick={() => setTransactionToEdit(t)}
-                    disabled={isGoal || isTransfer}
+                    disabled={isGoal || isTransfer || isCF}
                     className={isDark ? "text-slate-500 hover:text-teal-400 transition-colors p-1 disabled:opacity-30 disabled:cursor-not-allowed" : "text-zinc-400 hover:text-teal-600 transition-colors p-1 disabled:opacity-30 disabled:cursor-not-allowed"}
                     aria-label={`Edit transaksi ${t.desc}`}
-                    title={isGoal || isTransfer ? "Transaksi ini tidak bisa diedit" : "Edit"}
+                    title={isGoal || isTransfer || isCF ? "Transaksi ini tidak bisa diedit" : "Edit"}
                   >
                     <IconEdit size={16} />
                   </button>
                   <button
                     type="button"
                     onClick={() => setTransactionToDelete(t)}
-                    className={isDark ? "text-slate-500 hover:text-rose-400 transition-colors p-1" : "text-zinc-400 hover:text-rose-500 transition-colors p-1"}
+                    disabled={isCF}
+                    className={isDark ? "text-slate-500 hover:text-rose-400 transition-colors p-1 disabled:opacity-30 disabled:cursor-not-allowed" : "text-zinc-400 hover:text-rose-500 transition-colors p-1 disabled:opacity-30 disabled:cursor-not-allowed"}
                     aria-label={`Hapus transaksi ${t.desc}`}
-                    title="Hapus"
+                    title={isCF ? "Transaksi ini tidak bisa dihapus" : "Hapus"}
                   >
                     <IconTrash size={16} />
                   </button>
@@ -158,9 +175,11 @@ export default function TransactionList({ filterWallet = "all", onAddClick }: Pr
         message={transactionToDelete ? (() => {
           const isTransfer = Boolean(transactionToDelete.transferId);
           const isGoal = Boolean(transactionToDelete.goalId);
+          const isCF = Boolean(transactionToDelete.isCarryForward);
           let msg = `Transaksi "${transactionToDelete.desc}" sebesar ${formatRupiah(transactionToDelete.amt)} akan dihapus.`;
           if (isTransfer) msg += " Pasangan transfer juga akan dihapus.";
           if (isGoal) msg += " Saldo goal akan dikoreksi otomatis.";
+          if (isCF) msg = "Transaksi Saldo Bulan Lalu tidak bisa dihapus. Entri ini dibuat otomatis.";
           return msg;
         })() : ""}
         confirmLabel="Ya, Hapus"

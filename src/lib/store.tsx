@@ -27,6 +27,8 @@ export interface Transaction {
   goalId?: number;
   /** Present when this transaction is part of a wallet-to-wallet transfer. */
   transferId?: number;
+  /** Present when this is an auto-generated carry-forward entry ("Saldo Bulan Lalu"). */
+  isCarryForward?: boolean;
 }
 
 export interface ScheduleItem {
@@ -166,6 +168,12 @@ export function getNextScheduleOccurrence(
   return null;
 }
 
+/** Given "YYYY-MM", returns the next month as "YYYY-MM". */
+function nextMonth(ym: string): string {
+  const [y, m] = ym.split("-").map(Number);
+  return m === 12 ? `${y + 1}-01` : `${y}-${String(m + 1).padStart(2, "0")}`;
+}
+
 const DEFAULT_WALLETS: Wallet[] = [
   { id: 1, name: "BCA", balance: 0, icon: "card", color: "emerald" },
   { id: 2, name: "Cash", balance: 0, icon: "cash", color: "teal" },
@@ -238,6 +246,7 @@ function sanitizeTransaction(value: unknown): Transaction | null {
   const walletId = value.walletId === undefined ? undefined : toFiniteNumber(value.walletId, NaN);
   const goalId = value.goalId === undefined ? undefined : toFiniteNumber(value.goalId, NaN);
   const transferId = value.transferId === undefined ? undefined : toFiniteNumber(value.transferId, NaN);
+  const isCarryForward = value.isCarryForward === true;
 
   return {
     id: toFiniteNumber(value.id, createId()),
@@ -249,6 +258,7 @@ function sanitizeTransaction(value: unknown): Transaction | null {
     ...(Number.isFinite(walletId) ? { walletId } : {}),
     ...(Number.isFinite(goalId) ? { goalId } : {}),
     ...(Number.isFinite(transferId) ? { transferId } : {}),
+    ...(isCarryForward ? { isCarryForward: true } : {}),
   };
 }
 
@@ -423,7 +433,9 @@ function getWalletBalance(data: UserData, walletId: number): number | null {
   const wallet = data.wallets.find((item) => item.id === walletId);
   if (!wallet) return null;
 
-  const walletTransactions = data.txs.filter((transaction) => transaction.walletId === walletId);
+  const walletTransactions = data.txs.filter(
+    (transaction) => transaction.walletId === walletId && !transaction.isCarryForward
+  );
   const income = walletTransactions
     .filter((transaction) => transaction.type === "in")
     .reduce((amount, transaction) => amount + transaction.amt, 0);
@@ -638,6 +650,152 @@ function useDuitStoreInternal() {
     [enqueueFirestoreUpdate, loadedUserId, uid]
   );
 
+  /* ─── Ensure "Saldo Bulan Lalu" carry-forward entries ─────── */
+  // On data load, check if carry-forward transactions exist for
+  // each wallet for every month with activity. Creates missing entries,
+  // updates stale amounts, and removes orphaned/zero-balance entries.
+  useEffect(() => {
+    if (!uid || loadedUserId !== uid || loading) return;
+
+    const currentData = dataRef.current;
+    const currentMonth = todayStr().slice(0, 7);
+
+    // Collect all months that should have CF entries (from first tx to current month)
+    const walletMonths = new Map<string, Set<string>>(); // walletId → Set of months
+    for (const wallet of currentData.wallets) {
+      walletMonths.set(String(wallet.id), new Set());
+    }
+
+    for (const tx of currentData.txs) {
+      if (!tx.isCarryForward && tx.walletId && tx.date) {
+        const month = tx.date.slice(0, 7);
+        if (month <= currentMonth) {
+          walletMonths.get(String(tx.walletId))?.add(month);
+        }
+      }
+    }
+
+    // Include the month AFTER the last activity month, up to current month,
+    // so the carry-forward balance still appears even when no new txs exist.
+    // (But NOT for wallets with zero prior transactions — no "bulan lalu" to carry.)
+    for (const wallet of currentData.wallets) {
+      const activeMonths = walletMonths.get(String(wallet.id));
+      if (!activeMonths || activeMonths.size === 0) continue;
+
+      // Find the latest month with activity
+      const sortedMonths = [...activeMonths].sort();
+      const lastActive = sortedMonths[sortedMonths.length - 1];
+
+      // Add every month from lastActive+1 up to currentMonth (inclusive)
+      let next = nextMonth(lastActive);
+      while (next <= currentMonth) {
+        activeMonths.add(next);
+        next = nextMonth(next);
+      }
+    }
+
+    const toCreate: Transaction[] = [];
+    const toUpdateById = new Map<number, number>(); // existing CF id → correct amt
+    const toDeleteIds = new Set<number>();
+
+    for (const wallet of currentData.wallets) {
+      const months = walletMonths.get(String(wallet.id));
+      if (!months) continue;
+
+      for (const month of months) {
+        const firstOfMonth = `${month}-01`;
+
+        // Calculate expected CF amount (balance at end of previous month)
+        const prevTxs = currentData.txs.filter(
+          (t) => !t.isCarryForward && t.walletId === wallet.id && t.date < firstOfMonth
+        );
+
+        // Skip if no prior transactions — there is no "bulan lalu" balance to carry
+        if (prevTxs.length === 0) continue;
+
+        const income = prevTxs.filter((t) => t.type === "in").reduce((s, t) => s + t.amt, 0);
+        const expense = prevTxs.filter((t) => t.type === "out").reduce((s, t) => s + t.amt, 0);
+        const expectedAmt = wallet.balance + income - expense;
+
+        // Find existing CF entry for this wallet/month
+        const existingCF = currentData.txs.find(
+          (t) => t.isCarryForward && t.date === firstOfMonth && t.walletId === wallet.id
+        );
+
+        if (expectedAmt > 0) {
+          if (!existingCF) {
+            // Create new CF entry
+            toCreate.push({
+              id: createId(),
+              type: "in",
+              amt: expectedAmt,
+              cat: "Saldo Bulan Lalu",
+              desc: "Saldo Bulan Lalu",
+              date: firstOfMonth,
+              walletId: wallet.id,
+              isCarryForward: true,
+            });
+          } else if (existingCF.amt !== expectedAmt) {
+            // Update existing CF entry with correct amount
+            toUpdateById.set(existingCF.id, expectedAmt);
+          }
+        } else if (existingCF) {
+          // Balance is 0 or negative — remove the CF entry
+          toDeleteIds.add(existingCF.id);
+        }
+      }
+    }
+
+    // Remove CF entries for wallets that no longer exist or months with no activity
+    for (const tx of currentData.txs) {
+      if (!tx.isCarryForward) continue;
+      const month = tx.date.slice(0, 7);
+      const walletMonthsSet = walletMonths.get(String(tx.walletId));
+      if (!walletMonthsSet || !walletMonthsSet.has(month)) {
+        toDeleteIds.add(tx.id);
+        // Don't update an entry we're about to delete
+        toUpdateById.delete(tx.id);
+      }
+    }
+
+    if (toCreate.length === 0 && toUpdateById.size === 0 && toDeleteIds.size === 0) return;
+
+    updateData((previous) => {
+      let txs = previous.txs;
+
+      // Delete orphaned or zero-balance CF entries
+      if (toDeleteIds.size > 0) {
+        txs = txs.filter((t) => !(t.isCarryForward && toDeleteIds.has(t.id)));
+      }
+
+      // Update stale CF entries with correct amounts
+      if (toUpdateById.size > 0) {
+        txs = txs.map((t) => {
+          if (t.isCarryForward && toUpdateById.has(t.id)) {
+            return { ...t, amt: toUpdateById.get(t.id)! };
+          }
+          return t;
+        });
+      }
+
+      // Create new CF entries (double-check inside updater to prevent duplicates)
+      if (toCreate.length > 0) {
+        const filtered = toCreate.filter(
+          (cf) =>
+            !txs.some(
+              (t) => t.isCarryForward && t.date === cf.date && t.walletId === cf.walletId
+            )
+        );
+        if (filtered.length > 0) {
+          txs = [...filtered, ...txs];
+        }
+      }
+
+      if (txs === previous.txs) return previous;
+      return { ...previous, txs };
+    });
+  }, [loadedUserId, uid, loading, data.txs, data.wallets]);
+
   /* ─── Derived: settings dengan default ─────────────────────── */
   const settings: Settings = useMemo(
     () => ({ name: "Kamu", themeMode: "time", ...data.settings }),
@@ -693,6 +851,9 @@ function useDuitStoreInternal() {
         const tx = previous.txs.find((t) => t.id === id);
         if (!tx) return previous;
 
+        // Block deletion of carry-forward entries (auto-generated)
+        if (tx.isCarryForward) return previous;
+
         // Collect IDs to remove: the target tx + any paired transfer
         const idsToRemove = new Set([id]);
         if (tx.transferId) {
@@ -737,6 +898,9 @@ function useDuitStoreInternal() {
 
         // Block editing of goal transactions (use fund/withdraw instead)
         if (existing.goalId) return previous;
+
+        // Block editing of carry-forward entries (auto-generated)
+        if (existing.isCarryForward) return previous;
 
         // If changing walletId on an "out" tx, validate the new wallet has balance
         if (patch.walletId !== undefined && patch.walletId !== existing.walletId && existing.type === "out") {
@@ -802,12 +966,62 @@ function useDuitStoreInternal() {
      GOALS
      ══════════════════════════════════════════════════════════ */
   const addGoal = useCallback(
-    (goal: Omit<Goal, "id">) => {
-      const item: Goal = { ...goal, id: createId() };
-      updateData((previous) => ({
-        ...previous,
-        goals: [...previous.goals, item],
-      }));
+    (goal: Omit<Goal, "id"> & { walletId?: number }): { ok: boolean; message?: string } => {
+      const currentAmt = goal.current || 0;
+      const walletId = goal.walletId;
+
+      // If initial savings > 0, wallet must be specified and have sufficient balance
+      if (currentAmt > 0) {
+        if (!walletId) {
+          return { ok: false, message: "Pilih dompet sumber untuk tabungan awal." };
+        }
+        const sourceBalance = getWalletBalance(dataRef.current, walletId);
+        if (sourceBalance === null) {
+          return { ok: false, message: "Dompet sumber tidak ditemukan." };
+        }
+        if (sourceBalance < currentAmt) {
+          return { ok: false, message: `Saldo dompet tidak mencukupi. Saldo: Rp${sourceBalance.toLocaleString("id-ID")}` };
+        }
+      }
+
+      const goalId = createId();
+      const { walletId: _sourceWalletId, ...goalFields } = goal;
+      const item: Goal = { ...goalFields, id: goalId };
+
+      // Create a goal-funding "out" transaction if initial savings > 0
+      const fundingTx: Transaction | null = currentAmt > 0 && walletId ? {
+        id: createId(),
+        type: "out",
+        amt: currentAmt,
+        cat: "Tabungan",
+        desc: `Tabungan Goal: ${goal.name}`,
+        date: todayStr(),
+        walletId,
+        goalId,
+      } : null;
+
+      updateData((previous) => {
+        // Double-check balance inside updater for race-condition safety
+        if (fundingTx && fundingTx.walletId) {
+          const bal = getWalletBalance(previous, fundingTx.walletId);
+          if (bal === null || bal < fundingTx.amt) {
+            // Silently return — the pre-check already warned the user
+            return previous;
+          }
+        }
+
+        const txs = fundingTx
+          ? [fundingTx, ...previous.txs]
+          : previous.txs;
+
+        return {
+          ...previous,
+          goals: [...previous.goals, item],
+          txs,
+        };
+      });
+
+      return { ok: true };
     },
     [updateData]
   );
@@ -1148,20 +1362,23 @@ function useDuitStoreInternal() {
   const { txs, scheds, goals, moods, wallets } = data;
 
   // Gross totals include goal transfers – needed for wallet balance.
+  // Exclude carry-forward entries (display only, not real money flows).
   const totalInGross = txs
-    .filter((transaction) => transaction.type === "in")
+    .filter((transaction) => transaction.type === "in" && !transaction.isCarryForward)
     .reduce((amount, transaction) => amount + transaction.amt, 0);
   const totalOutGross = txs
-    .filter((transaction) => transaction.type === "out")
+    .filter((transaction) => transaction.type === "out" && !transaction.isCarryForward)
     .reduce((amount, transaction) => amount + transaction.amt, 0);
 
-  // Reporting totals exclude goal transfers and wallet transfers – they are
-  // internal moves, not real income/spending.
+  // Reporting totals: wallet transfers and carry-forward are never real flows.
+  // Goal funding ("out" + goalId) is savings, not spending — excluded from expense.
+  // Goal withdrawal ("in" + goalId) returns money to wallet — included as income.
+  const isRealFlow = (t: Transaction) => !t.transferId && !t.isCarryForward && !(t.goalId && t.type === "out");
   const totalIn = txs
-    .filter((transaction) => transaction.type === "in" && !transaction.goalId && !transaction.transferId)
+    .filter((transaction) => transaction.type === "in" && isRealFlow(transaction))
     .reduce((amount, transaction) => amount + transaction.amt, 0);
   const totalOut = txs
-    .filter((transaction) => transaction.type === "out" && !transaction.goalId && !transaction.transferId)
+    .filter((transaction) => transaction.type === "out" && isRealFlow(transaction))
     .reduce((amount, transaction) => amount + transaction.amt, 0);
 
   const initialWalletBalance = wallets.reduce((amount, wallet) => amount + wallet.balance, 0);
@@ -1169,20 +1386,20 @@ function useDuitStoreInternal() {
 
   const thisMonth = todayStr().slice(0, 7);
   const outMonth = txs
-    .filter((transaction) => transaction.type === "out" && !transaction.goalId && !transaction.transferId && transaction.date?.startsWith(thisMonth))
+    .filter((transaction) => transaction.type === "out" && isRealFlow(transaction) && transaction.date?.startsWith(thisMonth))
     .reduce((amount, transaction) => amount + transaction.amt, 0);
   const inMonth = txs
-    .filter((transaction) => transaction.type === "in" && !transaction.goalId && !transaction.transferId && transaction.date?.startsWith(thisMonth))
+    .filter((transaction) => transaction.type === "in" && isRealFlow(transaction) && transaction.date?.startsWith(thisMonth))
     .reduce((amount, transaction) => amount + transaction.amt, 0);
 
   const totalSaved = goals.reduce((amount, goal) => amount + goal.current, 0);
 
   const today = todayStr();
   const todayIncome = txs
-    .filter((transaction) => transaction.type === "in" && !transaction.goalId && !transaction.transferId && transaction.date === today)
+    .filter((transaction) => transaction.type === "in" && isRealFlow(transaction) && transaction.date === today)
     .reduce((amount, transaction) => amount + transaction.amt, 0);
   const todayExpense = txs
-    .filter((transaction) => transaction.type === "out" && !transaction.goalId && !transaction.transferId && transaction.date === today)
+    .filter((transaction) => transaction.type === "out" && isRealFlow(transaction) && transaction.date === today)
     .reduce((amount, transaction) => amount + transaction.amt, 0);
 
   const todaySchedules = scheds
@@ -1203,7 +1420,7 @@ function useDuitStoreInternal() {
   );
 
   const categories = txs
-    .filter((transaction) => transaction.type === "out" && !transaction.goalId && !transaction.transferId)
+    .filter((transaction) => transaction.type === "out" && isRealFlow(transaction))
     .reduce<Record<string, number>>((result, transaction) => {
       const category = transaction.cat || "Lainnya";
       result[category] = (result[category] || 0) + transaction.amt;
@@ -1214,7 +1431,9 @@ function useDuitStoreInternal() {
   const todayMood = moods[today];
 
   const walletsWithBalance: Wallet[] = wallets.map((wallet) => {
-    const walletTransactions = txs.filter((transaction) => transaction.walletId === wallet.id);
+    const walletTransactions = txs.filter(
+      (transaction) => transaction.walletId === wallet.id && !transaction.isCarryForward
+    );
     const income = walletTransactions
       .filter((transaction) => transaction.type === "in")
       .reduce((amount, transaction) => amount + transaction.amt, 0);
@@ -1251,7 +1470,7 @@ function useDuitStoreInternal() {
     lines.push("");
 
     // ── Transaksi hari ini ──
-    const todayTxList = txs.filter((t) => t.date === today && !t.goalId && !t.transferId);
+    const todayTxList = txs.filter((t) => t.date === today && !t.transferId && !t.isCarryForward && !(t.goalId && t.type === "out"));
     const todayInList = todayTxList.filter((t) => t.type === "in");
     const todayOutList = todayTxList.filter((t) => t.type === "out");
 
@@ -1280,7 +1499,7 @@ function useDuitStoreInternal() {
     // ── Transaksi 7 hari terakhir (selain hari ini) ──
     const sevenDaysAgo = addDaysToDateKey(today, -7);
     const recentTxList = txs
-      .filter((t) => !t.goalId && !t.transferId && t.date !== today && t.date >= sevenDaysAgo)
+      .filter((t) => !t.transferId && !t.isCarryForward && !(t.goalId && t.type === "out") && t.date !== today && t.date >= sevenDaysAgo)
       .slice(0, 30);
 
     if (recentTxList.length > 0) {

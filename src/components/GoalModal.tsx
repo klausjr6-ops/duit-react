@@ -4,6 +4,7 @@ import { useStore } from "../lib/store";
 import { useTheme } from "../lib/ThemeContext";
 import { useModalDialog } from "../hooks/useModalDialog";
 import { toast } from "../hooks/useToast";
+import { formatRupiah } from "../lib/format";
 import { IconClose, GOAL_ICONS } from "../utils/icons";
 
 interface Props {
@@ -11,12 +12,13 @@ interface Props {
 }
 
 export default function GoalModal({ onClose }: Props) {
-  const { addGoal } = useStore();
+  const { wallets, addGoal } = useStore();
   const { isDark } = useTheme();
 
   const [name, setName] = useState("");
   const [target, setTarget] = useState("");
   const [current, setCurrent] = useState("");
+  const [walletId, setWalletId] = useState("");
   const [deadline, setDeadline] = useState("");
   const [icon, setIcon] = useState(GOAL_ICONS[0].key);
   const [error, setError] = useState<string | null>(null);
@@ -43,14 +45,24 @@ export default function GoalModal({ onClose }: Props) {
       setError("Tabungan awal tidak boleh melebihi target.");
       return;
     }
+    if (currentNum > 0 && !walletId) {
+      setError("Pilih dompet sumber untuk tabungan awal. Dana akan dipindahkan dari dompet ke goal.");
+      return;
+    }
 
-    addGoal({
+    const result = addGoal({
       name: name.trim(),
       target: targetNum,
       current: currentNum,
       deadline: deadline || undefined,
       icon,
+      ...(currentNum > 0 ? { walletId: parseInt(walletId, 10) } : {}),
     });
+
+    if (!result.ok) {
+      setError(result.message || "Gagal menambahkan goal.");
+      return;
+    }
 
     toast.success(`Goal "${name.trim()}" berhasil ditambahkan`);
     onClose();
@@ -127,6 +139,20 @@ export default function GoalModal({ onClose }: Props) {
             <label className={labelCls}>Tabungan Awal (opsional)</label>
             <input type="text" inputMode="numeric" value={current ? `Rp ${formatInputRupiah(current)}` : ""} onChange={(e) => setCurrent(e.target.value.replace(/\D/g, ""))} placeholder="Rp 0" className={inputCls} />
           </div>
+          {parseInt(current.replace(/\D/g, "") || "0", 10) > 0 && (
+            <div>
+              <label className={labelCls}>Dompet Sumber</label>
+              <select value={walletId} onChange={(e) => setWalletId(e.target.value)} className={inputCls}>
+                <option value="">-- Pilih Dompet --</option>
+                {wallets.map((w) => (
+                  <option key={w.id} value={w.id}>{w.name} · {formatRupiah(w.balance)}</option>
+                ))}
+              </select>
+              <p className={`mt-1 text-[10px] ${isDark ? "text-slate-500" : "text-zinc-500"}`}>
+                Dana {formatRupiah(parseInt(current.replace(/\D/g, "") || "0", 10))} akan dipindahkan dari dompet ke goal.
+              </p>
+            </div>
+          )}
           <div>
             <label className={labelCls}>Target Tanggal (opsional)</label>
             <input type="date" value={deadline} onChange={(e) => setDeadline(e.target.value)} className={inputCls} />

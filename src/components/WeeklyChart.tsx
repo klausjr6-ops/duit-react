@@ -20,12 +20,12 @@ export default function WeeklyChart() {
 
     for (let offset = 6; offset >= 0; offset -= 1) {
       const date = addDaysToDateKey(today, -offset);
-      const dayTransactions = txs.filter((transaction) => transaction.date === date);
+      const dayTransactions = txs.filter((transaction) => transaction.date === date && !transaction.isCarryForward);
       const income = dayTransactions
-        .filter((transaction) => transaction.type === "in" && !transaction.goalId && !transaction.transferId)
+        .filter((transaction) => transaction.type === "in" && !transaction.transferId)
         .reduce((amount, transaction) => amount + transaction.amt, 0);
       const expense = dayTransactions
-        .filter((transaction) => transaction.type === "out" && !transaction.goalId && !transaction.transferId)
+        .filter((transaction) => transaction.type === "out" && !transaction.transferId && !transaction.goalId)
         .reduce((amount, transaction) => amount + transaction.amt, 0);
       days.push({ label: weekdayLabel(date), date, in: income, out: expense });
     }

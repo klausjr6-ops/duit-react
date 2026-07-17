@@ -30,7 +30,9 @@ export default function EditTransactionModal({ tx, onClose }: Props) {
   const { dialogRef, onDialogKeyDown } = useModalDialog(true, onClose, inputRef);
 
   const isGoalTx = Boolean(tx.goalId);
+  const isGoalWithdrawal = Boolean(tx.goalId && tx.type === "in");
   const isTransferTx = Boolean(tx.transferId);
+  const isCarryForwardTx = Boolean(tx.isCarryForward);
 
   const formatInputRupiah = (val: string) => {
     const num = val.replace(/\D/g, "");
@@ -42,6 +44,7 @@ export default function EditTransactionModal({ tx, onClose }: Props) {
     setError(null);
     if (isGoalTx) { setError("Transaksi Goal tidak bisa diedit di sini. Gunakan menu Tarik/Nabung Goal."); return; }
     if (isTransferTx) { setError("Transaksi Transfer tidak bisa diedit. Transfer antar dompet tidak dapat diubah manual."); return; }
+    if (isCarryForwardTx) { setError("Transaksi Saldo Bulan Lalu tidak bisa diedit. Entri ini dibuat otomatis."); return; }
     if (!type || !cat || !walletId || !amt) { setError("Lengkapi semua field."); return; }
     const numAmt = parseInt(amt.replace(/\D/g, ""), 10);
     if (Number.isNaN(numAmt) || numAmt <= 0) { setError("Jumlah tidak valid."); return; }
@@ -62,11 +65,18 @@ export default function EditTransactionModal({ tx, onClose }: Props) {
         <div className="flex justify-between items-center mb-5"><h2 className={titleCls}>Edit Transaksi</h2><button aria-label="Tutup" onClick={onClose} className={closeCls}><IconClose size={20} /></button></div>
         {isGoalTx ? (
           <div className="rounded-xl border border-amber-400/30 bg-amber-400/10 p-4 text-sm text-amber-700 dark:text-amber-300">
-            Transaksi Goal ({tx.desc}) tidak bisa diedit manual.<br/>Gunakan menu Nabung / Tarik Goal untuk koreksi.
+            {isGoalWithdrawal
+              ? <>Transaksi penarikan Goal ({tx.desc}) tidak bisa diedit manual.<br/>Penarikan goal sudah tercatat sebagai pemasukan otomatis.</>
+              : <>Transaksi tabungan Goal ({tx.desc}) tidak bisa diedit manual.<br/>Gunakan menu Nabung / Tarik Goal untuk koreksi.</>
+            }
           </div>
         ) : isTransferTx ? (
           <div className="rounded-xl border border-blue-400/30 bg-blue-400/10 p-4 text-sm text-blue-700 dark:text-blue-300">
             Transaksi Transfer tidak bisa diedit manual.<br/>Transfer antar dompet tidak dapat diubah satu per satu.
+          </div>
+        ) : isCarryForwardTx ? (
+          <div className="rounded-xl border border-teal-400/30 bg-teal-400/10 p-4 text-sm text-teal-700 dark:text-teal-300">
+            Transaksi Saldo Bulan Lalu tidak bisa diedit.<br/>Entri ini dibuat otomatis pada awal bulan sebagai sisa saldo bulan sebelumnya.
           </div>
         ) : (
         <form onSubmit={handleSubmit} className="space-y-4">
