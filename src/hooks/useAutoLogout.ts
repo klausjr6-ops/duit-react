@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef } from "react";
 
 const INACTIVITY_MS = 5 * 60 * 1000; // 5 menit
 const SESSION_EXPIRED_KEY = "duit_session_expired";
+const LAST_ACTIVITY_KEY = "duit_last_activity";
 
 const EVENTS: (keyof WindowEventMap)[] = [
   "mousedown",
@@ -12,8 +13,40 @@ const EVENTS: (keyof WindowEventMap)[] = [
   "click",
 ];
 
+/** Update last activity timestamp in localStorage (persists across browser restarts). */
+export function stampActivity(): void {
+  try {
+    localStorage.setItem(LAST_ACTIVITY_KEY, Date.now().toString());
+  } catch {
+    // localStorage unavailable — non-critical
+  }
+}
+
+/**
+ * Check if the session is stale — i.e. the app was closed and reopened
+ * after more than INACTIVITY_MS (5 min) with no user activity.
+ * Returns false if no timestamp exists (first use or cleared storage).
+ */
+export function isSessionStale(): boolean {
+  try {
+    const raw = localStorage.getItem(LAST_ACTIVITY_KEY);
+    if (!raw) return false; // No record = first use, not stale
+    const lastActivity = parseInt(raw, 10);
+    if (isNaN(lastActivity)) return false;
+    return Date.now() - lastActivity > INACTIVITY_MS;
+  } catch {
+    return false;
+  }
+}
+
 /**
  * Hook auto-logout setelah 5 menit tidak ada aktivitas.
+ *
+ * Dua mekanisme:
+ * 1. **In-session timer** — saat app terbuka, timer 5 menit tanpa aktivitas → logout
+ * 2. **Cross-session stale check** — saat app dibuka kembali (mobile/browser restart),
+ *    cek localStorage timestamp → jika > 5 menit, force logout
+ *
  * Saat logout otomatis terjadi, flag disimpan di sessionStorage
  * agar halaman login bisa menampilkan notifikasi "Sesi telah berakhir".
  */
@@ -26,6 +59,9 @@ export function useAutoLogout(onLogout: () => Promise<void>) {
     if (timerRef.current) {
       clearTimeout(timerRef.current);
     }
+
+    // Stamp activity to localStorage for cross-session detection
+    stampActivity();
 
     // Logout setelah 5 menit penuh tanpa warning
     timerRef.current = setTimeout(() => {

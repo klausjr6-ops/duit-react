@@ -15,6 +15,7 @@ import {
   type User,
 } from "firebase/auth";
 import { auth, googleProvider } from "./firebase";
+import { stampActivity } from "../hooks/useAutoLogout";
 
 interface AuthContextType {
   user: User | null;
@@ -44,6 +45,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const loginEmail = async (email: string, password: string) => {
     await signInWithEmailAndPassword(auth, email, password);
+    stampActivity();
   };
 
   const registerEmail = async (email: string, password: string, name: string) => {
@@ -51,10 +53,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (name.trim()) {
       await updateProfile(cred.user, { displayName: name.trim() });
     }
+    stampActivity();
   };
 
   const loginGoogle = async () => {
     await signInWithPopup(auth, googleProvider);
+    stampActivity();
   };
 
   const resetPassword = async (email: string) => {
