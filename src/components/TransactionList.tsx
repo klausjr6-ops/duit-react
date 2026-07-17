@@ -186,8 +186,12 @@ export default function TransactionList({ filterWallet = "all", onAddClick }: Pr
         onClose={() => setTransactionToDelete(null)}
         onConfirm={() => {
           if (transactionToDelete) {
-            delTx(transactionToDelete.id);
-            toast.success("Transaksi dihapus");
+            if (transactionToDelete.isCarryForward) {
+              toast.error("Transaksi Saldo Bulan Lalu tidak bisa dihapus. Entri ini dibuat otomatis.");
+            } else {
+              delTx(transactionToDelete.id);
+              toast.success("Transaksi dihapus");
+            }
           }
           setTransactionToDelete(null);
         }}

@@ -806,7 +806,7 @@ function useDuitStoreInternal() {
 
     // Release processing flag after Firestore write settles
     // (setTimeout ensures the flag is held through the current React render cycle)
-    setTimeout(() => { cfProcessingRef.current = false; }, 2000);
+    setTimeout(() => { cfProcessingRef.current = false; }, 5000);
   }, [loadedUserId, uid, loading, data.txs, data.wallets]);
 
   /* ─── Derived: settings dengan default ─────────────────────── */
@@ -1423,7 +1423,7 @@ function useDuitStoreInternal() {
     });
 
   const savingsRate = totalIn > 0 ? Math.max(0, (totalIn - totalOut) / totalIn) : 0;
-  const overspend = inMonth > 0 && outMonth > inMonth;
+  const overspend = outMonth > inMonth;
   const score = Math.max(
     0,
     Math.min(

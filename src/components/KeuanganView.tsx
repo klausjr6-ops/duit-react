@@ -27,11 +27,11 @@ export default function KeuanganView({ quickType, quickNonce, onQuickDone }: Keu
   const { wallets, addTx, inMonth, outMonth, balance, txs } = useStore();
   const { isDark } = useTheme();
 
-  // Calculate "Saldo Bulan Lalu" for current month display
+  // Calculate total "Saldo Bulan Lalu" for current month display
   const thisMonth = todayStr().slice(0, 7);
-  const currentCF = txs.find(
-    (t) => t.isCarryForward && t.date === `${thisMonth}-01`
-  );
+  const cfTotal = txs
+    .filter(t => t.isCarryForward && t.date === `${thisMonth}-01`)
+    .reduce((sum, t) => sum + t.amt, 0);
 
   const [type, setType] = useState<"" | "in" | "out">("");
   const [cat, setCat] = useState("");
@@ -119,7 +119,7 @@ export default function KeuanganView({ quickType, quickNonce, onQuickDone }: Keu
         </div>
       </div>
 
-      {currentCF && (
+      {cfTotal > 0 && (
         <motion.div
           initial={{ opacity: 0, y: -8 }}
           animate={{ opacity: 1, y: 0 }}
@@ -133,7 +133,7 @@ export default function KeuanganView({ quickType, quickNonce, onQuickDone }: Keu
             <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
           </svg>
           <span className="text-sm font-semibold">Saldo Bulan Lalu:</span>
-          <span className="text-sm font-bold">{formatRupiah(currentCF.amt)}</span>
+          <span className="text-sm font-bold">{formatRupiah(cfTotal)}</span>
           <span className={`text-xs ${isDark ? "text-slate-500" : "text-zinc-400"}`}>
             (sisa saldo bulan sebelumnya)
           </span>
