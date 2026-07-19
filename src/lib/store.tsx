@@ -922,24 +922,20 @@ function useDuitStoreInternal() {
         // Block editing of carry-forward entries (auto-generated)
         if (existing.isCarryForward) return previous;
 
-        // If changing walletId on an "out" tx, validate the new wallet has balance
-        if (patch.walletId !== undefined && patch.walletId !== existing.walletId && existing.type === "out") {
-          const newAmt = patch.amt ?? existing.amt;
-          const sourceBalance = getWalletBalance(previous, patch.walletId);
-          if (sourceBalance !== null && sourceBalance < newAmt) return previous;
-        }
+        // Determine the FINAL type after patch is applied
+        const finalType = patch.type ?? existing.type;
+        const finalWalletId = patch.walletId ?? existing.walletId;
+        const finalAmt = patch.amt ?? existing.amt;
 
-        // If changing amt on an "out" tx on the same wallet, validate balance
-        if (patch.amt !== undefined && patch.amt !== existing.amt && existing.type === "out" && !existing.goalId) {
-          const walletId = patch.walletId ?? existing.walletId;
-          if (walletId) {
-            const sourceBalance = getWalletBalance(previous, walletId);
-            if (sourceBalance === null) return previous;
-            const oldAmt = existing.amt;
-            // New balance = current balance + oldAmt (undo old tx) - patch.amt (apply new tx)
-            const newBalance = sourceBalance + oldAmt - patch.amt;
-            if (newBalance < 0) return previous;
-          }
+        // Balance validation: if the final type is "out", ensure wallet has sufficient balance
+        if (finalType === "out" && finalWalletId) {
+          const sourceBalance = getWalletBalance(previous, finalWalletId);
+          if (sourceBalance === null) return previous;
+          // Undo old tx effect, then apply new tx effect
+          const oldEffect = existing.type === "out" ? -existing.amt : existing.amt;
+          const newEffect = finalType === "out" ? finalAmt : -finalAmt;
+          const newBalance = sourceBalance + oldEffect - newEffect;
+          if (newBalance < 0) return previous;
         }
 
         return {

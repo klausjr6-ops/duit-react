@@ -48,6 +48,20 @@ export default function EditTransactionModal({ tx, onClose }: Props) {
     if (!type || !cat || !walletId || !amt) { setError("Lengkapi semua field."); return; }
     const numAmt = parseInt(amt.replace(/\D/g, ""), 10);
     if (Number.isNaN(numAmt) || numAmt <= 0) { setError("Jumlah tidak valid."); return; }
+    // Balance check: if changing type to "out" (or staying "out" with different amount/wallet)
+    if (type === "out") {
+      const selectedWallet = wallets.find((w) => w.id === parseInt(walletId, 10));
+      if (selectedWallet) {
+        // Calculate effective balance: undo old tx, apply new tx
+        const oldEffect = tx.type === "out" ? -tx.amt : tx.amt;
+        const newEffect = numAmt; // type is "out"
+        const effectiveBalance = selectedWallet.balance + oldEffect - newEffect;
+        if (effectiveBalance < 0) {
+          setError("Saldo dompet tidak mencukupi setelah perubahan ini.");
+          return;
+        }
+      }
+    }
     updateTx(tx.id, { type, cat, desc: desc || cat, amt: numAmt, date, walletId: parseInt(walletId, 10) });
     toast.success("Transaksi berhasil diperbarui");
     onClose();
