@@ -107,6 +107,7 @@ function DashboardApp() {
     settings,
   } = store;
   const isContextualDashboard = settings.dashboardMode === "contextual";
+  const isContextualHome = isContextualDashboard && active === "home";
 
   // Pull-to-refresh: force Firestore to re-read by briefly detaching and
   // re-attaching the snapshot listener (toggle loadedUserId off then on).
@@ -182,13 +183,15 @@ function DashboardApp() {
         isDark={isDark}
       />
 
-      <Sidebar
-        active={active}
-        setActive={handleNavigation}
-        onAvatarClick={() => setShowAccount(true)}
-      />
+      {!isContextualHome && (
+        <Sidebar
+          active={active}
+          setActive={handleNavigation}
+          onAvatarClick={() => setShowAccount(true)}
+        />
+      )}
 
-      <main className="relative z-10 min-h-screen px-4 pb-28 pt-6 sm:px-8 sm:pt-8 md:ml-20 md:px-5 md:pb-24 lg:px-10">
+      <main className={`relative z-10 min-h-screen px-4 pb-28 pt-6 sm:px-8 sm:pt-8 md:px-5 md:pb-24 lg:px-10 ${isContextualHome ? "md:ml-0" : "md:ml-20"}`}>
         <div className="mx-auto max-w-7xl space-y-6">
           {(syncError || syncing) && (
             <div aria-live="polite">
@@ -223,6 +226,7 @@ function DashboardApp() {
                 onExpenseClick={() => openQuickTransaction("out")}
                 onScheduleClick={() => setActive("calendar")}
                 onGoalClick={() => setActive("target")}
+                onOpenSettings={() => setShowAccount(true)}
               />
             ) : (
               <>

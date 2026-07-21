@@ -16,13 +16,14 @@ interface Props {
   onExpenseClick: () => void;
   onScheduleClick: () => void;
   onGoalClick: () => void;
+  onOpenSettings: () => void;
 }
 
 type Context = "morning" | "afternoon" | "evening" | "monthEnd";
 
 export default function ContextualDashboard(props: Props) {
   const { isDark } = useTheme();
-  const { wallets, goals, todaySchedules } = useStore();
+  const { wallets, goals, todaySchedules, settings } = useStore();
   const { hour } = jakartaTimeParts(props.now);
   const day = Number(dateKeyInJakarta(props.now).slice(-2));
   const context: Context = day >= 28 ? "monthEnd" : hour >= 18 || hour < 4 ? "evening" : hour >= 12 ? "afternoon" : "morning";
@@ -44,8 +45,19 @@ export default function ContextualDashboard(props: Props) {
   const label = isDark ? "text-slate-500" : "text-zinc-500";
   const main = isDark ? "text-white" : "text-zinc-900";
   const muted = isDark ? "text-slate-400" : "text-zinc-500";
+  const dayText = new Intl.DateTimeFormat("id-ID", { timeZone: "Asia/Jakarta", weekday: "long", day: "2-digit", month: "long", year: "numeric" }).format(props.now).toUpperCase();
+  const greeting = hour < 11 ? "Selamat pagi" : hour < 15 ? "Halo lagi" : hour < 18 ? "Selamat sore" : "Kamu sudah sampai di penghujung hari";
 
   return <div className="space-y-6">
+    <div className="flex items-center justify-between">
+      <div className={`flex items-center gap-2 text-xl font-extrabold tracking-tight ${main}`}><span className="grid h-9 w-9 place-items-center rounded-xl bg-gradient-to-br from-teal-400 to-blue-500 text-lg text-white shadow-lg shadow-teal-500/20">D</span>DUIT</div>
+      <button type="button" onClick={props.onOpenSettings} aria-label="Buka pengaturan akun" className={`grid h-9 w-9 place-items-center rounded-full text-sm font-bold ${isDark ? "bg-teal-400/15 text-teal-200" : "bg-teal-100 text-teal-700"}`}>{settings.name?.slice(0, 1).toUpperCase() || "K"}</button>
+    </div>
+    <header className="pt-1">
+      <p className={`text-[10px] font-extrabold tracking-[0.16em] ${isDark ? "text-teal-300" : "text-teal-700"}`}>{dayText} · {context === "monthEnd" ? "PENUTUP BULAN" : context === "evening" ? "MALAM" : context === "afternoon" ? "SIANG" : "PAGI"}</p>
+      <h1 className={`mt-2 text-3xl font-extrabold tracking-tight sm:text-[32px] ${main}`}>{greeting}{settings.name && settings.name !== "Kamu" && context !== "evening" ? `, ${settings.name}` : "."}</h1>
+      <p className={`mt-1 text-sm ${muted}`}>{context === "morning" ? "Hari ini cukup padat. Mulai dari satu hal yang paling penting." : context === "afternoon" ? "Mari lihat apa yang sudah berjalan sebelum hari berakhir." : context === "evening" ? "Tidak semua harus selesai untuk membuat hari ini berarti." : "Lihat yang sudah berjalan, bukan hanya yang belum tercapai."}</p>
+    </header>
     <section className={`relative overflow-hidden rounded-3xl border p-6 sm:p-7 ${isDark ? "border-white/10 bg-slate-900/70" : "border-teal-100 bg-white shadow-sm"}`}>
       <div className={`absolute inset-x-0 top-0 h-1.5 bg-gradient-to-r ${context === "evening" ? "from-slate-500 via-slate-600 to-slate-700" : context === "monthEnd" ? "from-amber-400 via-orange-500 to-rose-400" : context === "afternoon" ? "from-cyan-400 via-blue-500 to-indigo-500" : "from-teal-400 via-cyan-400 to-blue-500"}`} />
       <div className="pointer-events-none absolute -right-24 -top-24 h-64 w-64 rounded-full bg-teal-400/15 blur-3xl" />
