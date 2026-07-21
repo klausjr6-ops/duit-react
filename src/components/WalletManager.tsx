@@ -39,12 +39,13 @@ export default function WalletManager({ onClose }: Props) {
       setError("Nama dompet sudah digunakan.");
       return;
     }
-    addWallet({
+    const result = addWallet({
       name: name.trim(),
       balance: parseInt(initBalance.replace(/\D/g, "") || "0"),
       icon,
       color,
     });
+    if (!result.ok) { setError(result.message || "Dompet belum berhasil ditambahkan."); return; }
     toast.success(`Dompet "${name.trim()}" berhasil ditambahkan`);
     setName(""); setIcon(WALLET_ICONS[0].key); setColor(WALLET_COLORS[0].key); setInitBalance("");
   };

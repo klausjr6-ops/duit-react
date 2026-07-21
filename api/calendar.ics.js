@@ -114,13 +114,11 @@ function todayInJakarta() {
   return `${get("year")}-${get("month")}-${get("day")}`;
 }
 
-function nextDateForDay(dayName) {
+function legacyAnchorDate(dayName) {
+  // Stable Sunday anchor: legacy weekly schedules must not change DTSTART
+  // every time a calendar client refreshes this feed.
   const targetIndex = DAYS_ORDER.indexOf(dayName);
-  const today = todayInJakarta();
-  if (targetIndex < 0) return today;
-
-  const offset = (targetIndex - dayIndexFromDateKey(today) + 7) % 7;
-  return addDaysToDateKey(today, offset);
+  return targetIndex < 0 ? "2000-01-02" : addDaysToDateKey("2000-01-02", targetIndex);
 }
 
 function scheduleRule(schedule, startDate) {
@@ -178,7 +176,7 @@ export default async function handler(req, res) {
     ];
 
     schedules.forEach((schedule) => {
-      const startDate = schedule.date || nextDateForDay(schedule.day);
+      const startDate = schedule.date || legacyAnchorDate(schedule.day);
       if (!isValidDateKey(startDate) || !isValidTime(schedule.start)) return;
       const endTime = schedule.end && isValidTime(schedule.end)
         ? schedule.end

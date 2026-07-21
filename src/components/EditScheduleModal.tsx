@@ -30,7 +30,8 @@ export default function EditScheduleModal({ sched, onClose }: Props) {
     if (end && end <= start) { setError("Jam selesai harus setelah jam mulai."); return; }
     if (recurring && !untilDate) { setError("Isi tanggal batas pengulangan."); return; }
     if (recurring && untilDate < date) { setError("Tanggal batas tidak boleh sebelum tanggal mulai."); return; }
-    updateSched(sched.id, { name: name.trim(), desc: desc.trim() || undefined, date, start, end: end || undefined, recurring, untilDate: recurring ? untilDate : undefined, icon });
+    const result = updateSched(sched.id, { name: name.trim(), desc: desc.trim() || undefined, date, start, end: end || undefined, recurring, untilDate: recurring ? untilDate : undefined, icon });
+    if (!result.ok) { setError(result.message || "Jadwal belum berhasil diperbarui."); return; }
     toast.success(`Jadwal "${name.trim()}" berhasil diperbarui`);
     onClose();
   };

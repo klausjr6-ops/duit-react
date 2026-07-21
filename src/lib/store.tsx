@@ -242,6 +242,28 @@ function toTimeValue(value: unknown, fallback = "09:00"): string {
   return hour >= 0 && hour <= 23 && minute >= 0 && minute <= 59 ? raw : fallback;
 }
 
+function isValidDateKey(value: unknown): value is string {
+  return typeof value === "string" && toDateKey(value, "") === value;
+}
+
+function isValidTime(value: unknown): value is string {
+  return typeof value === "string" && toTimeValue(value, "") === value;
+}
+
+function validateScheduleInput(schedule: Omit<ScheduleItem, "id">): string | null {
+  if (!schedule.name?.trim()) return "Nama jadwal harus diisi.";
+  if (!isValidDateKey(schedule.date) || !isValidTime(schedule.start)) {
+    return "Tanggal atau jam mulai tidak valid.";
+  }
+  if (schedule.end && (!isValidTime(schedule.end) || schedule.end <= schedule.start)) {
+    return "Jam selesai harus setelah jam mulai.";
+  }
+  if (schedule.untilDate && (!isValidDateKey(schedule.untilDate) || schedule.untilDate < schedule.date)) {
+    return "Tanggal batas pengulangan tidak valid.";
+  }
+  return null;
+}
+
 function toThemeMode(value: unknown): ThemeMode | undefined {
   return value === "system" || value === "time" || value === "light" || value === "dark"
     ? value
@@ -895,8 +917,14 @@ function useDuitStoreInternal() {
      ══════════════════════════════════════════════════════════ */
   const addTx = useCallback(
     (tx: Omit<Transaction, "id">): { ok: boolean; message?: string } => {
+      if ((tx.type !== "in" && tx.type !== "out") || !Number.isFinite(tx.amt) || tx.amt <= 0) {
+        return { ok: false, message: "Data transaksi atau nominal tidak valid." };
+      }
+      if (!isValidDateKey(tx.date)) {
+        return { ok: false, message: "Tanggal transaksi tidak valid." };
+      }
       // Validate wallet exists for any transaction with walletId
-      if (tx.walletId) {
+      if (tx.walletId !== undefined) {
         const walletExists = dataRef.current.wallets.some((w) => w.id === tx.walletId);
         if (!walletExists) {
           return { ok: false, message: "Dompet tidak ditemukan." };
@@ -911,10 +939,16 @@ function useDuitStoreInternal() {
       }
       const transaction: Transaction = { ...tx, id: createId() };
       updateData((previous) => {
-        // Double-check inside updater (safety net for race conditions)
-        if (transaction.type === "out" && transaction.walletId) {
+        // Double-check every invariant against the fresh transaction data.
+        if (
+          (transaction.type !== "in" && transaction.type !== "out") ||
+          !Number.isFinite(transaction.amt) || transaction.amt <= 0 ||
+          !isValidDateKey(transaction.date) ||
+          (transaction.walletId !== undefined && !previous.wallets.some((wallet) => wallet.id === transaction.walletId))
+        ) return previous;
+        if (transaction.type === "out" && transaction.walletId !== undefined) {
           const bal = getWalletBalance(previous, transaction.walletId);
-          if (bal !== null && bal < transaction.amt) return previous;
+          if (bal === null || bal < transaction.amt) return previous;
         }
         return {
           ...previous,
@@ -1030,12 +1064,15 @@ function useDuitStoreInternal() {
      SCHEDULES
      ══════════════════════════════════════════════════════════ */
   const addSched = useCallback(
-    (schedule: Omit<ScheduleItem, "id">) => {
-      const item: ScheduleItem = { ...schedule, id: createId() };
-      updateData((previous) => ({
-        ...previous,
-        scheds: [...previous.scheds, item],
-      }));
+    (schedule: Omit<ScheduleItem, "id">): { ok: boolean; message?: string } => {
+      const validationError = validateScheduleInput(schedule);
+      if (validationError) return { ok: false, message: validationError };
+      const item: ScheduleItem = { ...schedule, name: schedule.name.trim(), id: createId() };
+      updateData((previous) => {
+        if (validateScheduleInput(schedule)) return previous;
+        return { ...previous, scheds: [...previous.scheds, item] };
+      });
+      return { ok: true };
     },
     [updateData]
   );
@@ -1050,11 +1087,22 @@ function useDuitStoreInternal() {
   );
 
   const updateSched = useCallback(
-    (id: number, patch: Partial<Omit<ScheduleItem, "id">>) =>
-      updateData((previous) => ({
-        ...previous,
-        scheds: previous.scheds.map((s) => (s.id === id ? { ...s, ...patch } : s)),
-      })),
+    (id: number, patch: Partial<Omit<ScheduleItem, "id">>): { ok: boolean; message?: string } => {
+      const existing = dataRef.current.scheds.find((schedule) => schedule.id === id);
+      if (!existing) return { ok: false, message: "Jadwal tidak ditemukan." };
+      const candidate = { ...existing, ...patch };
+      const validationError = validateScheduleInput(candidate);
+      if (validationError) return { ok: false, message: validationError };
+      updateData((previous) => {
+        const current = previous.scheds.find((schedule) => schedule.id === id);
+        if (!current || validateScheduleInput({ ...current, ...patch })) return previous;
+        return {
+          ...previous,
+          scheds: previous.scheds.map((schedule) => schedule.id === id ? { ...schedule, ...patch, name: candidate.name.trim() } : schedule),
+        };
+      });
+      return { ok: true };
+    },
     [updateData]
   );
 
@@ -1065,6 +1113,13 @@ function useDuitStoreInternal() {
     (goal: Omit<Goal, "id"> & { walletId?: number }): { ok: boolean; message?: string } => {
       const currentAmt = goal.current || 0;
       const walletId = goal.walletId;
+      if (!goal.name?.trim() || !Number.isFinite(goal.target) || goal.target <= 0 ||
+        !Number.isFinite(currentAmt) || currentAmt < 0 || currentAmt > goal.target) {
+        return { ok: false, message: "Data goal tidak valid." };
+      }
+      if (goal.deadline && !isValidDateKey(goal.deadline)) {
+        return { ok: false, message: "Tanggal target goal tidak valid." };
+      }
 
       // If initial savings > 0, wallet must be specified and have sufficient balance
       if (currentAmt > 0) {
@@ -1097,7 +1152,10 @@ function useDuitStoreInternal() {
       } : null;
 
       updateData((previous) => {
-        // Double-check balance inside updater for race-condition safety
+        // Double-check invariant and balance inside updater for race safety.
+        if (!item.name.trim() || !Number.isFinite(item.target) || item.target <= 0 ||
+          !Number.isFinite(item.current) || item.current < 0 || item.current > item.target ||
+          (item.deadline && !isValidDateKey(item.deadline))) return previous;
         if (fundingTx && fundingTx.walletId) {
           const bal = getWalletBalance(previous, fundingTx.walletId);
           if (bal === null || bal < fundingTx.amt) {
@@ -1297,12 +1355,16 @@ function useDuitStoreInternal() {
      WALLETS
      ══════════════════════════════════════════════════════════ */
   const addWallet = useCallback(
-    (wallet: Omit<Wallet, "id">) => {
-      const item: Wallet = { ...wallet, id: createId() };
-      updateData((previous) => ({
-        ...previous,
-        wallets: [...previous.wallets, item],
-      }));
+    (wallet: Omit<Wallet, "id">): { ok: boolean; message?: string } => {
+      if (!wallet.name?.trim() || !Number.isFinite(wallet.balance) || wallet.balance < 0) {
+        return { ok: false, message: "Data dompet atau saldo awal tidak valid." };
+      }
+      const item: Wallet = { ...wallet, name: wallet.name.trim(), id: createId() };
+      updateData((previous) => {
+        if (!item.name || !Number.isFinite(item.balance) || item.balance < 0) return previous;
+        return { ...previous, wallets: [...previous.wallets, item] };
+      });
+      return { ok: true };
     },
     [updateData]
   );
