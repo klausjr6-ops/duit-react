@@ -476,6 +476,35 @@ export default function AccountModal({ open, onClose }: AccountModalProps) {
                     </div>
                   </div>
 
+                  <div className="mb-4">
+                    <label className={`mb-2 block text-xs font-medium ${isDark ? "text-slate-400" : "text-zinc-600"}`}>
+                      Dashboard
+                    </label>
+                    <div className={`rounded-2xl border p-1 ${isDark ? "border-white/10 bg-white/5" : "border-zinc-200 bg-zinc-100"}`}>
+                      {([
+                        { id: "default", title: "Default", desc: "Susunan card selalu sama." },
+                        { id: "contextual", title: "Kontekstual", desc: "Prioritas dashboard mengikuti waktu dan kondisi hari ini." },
+                      ] as const).map((option) => {
+                        const active = (settings.dashboardMode || "default") === option.id;
+                        return (
+                          <button
+                            key={option.id}
+                            type="button"
+                            onClick={() => updateSettings({ dashboardMode: option.id })}
+                            className={`w-full rounded-xl px-3 py-3 text-left transition-all ${active
+                              ? isDark ? "bg-teal-400/15 text-white shadow-sm" : "bg-white text-zinc-900 shadow-sm"
+                              : isDark ? "text-slate-400 hover:bg-white/5" : "text-zinc-600 hover:bg-white/70"}`}
+                          >
+                            <span className="flex items-center justify-between gap-3">
+                              <span><span className="block text-sm font-semibold">{option.title}</span><span className={`mt-0.5 block text-xs font-normal ${isDark ? "text-slate-500" : "text-zinc-500"}`}>{option.desc}</span></span>
+                              <span className={`h-4 w-4 shrink-0 rounded-full border-2 ${active ? "border-teal-500 bg-teal-500 shadow-[inset_0_0_0_3px_white]" : isDark ? "border-slate-600" : "border-zinc-300"}`} />
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
                   <div className="mt-4 mb-4 space-y-2">
                     <button
                       type="button"

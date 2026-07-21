@@ -8,6 +8,7 @@ import StatCard from "./components/StatCard";
 import TimelineCard from "./components/TimelineCard";
 import MoodCard from "./components/MoodCard";
 import ReportCard from "./components/ReportCard";
+import ContextualDashboardBanner from "./components/ContextualDashboardBanner";
 import PullToRefreshIndicator from "./components/PullToRefreshIndicator";
 import DraggableFAB from "./components/DraggableFAB";
 import ToastContainer from "./components/ToastContainer";
@@ -103,7 +104,9 @@ function DashboardApp() {
     loadedUserId,
     syncing,
     syncError,
+    settings,
   } = store;
+  const isContextualDashboard = settings.dashboardMode === "contextual";
 
   // Pull-to-refresh: force Firestore to re-read by briefly detaching and
   // re-attaching the snapshot listener (toggle loadedUserId off then on).
@@ -211,7 +214,22 @@ function DashboardApp() {
             <>
               <Header now={now} score={score} />
 
-              <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+              {isContextualDashboard && (
+                <ContextualDashboardBanner
+                  now={now}
+                  scheduleCount={todaySchedules.length}
+                  inMonth={inMonth}
+                  outMonth={outMonth}
+                  onAction={() => {
+                    const hour = new Intl.DateTimeFormat("en-US", { timeZone: "Asia/Jakarta", hour: "2-digit", hourCycle: "h23" })
+                      .formatToParts(now).find((part) => part.type === "hour")?.value;
+                    setActive(hour && Number(hour) >= 18 ? "home" : "calendar");
+                    if (hour && Number(hour) >= 18) window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" });
+                  }}
+                />
+              )}
+
+              <div className={`grid grid-cols-1 gap-6 lg:grid-cols-3 ${isContextualDashboard ? "lg:grid-cols-2" : "lg:grid-cols-3"}`}>
                 <ClockCard now={now} />
                 <HealthCard score={score} />
                 <TodayCard

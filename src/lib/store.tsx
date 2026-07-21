@@ -60,12 +60,15 @@ export interface MoodEntry {
 }
 
 export type ThemeMode = "system" | "time" | "light" | "dark";
+export type DashboardMode = "default" | "contextual";
 export type FabCorner = "top-left" | "top-right" | "bottom-left" | "bottom-right";
 
 export interface Settings {
   name: string;
   avatar?: string;
   themeMode?: ThemeMode;
+  /** Whether the home dashboard stays fixed or adapts its card priority to context. */
+  dashboardMode?: DashboardMode;
   /** Secret capability used by the private iCalendar feed. */
   calendarToken?: string;
   /** Preferred FAB corner position — synced to Firestore. */
@@ -270,6 +273,10 @@ function toThemeMode(value: unknown): ThemeMode | undefined {
     : undefined;
 }
 
+function toDashboardMode(value: unknown): DashboardMode | undefined {
+  return value === "default" || value === "contextual" ? value : undefined;
+}
+
 function sanitizeTransaction(value: unknown): Transaction | null {
   if (!isRecord(value)) return null;
   const type = value.type === "in" || value.type === "out" ? value.type : null;
@@ -355,6 +362,7 @@ function sanitizeSettings(value: unknown): Partial<Settings> {
   if (!isRecord(value)) return { name: "Kamu", themeMode: "time" };
 
   const themeMode = toThemeMode(value.themeMode);
+  const dashboardMode = toDashboardMode(value.dashboardMode);
   const avatar = typeof value.avatar === "string" && value.avatar.startsWith("data:image/")
     ? value.avatar
     : undefined;
@@ -369,6 +377,7 @@ function sanitizeSettings(value: unknown): Partial<Settings> {
   return {
     name: toStringValue(value.name, "Kamu").trim().slice(0, 80) || "Kamu",
     themeMode: themeMode ?? "time",
+    dashboardMode: dashboardMode ?? "default",
     ...(avatar ? { avatar } : {}),
     ...(calendarToken ? { calendarToken } : {}),
     ...(fabCorner ? { fabCorner } : {}),
@@ -894,7 +903,7 @@ function useDuitStoreInternal() {
 
   /* ─── Derived: settings dengan default ─────────────────────── */
   const settings: Settings = useMemo(
-    () => ({ name: "Kamu", themeMode: "time", ...data.settings }),
+    () => ({ name: "Kamu", themeMode: "time", dashboardMode: "default", ...data.settings }),
     [data.settings]
   );
 
