@@ -8,7 +8,7 @@ import StatCard from "./components/StatCard";
 import TimelineCard from "./components/TimelineCard";
 import MoodCard from "./components/MoodCard";
 import ReportCard from "./components/ReportCard";
-import ContextualDashboard from "./components/ContextualDashboard";
+import ContextualDashboardBanner from "./components/ContextualDashboardBanner";
 import PullToRefreshIndicator from "./components/PullToRefreshIndicator";
 import DraggableFAB from "./components/DraggableFAB";
 import ToastContainer from "./components/ToastContainer";
@@ -107,7 +107,6 @@ function DashboardApp() {
     settings,
   } = store;
   const isContextualDashboard = settings.dashboardMode === "contextual";
-  const isContextualHome = isContextualDashboard && active === "home";
 
   // Pull-to-refresh: force Firestore to re-read by briefly detaching and
   // re-attaching the snapshot listener (toggle loadedUserId off then on).
@@ -183,15 +182,13 @@ function DashboardApp() {
         isDark={isDark}
       />
 
-      {!isContextualHome && (
-        <Sidebar
-          active={active}
-          setActive={handleNavigation}
-          onAvatarClick={() => setShowAccount(true)}
-        />
-      )}
+      <Sidebar
+        active={active}
+        setActive={handleNavigation}
+        onAvatarClick={() => setShowAccount(true)}
+      />
 
-      <main className={`relative z-10 min-h-screen px-4 pb-28 pt-6 sm:px-8 sm:pt-8 md:px-5 md:pb-24 lg:px-10 ${isContextualHome ? "md:ml-0" : "md:ml-20"}`}>
+      <main className="relative z-10 min-h-screen px-4 pb-28 pt-6 sm:px-8 sm:pt-8 md:ml-20 md:px-5 md:pb-24 lg:px-10">
         <div className="mx-auto max-w-7xl space-y-6">
           {(syncError || syncing) && (
             <div aria-live="polite">
@@ -214,37 +211,37 @@ function DashboardApp() {
           )}
 
           {active === "home" && (
-            isContextualDashboard ? (
-              <ContextualDashboard
-                now={now}
-                balance={balance}
-                inMonth={inMonth}
-                outMonth={outMonth}
-                todayIncome={todayIncome}
-                todayExpense={todayExpense}
-                onIncomeClick={() => openQuickTransaction("in")}
-                onExpenseClick={() => openQuickTransaction("out")}
-                onScheduleClick={() => setActive("calendar")}
-                onGoalClick={() => setActive("target")}
-                onOpenSettings={() => setShowAccount(true)}
-              />
-            ) : (
-              <>
-                <Header now={now} score={score} />
-                <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-                  <ClockCard now={now} />
-                  <HealthCard score={score} />
-                  <TodayCard income={todayIncome} expense={todayExpense} scheduleCount={todaySchedules.length} onIncomeClick={() => openQuickTransaction("in")} onExpenseClick={() => openQuickTransaction("out")} onScheduleClick={() => setActive("calendar")} />
-                </div>
-                <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-                  <StatCard label="TOTAL SALDO" value={balance} color={isDark ? "text-emerald-400" : "text-emerald-600"} accent="linear-gradient(90deg,#00E5C4,#10b981)" />
-                  <StatCard label="PENGELUARAN BULAN INI" value={outMonth} color={isDark ? "text-amber-400" : "text-amber-600"} accent="linear-gradient(90deg,#F5A623,#f59e0b)" delay={0.05} />
-                  <StatCard label="TABUNGAN TERKUMPUL" value={totalSaved} color={isDark ? "text-blue-400" : "text-blue-600"} accent="linear-gradient(90deg,#4A9EFF,#3b82f6)" suffix="dari seluruh goals" delay={0.1} />
-                </div>
-                <div className="grid grid-cols-1 gap-6 lg:grid-cols-2"><TimelineCard /><MoodCard /></div>
-                <ReportCard income={inMonth} expense={outMonth} />
-              </>
-            )
+            <>
+              <Header now={now} score={score} />
+              {isContextualDashboard && (
+                <ContextualDashboardBanner
+                  now={now}
+                  scheduleCount={todaySchedules.length}
+                  inMonth={inMonth}
+                  outMonth={outMonth}
+                  onAction={() => setActive("calendar")}
+                />
+              )}
+              <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+                <ClockCard now={now} />
+                <HealthCard score={score} />
+                <TodayCard
+                  income={todayIncome}
+                  expense={todayExpense}
+                  scheduleCount={todaySchedules.length}
+                  onIncomeClick={() => openQuickTransaction("in")}
+                  onExpenseClick={() => openQuickTransaction("out")}
+                  onScheduleClick={() => setActive("calendar")}
+                />
+              </div>
+              <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+                <StatCard label="TOTAL SALDO" value={balance} color={isDark ? "text-emerald-400" : "text-emerald-600"} accent="linear-gradient(90deg,#00E5C4,#10b981)" />
+                <StatCard label="PENGELUARAN BULAN INI" value={outMonth} color={isDark ? "text-amber-400" : "text-amber-600"} accent="linear-gradient(90deg,#F5A623,#f59e0b)" delay={0.05} />
+                <StatCard label="TABUNGAN TERKUMPUL" value={totalSaved} color={isDark ? "text-blue-400" : "text-blue-600"} accent="linear-gradient(90deg,#4A9EFF,#3b82f6)" suffix="dari seluruh goals" delay={0.1} />
+              </div>
+              <div className="grid grid-cols-1 gap-6 lg:grid-cols-2"><TimelineCard /><MoodCard /></div>
+              <ReportCard income={inMonth} expense={outMonth} />
+            </>
           )}
 
           {active === "wallet" && (
