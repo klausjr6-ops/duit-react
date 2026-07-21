@@ -79,7 +79,7 @@ function isSafeImageSource(src: string): boolean {
 
   try {
     const url = new URL(trimmed, window.location.origin);
-    return url.protocol === "https:" || url.protocol === "http:";
+    return url.protocol === "https:";
   } catch {
     return false;
   }
@@ -106,6 +106,7 @@ function renderInlineMarkdown(text: string, keyPrefix: string, isDark: boolean):
             src={src}
             alt={imageAlt || "Gambar dari DUIT"}
             loading="lazy"
+            referrerPolicy="no-referrer"
             className="my-2 max-h-72 max-w-full rounded-xl border border-black/10 object-contain shadow-sm"
           />
         );

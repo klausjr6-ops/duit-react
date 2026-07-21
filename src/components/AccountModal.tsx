@@ -118,6 +118,7 @@ export default function AccountModal({ open, onClose }: AccountModalProps) {
   const [confirmLogout, setConfirmLogout] = useState(false);
   const [confirmReset, setConfirmReset] = useState(false);
   const [confirmImport, setConfirmImport] = useState(false);
+  const [importingBackup, setImportingBackup] = useState(false);
   const [confirmCalendarReset, setConfirmCalendarReset] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
   const [calendarCopied, setCalendarCopied] = useState(false);
@@ -270,13 +271,19 @@ export default function AccountModal({ open, onClose }: AccountModalProps) {
     }
   };
 
-  const confirmImportBackup = () => {
-    if (!pendingImport) return;
-    replaceAll(pendingImport.data);
+  const confirmImportBackup = async () => {
+    if (!pendingImport || importingBackup) return;
+    setImportingBackup(true);
+    const result = await replaceAll(pendingImport.data);
+    setImportingBackup(false);
+    if (!result.ok) {
+      setBackupError(result.message || "Backup belum berhasil diimport.");
+      return;
+    }
     setConfirmImport(false);
     setPendingImport(null);
     toast.success("Backup berhasil diimport");
-    showBackupNotice("Backup berhasil diimport. Data sedang disinkronkan ke cloud.");
+    showBackupNotice("Backup berhasil disimpan ke cloud.");
   };
 
   const handleLogout = async () => {
@@ -721,10 +728,12 @@ export default function AccountModal({ open, onClose }: AccountModalProps) {
         confirmLabel="Ya, Import"
         tone="danger"
         onClose={() => {
+          if (importingBackup) return;
           setConfirmImport(false);
           setPendingImport(null);
         }}
-        onConfirm={confirmImportBackup}
+        onConfirm={() => { void confirmImportBackup(); }}
+        busy={importingBackup}
         isDark={isDark}
       />
       <ConfirmDialog

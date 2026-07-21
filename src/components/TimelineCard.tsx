@@ -1,8 +1,10 @@
 import { motion } from "framer-motion";
+import { useEffect, useState } from "react";
 import Card from "./Card";
 import { useStore, type ScheduleItem } from "../lib/store";
 import { useTheme } from "../lib/ThemeContext";
 import { IconCalendar, getScheduleIcon } from "../utils/icons";
+import { jakartaTimeParts } from "../lib/format";
 
 function timeToHour(t?: string) {
   if (!t) return 0;
@@ -13,8 +15,15 @@ function timeToHour(t?: string) {
 export default function TimelineCard() {
   const { todaySchedules } = useStore();
   const { isDark } = useTheme();
-  const now = new Date();
-  const hour = now.getHours() + now.getMinutes() / 60;
+  const [now, setNow] = useState(() => new Date());
+
+  useEffect(() => {
+    const interval = window.setInterval(() => setNow(new Date()), 30_000);
+    return () => window.clearInterval(interval);
+  }, []);
+
+  const jakartaNow = jakartaTimeParts(now);
+  const hour = jakartaNow.hour + jakartaNow.minute / 60;
 
   const closest =
     todaySchedules.length > 0
@@ -66,7 +75,7 @@ export default function TimelineCard() {
       <div className={`mt-2 flex items-center justify-between text-sm ${muted}`}>
         <span>00:00</span>
         <span className={`font-mono font-semibold ${textMain}`}>
-          {String(now.getHours()).padStart(2, "0")}:{String(now.getMinutes()).padStart(2, "0")}
+          {String(jakartaNow.hour).padStart(2, "0")}:{String(jakartaNow.minute).padStart(2, "0")}
         </span>
         <span>23:59</span>
       </div>

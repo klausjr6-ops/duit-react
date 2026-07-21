@@ -54,6 +54,19 @@ function icalStamp() {
   return `${now.getUTCFullYear()}${pad(now.getUTCMonth() + 1)}${pad(now.getUTCDate())}T${pad(now.getUTCHours())}${pad(now.getUTCMinutes())}${pad(now.getUTCSeconds())}Z`;
 }
 
+function isValidDateKey(dateKey) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateKey || "")) return false;
+  const [year, month, day] = dateKey.split("-").map(Number);
+  const parsed = new Date(Date.UTC(year, month - 1, day));
+  return parsed.getUTCFullYear() === year && parsed.getUTCMonth() === month - 1 && parsed.getUTCDate() === day;
+}
+
+function isValidTime(time) {
+  if (!/^\d{2}:\d{2}$/.test(time || "")) return false;
+  const [hour, minute] = time.split(":").map(Number);
+  return hour >= 0 && hour <= 23 && minute >= 0 && minute <= 59;
+}
+
 function icalDateTime(dateKey, time = "00:00") {
   const [year, month, day] = dateKey.split("-").map(Number);
   const [hour, minute] = time.split(":").map(Number);
@@ -119,7 +132,7 @@ function scheduleRule(schedule, startDate) {
   const byDay = DAY_TO_ICAL[dayName];
   if (!byDay) return null;
 
-  const until = schedule.untilDate ? `;UNTIL=${icalUntil(schedule.untilDate)}` : "";
+  const until = isValidDateKey(schedule.untilDate) ? `;UNTIL=${icalUntil(schedule.untilDate)}` : "";
   return `RRULE:FREQ=WEEKLY;BYDAY=${byDay}${until}`;
 }
 
@@ -166,7 +179,13 @@ export default async function handler(req, res) {
 
     schedules.forEach((schedule) => {
       const startDate = schedule.date || nextDateForDay(schedule.day);
-      const endTime = schedule.end || defaultEndTime(schedule.start);
+      if (!isValidDateKey(startDate) || !isValidTime(schedule.start)) return;
+      const endTime = schedule.end && isValidTime(schedule.end)
+        ? schedule.end
+        : defaultEndTime(schedule.start);
+      // Legacy schedules may cross midnight. iCalendar requires DTEND to be
+      // later than DTSTART, so move the end date to tomorrow in that case.
+      const endDate = endTime <= schedule.start ? addDaysToDateKey(startDate, 1) : startDate;
       const rule = scheduleRule(schedule, startDate);
 
       lines.push(
@@ -174,7 +193,7 @@ export default async function handler(req, res) {
         `UID:sched-${escapeText(schedule.id)}@duit-app`,
         `DTSTAMP:${icalStamp()}`,
         `DTSTART;TZID=Asia/Jakarta:${icalDateTime(startDate, schedule.start)}`,
-        `DTEND;TZID=Asia/Jakarta:${icalDateTime(startDate, endTime)}`,
+        `DTEND;TZID=Asia/Jakarta:${icalDateTime(endDate, endTime)}`,
         `SUMMARY:${escapeText(schedule.name || "Jadwal")}`
       );
 

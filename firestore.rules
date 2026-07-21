@@ -1,0 +1,11 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // The client may access only its own single DUIT data document.
+    // Server-side calendar and chat functions use Firebase Admin and are not
+    // restricted by these client rules.
+    match /users/{userId}/data/main {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+  }
+}

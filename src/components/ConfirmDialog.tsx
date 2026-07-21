@@ -11,6 +11,7 @@ interface ConfirmDialogProps {
   onClose: () => void;
   isDark: boolean;
   tone?: "danger" | "warning";
+  busy?: boolean;
 }
 
 export default function ConfirmDialog({
@@ -22,6 +23,7 @@ export default function ConfirmDialog({
   onClose,
   isDark,
   tone = "danger",
+  busy = false,
 }: ConfirmDialogProps) {
   const { dialogRef, onDialogKeyDown } = useModalDialog(open, onClose);
   const confirmClass = tone === "warning"
@@ -69,13 +71,14 @@ export default function ConfirmDialog({
             <p id="confirm-dialog-message" className={`mt-2 text-sm leading-relaxed ${textClass}`}>{message}</p>
 
             <div className="mt-6 flex gap-3">
-              <button type="button" onClick={onClose} className={cancelClass}>Batal</button>
+              <button type="button" onClick={onClose} disabled={busy} className={`${cancelClass} disabled:cursor-not-allowed disabled:opacity-50`}>Batal</button>
               <button
                 type="button"
                 onClick={onConfirm}
-                className={`flex-1 rounded-xl px-4 py-2.5 text-sm font-bold transition-colors ${confirmClass}`}
+                disabled={busy}
+                className={`flex-1 rounded-xl px-4 py-2.5 text-sm font-bold transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${confirmClass}`}
               >
-                {confirmLabel}
+                {busy ? "Menyimpan..." : confirmLabel}
               </button>
             </div>
           </motion.div>

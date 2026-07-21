@@ -40,9 +40,15 @@ function getSystemIsDark(): boolean {
 }
 
 function getTimeIsDark(date = new Date()): boolean {
-  const hour = date.getHours();
-  // Light 06:00–17:59, dark 18:00–05:59.
-  return hour < 6 || hour >= 18;
+  // Theme time follows the product timezone, not the device timezone.
+  const hourPart = new Intl.DateTimeFormat("en-US", {
+    timeZone: "Asia/Jakarta",
+    hour: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(date).find((part) => part.type === "hour")?.value;
+  const hour = Number(hourPart);
+  // Light 06:00–17:59 WIB, dark 18:00–05:59 WIB.
+  return !Number.isFinite(hour) || hour < 6 || hour >= 18;
 }
 
 function resolveIsDark(mode: ThemeMode, now: Date, systemDark: boolean): boolean {

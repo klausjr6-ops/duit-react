@@ -223,12 +223,23 @@ function toStringValue(value: unknown, fallback = ""): string {
 
 function toDateKey(value: unknown, fallback = todayStr()): string {
   const raw = toStringValue(value, fallback);
-  return /^\d{4}-\d{2}-\d{2}$/.test(raw) ? raw : fallback;
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(raw);
+  if (!match) return fallback;
+  const [year, month, day] = match.slice(1).map(Number);
+  const parsed = new Date(Date.UTC(year, month - 1, day));
+  return (
+    parsed.getUTCFullYear() === year &&
+    parsed.getUTCMonth() === month - 1 &&
+    parsed.getUTCDate() === day
+  ) ? raw : fallback;
 }
 
 function toTimeValue(value: unknown, fallback = "09:00"): string {
   const raw = toStringValue(value, fallback);
-  return /^\d{2}:\d{2}$/.test(raw) ? raw : fallback;
+  const match = /^(\d{2}):(\d{2})$/.exec(raw);
+  if (!match) return fallback;
+  const [hour, minute] = match.slice(1).map(Number);
+  return hour >= 0 && hour <= 23 && minute >= 0 && minute <= 59 ? raw : fallback;
 }
 
 function toThemeMode(value: unknown): ThemeMode | undefined {
@@ -342,23 +353,52 @@ function sanitizeSettings(value: unknown): Partial<Settings> {
   };
 }
 
+function assertUniqueIds(items: Array<{ id: number }>, label: string): void {
+  const ids = new Set<number>();
+  for (const item of items) {
+    if (ids.has(item.id)) throw new Error(`Backup memiliki ID ${label} yang duplikat.`);
+    ids.add(item.id);
+  }
+}
+
 export function sanitizeImportedUserData(value: unknown): UserData {
   if (!isRecord(value)) throw new Error("Format backup tidak valid.");
 
   const wallets = Array.isArray(value.wallets)
     ? value.wallets.map(sanitizeWallet).filter((item): item is Wallet => Boolean(item))
     : [];
+  const txs = Array.isArray(value.txs)
+    ? value.txs.map(sanitizeTransaction).filter((item): item is Transaction => Boolean(item))
+    : [];
+  const scheds = Array.isArray(value.scheds)
+    ? value.scheds.map(sanitizeSchedule).filter((item): item is ScheduleItem => Boolean(item))
+    : [];
+  const goals = Array.isArray(value.goals)
+    ? value.goals.map(sanitizeGoal).filter((item): item is Goal => Boolean(item))
+    : [];
+
+  assertUniqueIds(txs, "transaksi");
+  assertUniqueIds(scheds, "jadwal");
+  assertUniqueIds(goals, "goal");
+  assertUniqueIds(wallets, "dompet");
+
+  // Goal balances have one source of truth: their funding/withdrawal
+  // transactions. Never trust an editable backup's `current` field alone.
+  const goalAmounts = new Map<number, number>();
+  for (const transaction of txs) {
+    if (transaction.goalId === undefined) continue;
+    const delta = transaction.type === "out" ? transaction.amt : -transaction.amt;
+    goalAmounts.set(transaction.goalId, (goalAmounts.get(transaction.goalId) || 0) + delta);
+  }
+  const reconciledGoals = goals.map((goal) => ({
+    ...goal,
+    current: Math.max(0, Math.min(goal.target, goalAmounts.get(goal.id) || 0)),
+  }));
 
   return {
-    txs: Array.isArray(value.txs)
-      ? value.txs.map(sanitizeTransaction).filter((item): item is Transaction => Boolean(item))
-      : [],
-    scheds: Array.isArray(value.scheds)
-      ? value.scheds.map(sanitizeSchedule).filter((item): item is ScheduleItem => Boolean(item))
-      : [],
-    goals: Array.isArray(value.goals)
-      ? value.goals.map(sanitizeGoal).filter((item): item is Goal => Boolean(item))
-      : [],
+    txs,
+    scheds,
+    goals: reconciledGoals,
     moods: isRecord(value.moods)
       ? Object.fromEntries(
           Object.entries(value.moods).flatMap(([date, mood]) => {
@@ -377,6 +417,15 @@ export function sanitizeImportedUserData(value: unknown): UserData {
     settings: sanitizeSettings(value.settings),
     wallets: wallets.length > 0 ? wallets : DEFAULT_WALLETS.map((wallet) => ({ ...wallet })),
   };
+}
+
+function keepFirstUniqueId<T extends { id: number }>(items: T[]): T[] {
+  const ids = new Set<number>();
+  return items.filter((item) => {
+    if (ids.has(item.id)) return false;
+    ids.add(item.id);
+    return true;
+  });
 }
 
 function normalizeUserData(remote?: Partial<UserData>): UserData {
@@ -410,6 +459,14 @@ function normalizeUserData(remote?: Partial<UserData>): UserData {
       ? remote.wallets.map(sanitizeWallet).filter((item): item is Wallet => Boolean(item))
       : DEFAULT_WALLETS.map((wallet) => ({ ...wallet })),
   };
+
+  // Protect core edit/delete operations from malformed legacy documents.
+  // Imported backups are rejected with an error; for an already persisted
+  // legacy document we retain its first occurrence instead of duplicating IDs.
+  result.txs = keepFirstUniqueId(result.txs);
+  result.scheds = keepFirstUniqueId(result.scheds);
+  result.goals = keepFirstUniqueId(result.goals);
+  result.wallets = keepFirstUniqueId(result.wallets);
 
   // Fallback: if all wallets were invalid, provide defaults
   if (result.wallets.length === 0) {
@@ -722,18 +779,22 @@ function useDuitStoreInternal() {
           (t) => !t.isCarryForward && t.walletId === wallet.id && t.date < firstOfMonth
         );
 
-        // Skip if no prior transactions AND wallet has no base balance.
-        // A wallet with base balance but no transactions still has a "bulan lalu" balance.
-        if (prevTxs.length === 0 && wallet.balance <= 0) continue;
+        // Find an existing CF entry before deciding whether it is still valid.
+        const existingCF = currentData.txs.find(
+          (t) => t.isCarryForward && t.date === firstOfMonth && t.walletId === wallet.id
+        );
+
+        // A carry-forward only represents activity that existed before the
+        // target month. A brand-new wallet with only an entered base balance
+        // must not be labelled "Saldo Bulan Lalu".
+        if (prevTxs.length === 0) {
+          if (existingCF) toDeleteIds.add(existingCF.id);
+          continue;
+        }
 
         const income = prevTxs.filter((t) => t.type === "in").reduce((s, t) => s + t.amt, 0);
         const expense = prevTxs.filter((t) => t.type === "out").reduce((s, t) => s + t.amt, 0);
         const expectedAmt = wallet.balance + income - expense;
-
-        // Find existing CF entry for this wallet/month
-        const existingCF = currentData.txs.find(
-          (t) => t.isCarryForward && t.date === firstOfMonth && t.walletId === wallet.id
-        );
 
         if (expectedAmt > 0) {
           if (!existingCF) {
@@ -871,8 +932,9 @@ function useDuitStoreInternal() {
         const tx = previous.txs.find((t) => t.id === id);
         if (!tx) return previous;
 
-        // Block deletion of carry-forward entries (auto-generated)
-        if (tx.isCarryForward) return previous;
+        // Carry-forward and goal transactions are managed by their dedicated
+        // flows, never through the generic transaction delete action.
+        if (tx.isCarryForward || tx.goalId) return previous;
 
         // Collect IDs to remove: the target tx + any paired transfer
         const idsToRemove = new Set([id]);
@@ -927,15 +989,33 @@ function useDuitStoreInternal() {
         const finalWalletId = patch.walletId ?? existing.walletId;
         const finalAmt = patch.amt ?? existing.amt;
 
-        // Balance validation: if the final type is "out", ensure wallet has sufficient balance
-        if (finalType === "out" && finalWalletId) {
-          const sourceBalance = getWalletBalance(previous, finalWalletId);
-          if (sourceBalance === null) return previous;
-          // Undo old tx effect, then apply new tx effect
-          const oldEffect = existing.type === "out" ? -existing.amt : existing.amt;
-          const newEffect = finalType === "out" ? finalAmt : -finalAmt;
-          const newBalance = sourceBalance + oldEffect - newEffect;
-          if (newBalance < 0) return previous;
+        // Validate the wallet(s) independently. When a transaction moves to a
+        // different wallet, its old contribution must be undone in the OLD
+        // wallet — never in the destination wallet.
+        const contributionOld = existing.type === "in" ? existing.amt : -existing.amt;
+        const contributionNew = finalType === "in" ? finalAmt : -finalAmt;
+
+        if (!Number.isFinite(finalAmt) || finalAmt <= 0) return previous;
+        if (finalWalletId !== undefined && !previous.wallets.some((wallet) => wallet.id === finalWalletId)) {
+          return previous;
+        }
+
+        if (existing.walletId === finalWalletId) {
+          if (finalWalletId !== undefined) {
+            const walletBalance = getWalletBalance(previous, finalWalletId);
+            if (walletBalance === null || walletBalance + contributionNew - contributionOld < 0) {
+              return previous;
+            }
+          }
+        } else {
+          if (existing.walletId !== undefined) {
+            const oldWalletBalance = getWalletBalance(previous, existing.walletId);
+            if (oldWalletBalance === null || oldWalletBalance - contributionOld < 0) return previous;
+          }
+          if (finalWalletId !== undefined) {
+            const newWalletBalance = getWalletBalance(previous, finalWalletId);
+            if (newWalletBalance === null || newWalletBalance + contributionNew < 0) return previous;
+          }
         }
 
         return {
@@ -1055,11 +1135,28 @@ function useDuitStoreInternal() {
   );
 
   const updateGoal = useCallback(
-    (id: number, patch: Partial<Omit<Goal, "id" | "current">>) =>
-      updateData((previous) => ({
-        ...previous,
-        goals: previous.goals.map((g) => (g.id === id ? { ...g, ...patch } : g)),
-      })),
+    (id: number, patch: Partial<Omit<Goal, "id" | "current">>): { ok: boolean; message?: string } => {
+      const existing = dataRef.current.goals.find((goal) => goal.id === id);
+      if (!existing) return { ok: false, message: "Goal tidak ditemukan." };
+      const target = patch.target ?? existing.target;
+      if (!Number.isFinite(target) || target <= 0 || target < existing.current) {
+        return { ok: false, message: "Target goal tidak valid atau lebih kecil dari tabungan terkumpul." };
+      }
+
+      updateData((previous) => {
+        const current = previous.goals.find((goal) => goal.id === id);
+        if (!current) return previous;
+        const finalTarget = patch.target ?? current.target;
+        if (!Number.isFinite(finalTarget) || finalTarget <= 0 || finalTarget < current.current) {
+          return previous;
+        }
+        return {
+          ...previous,
+          goals: previous.goals.map((goal) => (goal.id === id ? { ...goal, ...patch } : goal)),
+        };
+      });
+      return { ok: true };
+    },
     [updateData]
   );
 
@@ -1271,22 +1368,48 @@ function useDuitStoreInternal() {
   );
 
   const updateWallet = useCallback(
-    (id: number, patch: Partial<Wallet>) =>
-      updateData((previous) => ({
-        ...previous,
-        wallets: previous.wallets.map((wallet) =>
-          wallet.id === id ? { ...wallet, ...patch } : wallet
-        ),
-      })),
+    (id: number, patch: Partial<Omit<Wallet, "id">>): { ok: boolean; message?: string } => {
+      const existing = dataRef.current.wallets.find((wallet) => wallet.id === id);
+      if (!existing) return { ok: false, message: "Dompet tidak ditemukan." };
+      const balance = patch.balance ?? existing.balance;
+      if (!Number.isFinite(balance) || balance < 0) {
+        return { ok: false, message: "Saldo awal dompet tidak valid." };
+      }
+
+      updateData((previous) => {
+        const current = previous.wallets.find((wallet) => wallet.id === id);
+        if (!current) return previous;
+        const finalBalance = patch.balance ?? current.balance;
+        if (!Number.isFinite(finalBalance) || finalBalance < 0) return previous;
+        return {
+          ...previous,
+          wallets: previous.wallets.map((wallet) =>
+            wallet.id === id ? { ...wallet, ...patch } : wallet
+          ),
+        };
+      });
+      return { ok: true };
+    },
     [updateData]
   );
 
   const transferWallet = useCallback(
     (fromId: number, toId: number, amount: number): { ok: boolean; message?: string } => {
-      // Pre-validate using latest data
+      if (!Number.isFinite(amount) || amount <= 0) {
+        return { ok: false, message: "Jumlah transfer tidak valid." };
+      }
+      if (fromId === toId) {
+        return { ok: false, message: "Dompet asal dan tujuan tidak boleh sama." };
+      }
+
+      // Pre-validate using latest data. The same checks are repeated inside
+      // the updater, where the Firestore transaction has fresh data.
       const sourceBalance = getWalletBalance(dataRef.current, fromId);
       if (sourceBalance === null) {
         return { ok: false, message: "Dompet asal tidak ditemukan." };
+      }
+      if (!dataRef.current.wallets.some((wallet) => wallet.id === toId)) {
+        return { ok: false, message: "Dompet tujuan tidak ditemukan." };
       }
       if (sourceBalance < amount) {
         return { ok: false, message: `Saldo tidak mencukupi. Saldo: Rp${sourceBalance.toLocaleString("id-ID")}` };
@@ -1315,9 +1438,13 @@ function useDuitStoreInternal() {
         transferId,
       };
       updateData((previous) => {
-        // Double-check inside updater (safety net for race conditions)
+        // Double-check every invariant against the current transaction data.
         const bal = getWalletBalance(previous, fromId);
-        if (bal === null || bal < amount) return previous;
+        const destinationExists = previous.wallets.some((wallet) => wallet.id === toId);
+        if (
+          !Number.isFinite(amount) || amount <= 0 || fromId === toId ||
+          bal === null || !destinationExists || bal < amount
+        ) return previous;
         return {
           ...previous,
           txs: [outTx, inTx, ...previous.txs],
@@ -1388,8 +1515,21 @@ function useDuitStoreInternal() {
   );
 
   const replaceAll = useCallback(
-    (nextData: UserData) => updateData(() => sanitizeImportedUserData(nextData)),
-    [updateData]
+    async (nextData: UserData): Promise<{ ok: boolean; message?: string }> => {
+      if (!uid || loadedUserId !== uid) {
+        return { ok: false, message: "Data akun masih dimuat. Coba lagi sebentar." };
+      }
+      let sanitized: UserData;
+      try {
+        sanitized = sanitizeImportedUserData(nextData);
+        await enqueueFirestoreUpdate(() => sanitized);
+        return { ok: true };
+      } catch (error) {
+        console.error("Backup restore error:", error);
+        return { ok: false, message: "Backup belum berhasil disimpan ke cloud. Coba lagi saat koneksi stabil." };
+      }
+    },
+    [enqueueFirestoreUpdate, loadedUserId, uid]
   );
 
   /* ══════════════════════════════════════════════════════════

@@ -27,7 +27,8 @@ export default function EditGoalModal({ goal, onClose }: Props) {
     const targetNum = parseInt(target.replace(/\D/g, ""), 10);
     if (Number.isNaN(targetNum) || targetNum <= 0) { setError("Target tidak valid."); return; }
     if (targetNum < goal.current) { setError(`Target tidak boleh kurang dari tabungan terkumpul (${goal.current.toLocaleString("id-ID")}).`); return; }
-    updateGoal(goal.id, { name: name.trim(), target: targetNum, deadline: deadline || undefined, icon });
+    const result = updateGoal(goal.id, { name: name.trim(), target: targetNum, deadline: deadline || undefined, icon });
+    if (!result.ok) { setError(result.message || "Goal belum berhasil diperbarui."); return; }
     toast.success(`Goal "${name.trim()}" berhasil diperbarui`);
     onClose();
   };

@@ -15,7 +15,9 @@ const requestBuckets = new Map();
 
 function getFirebaseAdminAuth() {
   const encodedServiceAccount = process.env.FIREBASE_SERVICE_ACCOUNT_BASE64;
-  if (!encodedServiceAccount) return null;
+  if (!encodedServiceAccount) {
+    throw new Error("Chat service account is not configured");
+  }
 
   if (!getApps().length) {
     const serviceAccount = JSON.parse(
@@ -29,11 +31,8 @@ function getFirebaseAdminAuth() {
 
 async function hasValidFirebaseSession(req) {
   const adminAuth = getFirebaseAdminAuth();
-  // Backwards-compatible during rollout. Once the same service account needed
-  // by the calendar feed is configured, chat automatically requires a signed-in
-  // Firebase user without changing DUIT's persona or response style.
-  if (!adminAuth) return true;
-
+  // Chat is private: a deployment without Firebase Admin configuration must
+  // fail closed instead of exposing a paid AI endpoint to anonymous traffic.
   const authorization = req.headers?.authorization;
   const token = typeof authorization === "string" && authorization.startsWith("Bearer ")
     ? authorization.slice("Bearer ".length)
@@ -307,7 +306,12 @@ export default async function handler(req, res) {
     }
   } catch (error) {
     console.error("Firebase Admin authentication setup error:", error);
-    res.status(503).json({ error: "Layanan chat belum siap. Coba lagi sebentar." });
+    const notConfigured = error instanceof Error && error.message === "Chat service account is not configured";
+    res.status(503).json({
+      error: notConfigured
+        ? "Layanan chat belum dikonfigurasi. Coba lagi nanti."
+        : "Layanan chat belum siap. Coba lagi sebentar.",
+    });
     return;
   }
 

@@ -28,7 +28,8 @@ export default function EditWalletModal({ wallet, onClose }: Props) {
     if (!name.trim()) { setError("Nama dompet harus diisi."); return; }
     const bal = parseInt(initialBalance.replace(/\D/g, "") || "0", 10);
     if (Number.isNaN(bal) || bal < 0) { setError("Saldo awal tidak valid."); return; }
-    updateWallet(wallet.id, { name: name.trim(), icon, color: colorKey, balance: bal });
+    const result = updateWallet(wallet.id, { name: name.trim(), icon, color: colorKey, balance: bal });
+    if (!result.ok) { setError(result.message || "Dompet belum berhasil diperbarui."); return; }
     toast.success(`Dompet "${name.trim()}" berhasil diperbarui`);
     onClose();
   };

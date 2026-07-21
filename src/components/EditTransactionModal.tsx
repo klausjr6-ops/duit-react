@@ -48,18 +48,27 @@ export default function EditTransactionModal({ tx, onClose }: Props) {
     if (!type || !cat || !walletId || !amt) { setError("Lengkapi semua field."); return; }
     const numAmt = parseInt(amt.replace(/\D/g, ""), 10);
     if (Number.isNaN(numAmt) || numAmt <= 0) { setError("Jumlah tidak valid."); return; }
-    // Balance check: if changing type to "out" (or staying "out" with different amount/wallet)
-    if (type === "out") {
-      const selectedWallet = wallets.find((w) => w.id === parseInt(walletId, 10));
-      if (selectedWallet) {
-        // Calculate effective balance: undo old tx, apply new tx
-        const oldEffect = tx.type === "out" ? -tx.amt : tx.amt;
-        const newEffect = numAmt; // type is "out"
-        const effectiveBalance = selectedWallet.balance + oldEffect - newEffect;
-        if (effectiveBalance < 0) {
-          setError("Saldo dompet tidak mencukupi setelah perubahan ini.");
-          return;
-        }
+    // Validate each affected wallet independently. A transaction moved to a
+    // different wallet must be undone in its old wallet, not in the new one.
+    const finalWalletId = parseInt(walletId, 10);
+    const oldContribution = tx.type === "in" ? tx.amt : -tx.amt;
+    const newContribution = type === "in" ? numAmt : -numAmt;
+    if (tx.walletId === finalWalletId) {
+      const wallet = wallets.find((item) => item.id === finalWalletId);
+      if (!wallet || wallet.balance + newContribution - oldContribution < 0) {
+        setError("Saldo dompet tidak mencukupi setelah perubahan ini.");
+        return;
+      }
+    } else {
+      const oldWallet = wallets.find((item) => item.id === tx.walletId);
+      const newWallet = wallets.find((item) => item.id === finalWalletId);
+      if (
+        !oldWallet || !newWallet ||
+        oldWallet.balance - oldContribution < 0 ||
+        newWallet.balance + newContribution < 0
+      ) {
+        setError("Saldo dompet tidak mencukupi setelah perubahan ini.");
+        return;
       }
     }
     updateTx(tx.id, { type, cat, desc: desc || cat, amt: numAmt, date, walletId: parseInt(walletId, 10) });
