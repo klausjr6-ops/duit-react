@@ -88,7 +88,7 @@ function DashboardApp() {
   const [quickTransaction, setQuickTransaction] = useState<{ type: "in" | "out"; nonce: number } | null>(null);
   const [showAccount, setShowAccount] = useState(false);
   const [showChat, setShowChat] = useState(false);
-  const [transitionKind, setTransitionKind] = useState<"dashboard" | "theme">("dashboard");
+  const [transitionKind, setTransitionKind] = useState<"dashboard" | "themeToDark" | "themeToLight">("dashboard");
   const [showTransition, setShowTransition] = useState(false);
   const transitionReadyRef = useRef(false);
   const transitionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -122,10 +122,10 @@ function DashboardApp() {
       return;
     }
     if (previous.dashboardMode === settings.dashboardMode && previous.isDark === isDark) return;
-    setTransitionKind(previous.isDark !== isDark ? "theme" : "dashboard");
+    setTransitionKind(previous.isDark !== isDark ? (isDark ? "themeToDark" : "themeToLight") : "dashboard");
     setShowTransition(true);
     if (transitionTimerRef.current) clearTimeout(transitionTimerRef.current);
-    transitionTimerRef.current = setTimeout(() => setShowTransition(false), 520);
+    transitionTimerRef.current = setTimeout(() => setShowTransition(false), previous.isDark !== isDark ? 1180 : 1080);
   }, [isDark, settings.dashboardMode]);
 
   useEffect(() => () => { if (transitionTimerRef.current) clearTimeout(transitionTimerRef.current); }, []);
@@ -313,7 +313,7 @@ function DashboardApp() {
 
       {/* ── Global Toast Notifications ── */}
       <ToastContainer />
-      <ViewTransitionLoader active={showTransition} kind={transitionKind} contextual={isContextualDashboard} now={now} />
+      <ViewTransitionLoader active={showTransition} kind={transitionKind} />
     </div>
   );
 }
