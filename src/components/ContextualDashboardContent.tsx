@@ -23,9 +23,10 @@ type Context = "morning" | "afternoon" | "evening" | "monthEnd";
 
 export default function ContextualDashboardContent(props: Props) {
   const { isDark } = useTheme();
-  const { wallets, goals, todaySchedules } = useStore();
+  const { wallets, goals, todaySchedules, todayMood } = useStore();
   const { hour } = jakartaTimeParts(props.now);
-  const day = Number(dateKeyInJakarta(props.now).slice(-2));
+  const todayKey = dateKeyInJakarta(props.now);
+  const day = Number(todayKey.slice(-2));
   const context: Context = day >= 28 ? "monthEnd" : hour >= 18 || hour < 4 ? "evening" : hour >= 12 ? "afternoon" : "morning";
   const label = isDark ? "text-slate-500" : "text-zinc-500";
   const main = isDark ? "text-white" : "text-zinc-900";
@@ -36,6 +37,7 @@ export default function ContextualDashboardContent(props: Props) {
 
   const contextTitle = context === "morning" ? "PAGI · MULAI HARI" : context === "afternoon" ? "SIANG · LANJUTKAN DENGAN SADAR" : context === "evening" ? "MALAM · TUTUP HARI" : "AKHIR BULAN · LIHAT GAMBAR BESAR";
   const contextText = context === "morning" ? "Prioritasmu adalah ritme, agenda, dan ruang aman hari ini." : context === "afternoon" ? "Fokus pada apa yang sudah berjalan dan yang masih tersisa hari ini." : context === "evening" ? "Tidak perlu mengejar semuanya. Lihat hari ini dengan tenang." : "Fokus pada arus kas, ruang yang tersisa, dan langkah bulan berikutnya.";
+  const motivation = getContextualMotivation({ context, dateKey: todayKey, scheduleCount: todaySchedules.length, todayExpense: props.todayExpense, inMonth: props.inMonth, outMonth: props.outMonth, moodLabel: todayMood?.label });
 
   return <div className="space-y-6">
     <section className={`rounded-2xl border px-4 py-3 sm:px-5 ${isDark ? "border-white/10 bg-white/5" : "border-teal-100 bg-teal-50/70"}`}>
@@ -50,7 +52,7 @@ export default function ContextualDashboardContent(props: Props) {
       </div>
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <Card><p className={`text-xs font-semibold tracking-widest ${label}`}>AKSI CEPAT</p><div className="mt-4 grid grid-cols-3 gap-3"><Action icon={<IconArrowDown size={18}/>} label="Catat keluar" onClick={props.onExpenseClick}/><Action icon={<IconArrowUp size={18}/>} label="Catat masuk" onClick={props.onIncomeClick}/><Action icon={<IconCalendar size={18}/>} label="Buka agenda" onClick={props.onScheduleClick}/></div></Card>
-        <Insight label="INSIGHT PAGI" text="Mulai dari satu hal yang paling penting. Sisanya bisa menunggu." accent="linear-gradient(90deg,#2dd4bf,#60a5fa)" />
+        <Insight label="MOTIVASI PAGI" text={motivation} accent="linear-gradient(90deg,#2dd4bf,#60a5fa)" />
       </div>
     </>}
 
@@ -59,17 +61,17 @@ export default function ContextualDashboardContent(props: Props) {
         <Card accent={accent}><p className={`text-xs font-semibold tracking-widest ${label}`}>RINGKASAN TRANSAKSI HARI INI</p><div className="mt-4 grid grid-cols-2 gap-5"><div><p className={`text-2xl font-extrabold ${main}`}>{formatRupiah(props.todayExpense)}</p><p className="mt-1 text-xs font-semibold text-rose-500">Pengeluaran</p></div><div><p className={`text-2xl font-extrabold ${main}`}>{formatRupiah(props.todayIncome)}</p><p className="mt-1 text-xs font-semibold text-emerald-500">Pemasukan</p></div></div><button onClick={props.onExpenseClick} className="mt-5 text-xs font-bold text-teal-600">+ Tambah transaksi →</button></Card>
         <Card><p className={`text-xs font-semibold tracking-widest ${label}`}>AGENDA TERSISA</p>{next ? <Agenda item={next} main={main} muted={muted}/> : <p className={`mt-3 text-sm ${muted}`}>Tidak ada agenda tersisa hari ini.</p>}</Card>
       </div>
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2"><Insight label="PENGINGAT RINGAN" text="Sisakan ruang untuk pulang tanpa terburu-buru." accent="linear-gradient(90deg,#38bdf8,#6366f1)"/><Wallets wallets={wallets} main={main} muted={muted}/></div>
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2"><Insight label="MOTIVASI SIANG" text={motivation} accent="linear-gradient(90deg,#38bdf8,#6366f1)"/><Wallets wallets={wallets} main={main} muted={muted}/></div>
     </>}
 
     {context === "evening" && <>
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2"><MoodCard/><Card accent={accent}><p className={`text-xs font-semibold tracking-widest ${label}`}>RINGKASAN ANGKA HARI INI</p><p className={`mt-2 text-3xl font-extrabold ${main}`}>{formatRupiah(props.todayExpense)}</p><p className={`mt-2 text-xs ${muted}`}>Pengeluaran hari ini · pemasukan {formatRupiah(props.todayIncome)}</p></Card></div>
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2"><Insight label="SATU PERTANYAAN" text="Hal kecil apa yang ternyata cukup baik hari ini?" accent="linear-gradient(90deg,#818cf8,#a78bfa)"/><Card><p className={`text-xs font-semibold tracking-widest ${label}`}>PERSIAPAN BESOK</p><p className={`mt-3 text-lg font-bold ${main}`}>Lihat jadwal besok tanpa harus mengerjakannya sekarang.</p><button onClick={props.onScheduleClick} className="mt-4 text-xs font-bold text-teal-600">Lihat jadwal →</button></Card></div>
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2"><Insight label="REFLEKSI MALAM" text={motivation} accent="linear-gradient(90deg,#818cf8,#a78bfa)"/><Card><p className={`text-xs font-semibold tracking-widest ${label}`}>PERSIAPAN BESOK</p><p className={`mt-3 text-lg font-bold ${main}`}>Lihat jadwal besok tanpa harus mengerjakannya sekarang.</p><button onClick={props.onScheduleClick} className="mt-4 text-xs font-bold text-teal-600">Lihat jadwal →</button></Card></div>
     </>}
 
     {context === "monthEnd" && <>
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2"><Card accent={accent}><p className={`text-xs font-semibold tracking-widest ${label}`}>ARUS KAS BULAN INI</p><p className={`mt-2 text-3xl font-extrabold ${main}`}>{formatRupiah(props.inMonth - props.outMonth)}</p><p className={`mt-2 text-xs ${muted}`}>Masuk {formatRupiah(props.inMonth)} · Keluar {formatRupiah(props.outMonth)}</p></Card><Card><p className={`text-xs font-semibold tracking-widest ${label}`}>RUANG PENGELUARAN TERSISA</p><p className={`mt-2 text-3xl font-extrabold ${main}`}>{formatRupiah(Math.max(0, props.inMonth - props.outMonth))}</p><div className={`mt-4 h-2 overflow-hidden rounded-full ${isDark ? "bg-white/10" : "bg-zinc-100"}`}><div className="h-full rounded-full bg-gradient-to-r from-amber-400 to-orange-500" style={{width:`${Math.min(100, props.inMonth ? props.outMonth / props.inMonth * 100 : 100)}%`}}/></div></Card></div>
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2"><Insight label="PERSIAPAN BULAN BARU" text="Ada goal dan transaksi yang bisa kamu siapkan sebelum bulan berganti." accent="linear-gradient(90deg,#f59e0b,#fb7185)"/>{topGoal ? <Card><p className={`text-xs font-semibold tracking-widest ${label}`}>GOAL TERDEKAT</p><p className={`mt-3 text-lg font-bold ${main}`}>{topGoal.name}</p><div className={`mt-3 h-2 overflow-hidden rounded-full ${isDark ? "bg-white/10" : "bg-zinc-100"}`}><div className="h-full rounded-full bg-blue-500" style={{width:`${Math.min(100,topGoal.current/topGoal.target*100)}%`}}/></div><p className={`mt-2 text-xs ${muted}`}>{formatRupiah(topGoal.current)} dari {formatRupiah(topGoal.target)}</p><button onClick={props.onGoalClick} className="mt-4 text-xs font-bold text-teal-600">Buka goal →</button></Card> : <Wallets wallets={wallets} main={main} muted={muted}/>}</div>
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2"><Insight label="PENUTUP BULAN" text={motivation} accent="linear-gradient(90deg,#f59e0b,#fb7185)"/>{topGoal ? <Card><p className={`text-xs font-semibold tracking-widest ${label}`}>GOAL TERDEKAT</p><p className={`mt-3 text-lg font-bold ${main}`}>{topGoal.name}</p><div className={`mt-3 h-2 overflow-hidden rounded-full ${isDark ? "bg-white/10" : "bg-zinc-100"}`}><div className="h-full rounded-full bg-blue-500" style={{width:`${Math.min(100,topGoal.current/topGoal.target*100)}%`}}/></div><p className={`mt-2 text-xs ${muted}`}>{formatRupiah(topGoal.current)} dari {formatRupiah(topGoal.target)}</p><button onClick={props.onGoalClick} className="mt-4 text-xs font-bold text-teal-600">Buka goal →</button></Card> : <Wallets wallets={wallets} main={main} muted={muted}/>}</div>
     </>}
   </div>;
 }
@@ -78,3 +80,23 @@ function Agenda({ item, main, muted }: { item: { start: string; name: string; de
 function Action({ icon, label, onClick }: { icon: ReactNode; label: string; onClick: () => void }) { const { isDark } = useTheme(); return <button type="button" onClick={onClick} className={`flex flex-col items-center gap-2 rounded-xl border p-3 text-xs font-bold ${isDark ? "border-white/10 bg-white/5 text-slate-200" : "border-zinc-200 bg-zinc-50 text-zinc-700"}`}><span className="text-teal-500">{icon}</span>{label}</button>; }
 function Insight({ label, text, accent }: { label: string; text: string; accent: string }) { const { isDark } = useTheme(); return <Card accent={accent}><p className={`text-xs font-semibold tracking-widest ${isDark ? "text-slate-500" : "text-zinc-500"}`}>{label}</p><p className={`mt-3 text-lg font-bold leading-relaxed ${isDark ? "text-white" : "text-zinc-900"}`}>“{text}”</p></Card>; }
 function Wallets({ wallets, main, muted }: { wallets: ReturnType<typeof useStore>["wallets"]; main: string; muted: string }) { return <Card><p className={`text-xs font-semibold tracking-widest ${muted}`}>SNAPSHOT WALLET</p><div className="mt-4 space-y-3">{wallets.slice(0,3).map(w=><div key={w.id} className="flex items-center gap-3"><span className="rounded-lg bg-teal-500/10 p-2 text-teal-600"><IconWallet size={16}/></span><span className={`flex-1 text-sm font-bold ${main}`}>{w.name}</span><span className={`text-sm font-bold ${main}`}>{formatRupiah(w.balance)}</span></div>)}</div></Card>; }
+
+
+function getContextualMotivation({ context, dateKey, scheduleCount, todayExpense, inMonth, outMonth, moodLabel }: { context: Context; dateKey: string; scheduleCount: number; todayExpense: number; inMonth: number; outMonth: number; moodLabel?: string }) {
+  const seed = [...dateKey].reduce((total, char) => total + char.charCodeAt(0), 0);
+  const choose = (items: string[]) => items[seed % items.length];
+  if (context === "morning") {
+    if (scheduleCount >= 3) return "Harimu cukup penuh. Kamu tidak harus mengerjakan semuanya sekaligus—mulai dari satu hal yang paling penting.";
+    return choose(["Kamu tidak perlu mengejar pagi yang sempurna. Satu langkah kecil yang selesai tetap berarti.", "Jaga ritmemu, bukan hanya daftar tugasmu. Hari yang tenang juga bisa menjadi hari yang baik.", "Mulai dengan yang penting, lalu biarkan sisanya menemukan tempatnya sendiri."]);
+  }
+  if (context === "afternoon") {
+    if (todayExpense > 0) return "Apa pun yang sudah terjadi pagi ini, kamu masih bisa memilih ritme yang lebih baik untuk sisa harimu.";
+    return choose(["Kamu sudah sampai di tengah hari. Tarik napas, lalu lanjutkan tanpa harus terburu-buru.", "Siang bukan tanda kamu terlambat. Ini kesempatan kedua untuk menjalani hari dengan sadar.", "Cukup periksa arahmu sebentar—kamu tidak harus mempercepat langkah."]);
+  }
+  if (context === "evening") {
+    if (moodLabel) return `Kamu menandai harimu sebagai “${moodLabel}”. Terima dulu apa yang kamu rasakan, tanpa perlu menyelesaikannya malam ini.`;
+    return choose(["Tidak semua hari harus produktif untuk tetap layak dihargai.", "Sebelum tidur, ingat satu hal kecil yang berhasil kamu lewati hari ini.", "Kamu boleh menutup hari tanpa jawaban untuk semua hal."]);
+  }
+  if (outMonth > inMonth) return "Bulan ini mungkin belum berjalan sesuai rencana. Yang penting sekarang bukan menyalahkan diri, melainkan memberi bulan berikutnya arah yang lebih baik.";
+  return choose(["Kamu sudah membangun sesuatu bulan ini, bahkan lewat langkah-langkah yang terlihat kecil.", "Penutup bulan bukan ujian. Ini hanya ruang untuk melihat apa yang ingin kamu bawa ke bulan berikutnya.", "Tidak semua kemajuan terlihat besar. Lihat kembali hal yang sudah kamu jaga bulan ini."]);
+}
