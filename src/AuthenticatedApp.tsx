@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, lazy, Suspense } from "react";
+import { useCallback, useEffect, useRef, useState, lazy, Suspense } from "react";
 import Sidebar from "./components/Sidebar";
 import Header from "./components/Header";
 import ClockCard from "./components/ClockCard";
@@ -12,6 +12,7 @@ import ContextualDashboardContent from "./components/ContextualDashboardContent"
 import PullToRefreshIndicator from "./components/PullToRefreshIndicator";
 import DraggableFAB from "./components/DraggableFAB";
 import ToastContainer from "./components/ToastContainer";
+import ViewTransitionLoader from "./components/ViewTransitionLoader";
 import { usePullToRefresh } from "./hooks/usePullToRefresh";
 import { useAutoLogout } from "./hooks/useAutoLogout";
 import { StoreProvider, useStore } from "./lib/store";
@@ -87,6 +88,10 @@ function DashboardApp() {
   const [quickTransaction, setQuickTransaction] = useState<{ type: "in" | "out"; nonce: number } | null>(null);
   const [showAccount, setShowAccount] = useState(false);
   const [showChat, setShowChat] = useState(false);
+  const [transitionKind, setTransitionKind] = useState<"dashboard" | "theme">("dashboard");
+  const [showTransition, setShowTransition] = useState(false);
+  const transitionReadyRef = useRef(false);
+  const transitionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useAutoLogout(logout);
 
@@ -107,6 +112,23 @@ function DashboardApp() {
     settings,
   } = store;
   const isContextualDashboard = settings.dashboardMode === "contextual";
+  const previousAppearanceRef = useRef({ dashboardMode: settings.dashboardMode, isDark });
+
+  useEffect(() => {
+    const previous = previousAppearanceRef.current;
+    previousAppearanceRef.current = { dashboardMode: settings.dashboardMode, isDark };
+    if (!transitionReadyRef.current) {
+      transitionReadyRef.current = true;
+      return;
+    }
+    if (previous.dashboardMode === settings.dashboardMode && previous.isDark === isDark) return;
+    setTransitionKind(previous.isDark !== isDark ? "theme" : "dashboard");
+    setShowTransition(true);
+    if (transitionTimerRef.current) clearTimeout(transitionTimerRef.current);
+    transitionTimerRef.current = setTimeout(() => setShowTransition(false), 520);
+  }, [isDark, settings.dashboardMode]);
+
+  useEffect(() => () => { if (transitionTimerRef.current) clearTimeout(transitionTimerRef.current); }, []);
 
   // Pull-to-refresh: force Firestore to re-read by briefly detaching and
   // re-attaching the snapshot listener (toggle loadedUserId off then on).
@@ -291,6 +313,7 @@ function DashboardApp() {
 
       {/* ── Global Toast Notifications ── */}
       <ToastContainer />
+      <ViewTransitionLoader active={showTransition} kind={transitionKind} contextual={isContextualDashboard} now={now} />
     </div>
   );
 }
