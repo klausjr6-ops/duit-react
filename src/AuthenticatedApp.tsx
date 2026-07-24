@@ -112,21 +112,35 @@ function DashboardApp() {
     settings,
   } = store;
   const isContextualDashboard = settings.dashboardMode === "contextual";
+  // Do not animate the initial Firestore/theme hydration: the app already has
+  // its boot loader, and a second transition immediately afterwards feels like
+  // a duplicate loading state.
+  const appLoading = authLoading || Boolean(user && (storeLoading || loadedUserId !== user.uid));
   const previousAppearanceRef = useRef({ dashboardMode: settings.dashboardMode, isDark });
 
   useEffect(() => {
     const previous = previousAppearanceRef.current;
     previousAppearanceRef.current = { dashboardMode: settings.dashboardMode, isDark };
-    if (!transitionReadyRef.current) {
-      transitionReadyRef.current = true;
+
+    if (appLoading) {
+      transitionReadyRef.current = false;
+      setShowTransition(false);
       return;
     }
+
+    // Give ThemeStoreSync a moment to apply the persisted theme after boot.
+    // Only deliberate changes after this quiet period receive an animation.
+    if (!transitionReadyRef.current) {
+      const readyTimer = setTimeout(() => { transitionReadyRef.current = true; }, 700);
+      return () => clearTimeout(readyTimer);
+    }
+
     if (previous.dashboardMode === settings.dashboardMode && previous.isDark === isDark) return;
     setTransitionKind(previous.isDark !== isDark ? (isDark ? "themeToDark" : "themeToLight") : "dashboard");
     setShowTransition(true);
     if (transitionTimerRef.current) clearTimeout(transitionTimerRef.current);
     transitionTimerRef.current = setTimeout(() => setShowTransition(false), previous.isDark !== isDark ? 1180 : 1080);
-  }, [isDark, settings.dashboardMode]);
+  }, [appLoading, isDark, settings.dashboardMode]);
 
   useEffect(() => () => { if (transitionTimerRef.current) clearTimeout(transitionTimerRef.current); }, []);
 
@@ -158,7 +172,6 @@ function DashboardApp() {
 
   // Jangan render data default sebelum snapshot Firestore untuk user aktif selesai.
   // Ini mencegah perubahan awal menimpa data cloud yang belum sempat dimuat.
-  const appLoading = authLoading || Boolean(user && (storeLoading || loadedUserId !== user.uid));
 
   const handleNavigation = (key: string) => {
     if (key === "wallet") setQuickTransaction(null);
