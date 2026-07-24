@@ -1844,6 +1844,9 @@ function useDuitStoreInternal() {
     settings,
     backupData,
     wallets: walletsWithBalance,
+    // Raw/base wallet values are used by the monthly report to calculate an
+    // accurate opening balance without double-counting carry-forward rows.
+    walletBases: wallets,
     // Loading & sync states
     loading,
     loadedUserId,

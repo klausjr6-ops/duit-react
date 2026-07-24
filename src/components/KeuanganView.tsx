@@ -5,6 +5,7 @@ import TransactionList from "./TransactionList";
 import WeeklyChart from "./WeeklyChart";
 import WalletManager from "./WalletManager";
 import EditWalletModal from "./EditWalletModal";
+import MonthlyReportView from "./MonthlyReportView";
 import { formatRupiah } from "../lib/format";
 import { useStore, todayStr, type Wallet } from "../lib/store";
 import { useTheme } from "../lib/ThemeContext";
@@ -21,10 +22,13 @@ interface KeuanganViewProps {
   quickType?: "in" | "out";
   quickNonce?: number;
   onQuickDone?: () => void;
+  onAskAI?: (month: string) => void;
+  onReportModeChange?: (active: boolean) => void;
 }
 
-export default function KeuanganView({ quickType, quickNonce, onQuickDone }: KeuanganViewProps) {
+export default function KeuanganView({ quickType, quickNonce, onQuickDone, onAskAI, onReportModeChange }: KeuanganViewProps) {
   const { wallets, addTx, inMonth, outMonth, balance, txs } = useStore();
+  const [viewMode, setViewMode] = useState<"transactions" | "report">("transactions");
   const { isDark } = useTheme();
 
   // Calculate total "Saldo Bulan Lalu" for current month display
@@ -45,6 +49,11 @@ export default function KeuanganView({ quickType, quickNonce, onQuickDone }: Keu
   const [hoveredWallet, setHoveredWallet] = useState<number | null>(null);
   const transactionFormRef = useRef<HTMLDivElement>(null);
   const [formError, setFormError] = useState<string | null>(null);
+
+  useEffect(() => {
+    onReportModeChange?.(viewMode === "report");
+    return () => onReportModeChange?.(false);
+  }, [onReportModeChange, viewMode]);
 
   useEffect(() => {
     if (!quickType) return;
@@ -112,13 +121,18 @@ export default function KeuanganView({ quickType, quickNonce, onQuickDone }: Keu
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-4 flex-wrap">
         <div>
           <h1 className={titleCls}>Keuangan</h1>
-          <p className={subCls}>Lacak setiap rupiah</p>
+          <p className={subCls}>{viewMode === "report" ? "Rekap transaksi bulanan" : "Lacak setiap rupiah"}</p>
+        </div>
+        <div className={`flex rounded-xl border p-1 ${isDark ? "border-white/10 bg-white/5" : "border-zinc-200 bg-zinc-100"}`}>
+          <button type="button" onClick={() => setViewMode("transactions")} className={`rounded-lg px-3 py-2 text-xs font-bold ${viewMode === "transactions" ? isDark ? "bg-white/15 text-white" : "bg-white text-zinc-900 shadow-sm" : isDark ? "text-slate-400" : "text-zinc-500"}`}>Transaksi</button>
+          <button type="button" onClick={() => setViewMode("report")} className={`rounded-lg px-3 py-2 text-xs font-bold ${viewMode === "report" ? isDark ? "bg-teal-400/15 text-teal-200" : "bg-white text-teal-700 shadow-sm" : isDark ? "text-slate-400" : "text-zinc-500"}`}>Laporan</button>
         </div>
       </div>
 
+      {viewMode === "report" ? <MonthlyReportView onAskAI={(month) => onAskAI?.(month)} /> : <>
       {cfTotal > 0 && (
         <motion.div
           initial={{ opacity: 0, y: -8 }}
@@ -312,6 +326,7 @@ export default function KeuanganView({ quickType, quickNonce, onQuickDone }: Keu
       </AnimatePresence>
 
       {walletToEdit && <EditWalletModal wallet={walletToEdit} onClose={() => setWalletToEdit(null)} />}
+      </>}
     </motion.div>
   );
 }

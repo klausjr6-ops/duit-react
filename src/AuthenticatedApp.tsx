@@ -88,6 +88,7 @@ function DashboardApp() {
   const [quickTransaction, setQuickTransaction] = useState<{ type: "in" | "out"; nonce: number } | null>(null);
   const [showAccount, setShowAccount] = useState(false);
   const [showChat, setShowChat] = useState(false);
+  const [reportMode, setReportMode] = useState(false);
   const [transitionKind, setTransitionKind] = useState<"dashboard" | "themeToDark" | "themeToLight">("dashboard");
   const [showTransition, setShowTransition] = useState(false);
   const transitionReadyRef = useRef(false);
@@ -168,6 +169,7 @@ function DashboardApp() {
 
   useEffect(() => {
     window.scrollTo(0, 0);
+    if (active !== "wallet") setReportMode(false);
   }, [active]);
 
   // Jangan render data default sebelum snapshot Firestore untuk user aktif selesai.
@@ -285,6 +287,8 @@ function DashboardApp() {
                 quickType={quickTransaction?.type}
                 quickNonce={quickTransaction?.nonce}
                 onQuickDone={() => setQuickTransaction(null)}
+                onReportModeChange={setReportMode}
+                onAskAI={() => setShowChat(true)}
               />
             </Suspense>
           )}
@@ -307,7 +311,7 @@ function DashboardApp() {
         inMonth={inMonth}
         outMonth={outMonth}
         score={score}
-        hidden={showChat}
+        hidden={showChat || reportMode}
       />
 
       {/* ── Modal Chat AI (popup) ── */}
