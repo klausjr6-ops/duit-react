@@ -5,8 +5,6 @@ import { useStore, type Transaction } from "../lib/store";
 import { useTheme } from "../lib/ThemeContext";
 import { IconArrowDown, IconArrowUp, IconCalendar, IconWallet } from "../utils/icons";
 
-interface Props { onAskAI: (month: string) => void; }
-
 function monthLabel(month: string) {
   const [year, value] = month.split("-").map(Number);
   return new Intl.DateTimeFormat("id-ID", { month: "long", year: "numeric", timeZone: "Asia/Jakarta" })
@@ -23,7 +21,7 @@ function dateLabel(date: string) {
     .format(new Date(Date.UTC(year, month - 1, day, 12)));
 }
 
-export default function MonthlyReportView({ onAskAI }: Props) {
+export default function MonthlyReportView() {
   const { txs, walletBases } = useStore();
   const { isDark } = useTheme();
   const current = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Jakarta", year: "numeric", month: "2-digit" }).format(new Date());
@@ -52,9 +50,10 @@ export default function MonthlyReportView({ onAskAI }: Props) {
   const button = isDark ? "border-white/10 bg-white/5 text-slate-200 hover:bg-white/10" : "border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50";
 
   return <div className="space-y-6">
-    <div className="flex flex-wrap items-end justify-between gap-4">
-      <div><p className={`text-xs font-semibold tracking-widest ${muted}`}>MODE LAPORAN</p><h2 className={`mt-1 text-3xl font-extrabold tracking-tight ${text}`}>Laporan Keuangan</h2><p className={`mt-1 text-sm ${muted}`}>Rekap transaksi dan arus kas bulanan.</p></div>
-      <button onClick={() => onAskAI(month)} className="rounded-xl bg-gradient-to-br from-teal-400 to-blue-500 px-4 py-3 text-sm font-bold text-zinc-900 shadow-lg shadow-teal-500/20">✦ Tanya DUIT</button>
+    <div>
+      <p className={`text-xs font-semibold tracking-widest ${muted}`}>MODE LAPORAN</p>
+      <h2 className={`mt-1 text-3xl font-extrabold tracking-tight ${text}`}>Laporan Keuangan</h2>
+      <p className={`mt-1 text-sm ${muted}`}>Rekap transaksi dan arus kas bulanan.</p>
     </div>
 
     <div className={`flex items-center justify-between gap-3 rounded-2xl p-3 ${panel}`}>

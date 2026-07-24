@@ -22,11 +22,10 @@ interface KeuanganViewProps {
   quickType?: "in" | "out";
   quickNonce?: number;
   onQuickDone?: () => void;
-  onAskAI?: (month: string) => void;
   onReportModeChange?: (active: boolean) => void;
 }
 
-export default function KeuanganView({ quickType, quickNonce, onQuickDone, onAskAI, onReportModeChange }: KeuanganViewProps) {
+export default function KeuanganView({ quickType, quickNonce, onQuickDone, onReportModeChange }: KeuanganViewProps) {
   const { wallets, addTx, inMonth, outMonth, balance, txs } = useStore();
   const [viewMode, setViewMode] = useState<"transactions" | "report">("transactions");
   const { isDark } = useTheme();
@@ -132,7 +131,7 @@ export default function KeuanganView({ quickType, quickNonce, onQuickDone, onAsk
         </div>
       </div>
 
-      {viewMode === "report" ? <MonthlyReportView onAskAI={(month) => onAskAI?.(month)} /> : <>
+      {viewMode === "report" ? <MonthlyReportView /> : <>
       {cfTotal > 0 && (
         <motion.div
           initial={{ opacity: 0, y: -8 }}

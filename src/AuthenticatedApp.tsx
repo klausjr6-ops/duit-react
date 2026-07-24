@@ -288,7 +288,6 @@ function DashboardApp() {
                 quickNonce={quickTransaction?.nonce}
                 onQuickDone={() => setQuickTransaction(null)}
                 onReportModeChange={setReportMode}
-                onAskAI={() => setShowChat(true)}
               />
             </Suspense>
           )}
