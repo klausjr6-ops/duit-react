@@ -507,6 +507,20 @@ function normalizeUserData(remote?: Partial<UserData>): UserData {
   return result;
 }
 
+function removeUndefinedDeep<T>(value: T): T {
+  if (Array.isArray(value)) {
+    return value.map((item) => removeUndefinedDeep(item)) as T;
+  }
+  if (value && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value as Record<string, unknown>)
+        .filter(([, item]) => item !== undefined)
+        .map(([key, item]) => [key, removeUndefinedDeep(item)])
+    ) as T;
+  }
+  return value;
+}
+
 function createId(): number {
   // Numeric IDs retain compatibility with existing Firestore data.
   // Use crypto.randomUUID() when available for near-zero collision risk.
@@ -701,7 +715,9 @@ function useDuitStoreInternal() {
             ? normalizeUserData(snapshot.data() as Partial<UserData>)
             : createDefaultData();
           const next = updater(current);
-          transaction.set(ref, next);
+          // Firestore rejects `undefined` even for optional UI fields such as
+          // schedule description/end time. Keep optional fields absent instead.
+          transaction.set(ref, removeUndefinedDeep(next));
         });
       });
 
