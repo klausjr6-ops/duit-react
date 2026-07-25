@@ -85,6 +85,9 @@ export default function WeeklyChart() {
           style={{ minWidth: "500px" }}
           role="img"
           aria-label="Grafik pemasukan dan pengeluaran tujuh hari terakhir"
+          onMouseMove={(event) => {
+            if (!(event.target instanceof SVGRectElement)) setHovered(null);
+          }}
         >
           {Array.from({ length: gridLines + 1 }).map((_, index) => {
             const y = chartPadTop + (barAreaHeight / gridLines) * index;
