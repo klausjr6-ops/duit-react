@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { addDaysToDateKey, todayStr, useStore } from "../lib/store";
 import { useTheme } from "../lib/ThemeContext";
 
@@ -13,7 +13,17 @@ function weekdayLabel(dateKey: string): string {
 export default function WeeklyChart() {
   const { txs } = useStore();
   const { isDark } = useTheme();
-  const [hovered, setHovered] = useState<{ date: string; label: string; value: number; color: string } | null>(null);
+  const chartAreaRef = useRef<HTMLDivElement>(null);
+  const [hovered, setHovered] = useState<{ date: string; label: string; value: number; color: string; x: number; y: number } | null>(null);
+
+  const setHover = (event: React.MouseEvent<SVGRectElement> | React.FocusEvent<SVGRectElement>, data: { date: string; label: string; value: number; color: string }) => {
+    const container = chartAreaRef.current?.getBoundingClientRect();
+    if (!container) return;
+    const target = event.currentTarget.getBoundingClientRect();
+    const x = "clientX" in event ? event.clientX - container.left : target.left - container.left + target.width / 2;
+    const y = "clientY" in event ? event.clientY - container.top : target.top - container.top;
+    setHovered({ ...data, x, y });
+  };
 
   const data = useMemo(() => {
     const days: { label: string; date: string; in: number; out: number }[] = [];
@@ -68,7 +78,7 @@ export default function WeeklyChart() {
 
   return (
     <div className="w-full">
-      <div className="relative overflow-x-auto" onMouseLeave={() => setHovered(null)}>
+      <div ref={chartAreaRef} className="relative overflow-x-auto" onMouseLeave={() => setHovered(null)}>
         <svg
           viewBox={`0 0 ${chartWidth} ${svgHeight}`}
           className="w-full"
@@ -117,9 +127,10 @@ export default function WeeklyChart() {
                   height={incomeHeight}
                   fill="#10b981"
                   rx="3"
-                  onMouseEnter={() => setHovered({ date: day.date, label: "Pemasukan", value: day.in, color: "#10b981" })}
-                  onFocus={() => setHovered({ date: day.date, label: "Pemasukan", value: day.in, color: "#10b981" })}
-                  onClick={() => setHovered({ date: day.date, label: "Pemasukan", value: day.in, color: "#10b981" })}
+                  onMouseEnter={(event) => setHover(event, { date: day.date, label: "Pemasukan", value: day.in, color: "#10b981" })}
+                  onMouseMove={(event) => setHover(event, { date: day.date, label: "Pemasukan", value: day.in, color: "#10b981" })}
+                  onFocus={(event) => setHover(event, { date: day.date, label: "Pemasukan", value: day.in, color: "#10b981" })}
+                  onClick={(event) => setHover(event, { date: day.date, label: "Pemasukan", value: day.in, color: "#10b981" })}
                   tabIndex={0}
                   role="button"
                   aria-label={`Pemasukan ${day.date}: Rp${day.in.toLocaleString("id-ID")}`}
@@ -133,9 +144,10 @@ export default function WeeklyChart() {
                   height={expenseHeight}
                   fill="#f43f5e"
                   rx="3"
-                  onMouseEnter={() => setHovered({ date: day.date, label: "Pengeluaran", value: day.out, color: "#f43f5e" })}
-                  onFocus={() => setHovered({ date: day.date, label: "Pengeluaran", value: day.out, color: "#f43f5e" })}
-                  onClick={() => setHovered({ date: day.date, label: "Pengeluaran", value: day.out, color: "#f43f5e" })}
+                  onMouseEnter={(event) => setHover(event, { date: day.date, label: "Pengeluaran", value: day.out, color: "#f43f5e" })}
+                  onMouseMove={(event) => setHover(event, { date: day.date, label: "Pengeluaran", value: day.out, color: "#f43f5e" })}
+                  onFocus={(event) => setHover(event, { date: day.date, label: "Pengeluaran", value: day.out, color: "#f43f5e" })}
+                  onClick={(event) => setHover(event, { date: day.date, label: "Pengeluaran", value: day.out, color: "#f43f5e" })}
                   tabIndex={0}
                   role="button"
                   aria-label={`Pengeluaran ${day.date}: Rp${day.out.toLocaleString("id-ID")}`}
@@ -156,7 +168,13 @@ export default function WeeklyChart() {
           })}
         </svg>
         {hovered && (
-          <div className={`pointer-events-none absolute left-1/2 top-3 z-10 -translate-x-1/2 rounded-xl border px-3 py-2 text-center shadow-lg backdrop-blur ${isDark ? "border-white/10 bg-slate-900/90 text-white" : "border-white bg-white/90 text-zinc-900"}`}>
+          <div
+            className={`pointer-events-none absolute z-10 rounded-xl border px-3 py-2 text-center shadow-lg backdrop-blur ${isDark ? "border-white/10 bg-slate-900/90 text-white" : "border-white bg-white/90 text-zinc-900"}`}
+            style={{
+              left: Math.min(Math.max(8, hovered.x + 12), Math.max(8, (chartAreaRef.current?.clientWidth || 0) - 156)),
+              top: Math.max(8, hovered.y - 76),
+            }}
+          >
             <p className="text-[10px] font-extrabold tracking-wider" style={{ color: hovered.color }}>{hovered.label.toUpperCase()}</p>
             <p className="mt-0.5 text-sm font-extrabold">Rp {hovered.value.toLocaleString("id-ID")}</p>
             <p className={`mt-0.5 text-[10px] ${isDark ? "text-slate-400" : "text-zinc-500"}`}>{hovered.date}</p>
