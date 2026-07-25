@@ -5,15 +5,16 @@ export function formatRupiah(value: number): string {
 }
 
 /** Numeric time parts in the product timezone, regardless of device locale. */
-export function jakartaTimeParts(date: Date): { hour: number; minute: number } {
+export function jakartaTimeParts(date: Date): { hour: number; minute: number; second: number } {
   const parts = new Intl.DateTimeFormat("en-US", {
     timeZone: JAKARTA_TIME_ZONE,
     hour: "2-digit",
     minute: "2-digit",
+    second: "2-digit",
     hourCycle: "h23",
   }).formatToParts(date);
   const read = (type: Intl.DateTimeFormatPartTypes) => Number(parts.find((part) => part.type === type)?.value);
-  return { hour: read("hour"), minute: read("minute") };
+  return { hour: read("hour"), minute: read("minute"), second: read("second") };
 }
 
 export function formatTime(date: Date): string {

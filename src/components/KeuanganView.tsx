@@ -49,10 +49,13 @@ export default function KeuanganView({ quickType, quickNonce, onQuickDone, onRep
   const transactionFormRef = useRef<HTMLDivElement>(null);
   const [formError, setFormError] = useState<string | null>(null);
 
-  useEffect(() => {
-    onReportModeChange?.(viewMode === "report");
-    return () => onReportModeChange?.(false);
-  }, [onReportModeChange, viewMode]);
+  // Ensure the global FAB is restored if this view unmounts while Laporan is open.
+  useEffect(() => () => onReportModeChange?.(false), [onReportModeChange]);
+
+  const changeViewMode = (next: "transactions" | "report") => {
+    onReportModeChange?.(next === "report");
+    setViewMode(next);
+  };
 
   useEffect(() => {
     if (!quickType) return;
@@ -126,8 +129,8 @@ export default function KeuanganView({ quickType, quickNonce, onQuickDone, onRep
           <p className={subCls}>{viewMode === "report" ? "Rekap transaksi bulanan" : "Lacak setiap rupiah"}</p>
         </div>
         <div className={`flex rounded-xl border p-1 ${isDark ? "border-white/10 bg-white/5" : "border-zinc-200 bg-zinc-100"}`}>
-          <button type="button" onClick={() => setViewMode("transactions")} className={`rounded-lg px-3 py-2 text-xs font-bold ${viewMode === "transactions" ? isDark ? "bg-white/15 text-white" : "bg-white text-zinc-900 shadow-sm" : isDark ? "text-slate-400" : "text-zinc-500"}`}>Transaksi</button>
-          <button type="button" onClick={() => setViewMode("report")} className={`rounded-lg px-3 py-2 text-xs font-bold ${viewMode === "report" ? isDark ? "bg-teal-400/15 text-teal-200" : "bg-white text-teal-700 shadow-sm" : isDark ? "text-slate-400" : "text-zinc-500"}`}>Laporan</button>
+          <button type="button" onClick={() => changeViewMode("transactions")} className={`rounded-lg px-3 py-2 text-xs font-bold ${viewMode === "transactions" ? isDark ? "bg-white/15 text-white" : "bg-white text-zinc-900 shadow-sm" : isDark ? "text-slate-400" : "text-zinc-500"}`}>Transaksi</button>
+          <button type="button" onClick={() => changeViewMode("report")} className={`rounded-lg px-3 py-2 text-xs font-bold ${viewMode === "report" ? isDark ? "bg-teal-400/15 text-teal-200" : "bg-white text-teal-700 shadow-sm" : isDark ? "text-slate-400" : "text-zinc-500"}`}>Laporan</button>
         </div>
       </div>
 

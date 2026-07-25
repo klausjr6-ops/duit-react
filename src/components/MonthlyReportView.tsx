@@ -32,7 +32,18 @@ export default function MonthlyReportView() {
     const inMonth = txs.filter((t) => t.date.startsWith(month));
     const before = txs.filter((t) => !t.isCarryForward && t.date < `${month}-01`);
     const opening = walletBases.reduce((sum, wallet) => sum + wallet.balance, 0) + before.reduce((sum, t) => sum + (t.type === "in" ? t.amt : -t.amt), 0);
-    const sorted = [...inMonth].sort((a, b) => a.date === b.date ? a.id - b.id : a.date.localeCompare(b.date));
+    // IDs are random, so they must never determine the running-balance order.
+    // The transaction array prepends new entries; reverse its original index
+    // for same-day items to show the oldest known entry first. Carry-forward
+    // stays first because it represents the opening balance for that day.
+    const sorted = inMonth
+      .map((tx, index) => ({ tx, index }))
+      .sort((a, b) => {
+        if (a.tx.date !== b.tx.date) return a.tx.date.localeCompare(b.tx.date);
+        if (a.tx.isCarryForward !== b.tx.isCarryForward) return a.tx.isCarryForward ? -1 : 1;
+        return b.index - a.index;
+      })
+      .map(({ tx }) => tx);
     const isRealFlow = (t: Transaction) => !t.transferId && !t.isCarryForward && !(t.goalId && t.type === "out");
     const income = sorted.filter((t) => t.type === "in" && isRealFlow(t)).reduce((sum, t) => sum + t.amt, 0);
     const expense = sorted.filter((t) => t.type === "out" && isRealFlow(t)).reduce((sum, t) => sum + t.amt, 0);

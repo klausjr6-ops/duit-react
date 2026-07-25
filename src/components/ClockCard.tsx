@@ -1,6 +1,6 @@
 import { motion } from "framer-motion";
 import Card from "./Card";
-import { formatDayDate, formatTime } from "../lib/format";
+import { formatDayDate, formatTime, jakartaTimeParts } from "../lib/format";
 import { useTheme } from "../lib/ThemeContext";
 
 interface ClockCardProps {
@@ -9,6 +9,7 @@ interface ClockCardProps {
 
 export default function ClockCard({ now }: ClockCardProps) {
   const { day, full } = formatDayDate(now);
+  const { hour, minute, second } = jakartaTimeParts(now);
   const { isDark } = useTheme();
 
   return (
@@ -29,7 +30,7 @@ export default function ClockCard({ now }: ClockCardProps) {
         <motion.div
           className="h-full rounded-full bg-gradient-to-r from-teal-400 to-blue-500"
           initial={{ width: 0 }}
-          animate={{ width: `${(now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds()) / 86400 * 100}%` }}
+          animate={{ width: `${(hour * 3600 + minute * 60 + second) / 86400 * 100}%` }}
         />
       </div>
     </Card>

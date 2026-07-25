@@ -150,7 +150,7 @@ export default function TransactionList({ filterWallet = "all", onAddClick }: Pr
                     type="button"
                     onClick={(event) => { event.stopPropagation(); setTransactionToEdit(t); }}
                     disabled={isGoal || isTransfer || isCF}
-                    className={isDark ? "text-slate-500 hover:text-teal-400 transition-colors p-1 disabled:opacity-30 disabled:cursor-not-allowed" : "text-zinc-400 hover:text-teal-600 transition-colors p-1 disabled:opacity-30 disabled:cursor-not-allowed"}
+                    className={isDark ? "hidden sm:inline-flex text-slate-500 hover:text-teal-400 transition-colors p-1 disabled:opacity-30 disabled:cursor-not-allowed" : "hidden sm:inline-flex text-zinc-400 hover:text-teal-600 transition-colors p-1 disabled:opacity-30 disabled:cursor-not-allowed"}
                     aria-label={`Edit transaksi ${t.desc}`}
                     title={isGoal || isTransfer || isCF ? "Transaksi ini tidak bisa diedit" : "Edit"}
                   >
@@ -160,7 +160,7 @@ export default function TransactionList({ filterWallet = "all", onAddClick }: Pr
                     type="button"
                     onClick={(event) => { event.stopPropagation(); setTransactionToDelete(t); }}
                     disabled={isCF || isTransfer || isGoal}
-                    className={isDark ? "text-slate-500 hover:text-rose-400 transition-colors p-1 disabled:opacity-30 disabled:cursor-not-allowed" : "text-zinc-400 hover:text-rose-500 transition-colors p-1 disabled:opacity-30 disabled:cursor-not-allowed"}
+                    className={isDark ? "hidden sm:inline-flex text-slate-500 hover:text-rose-400 transition-colors p-1 disabled:opacity-30 disabled:cursor-not-allowed" : "hidden sm:inline-flex text-zinc-400 hover:text-rose-500 transition-colors p-1 disabled:opacity-30 disabled:cursor-not-allowed"}
                     aria-label={`Hapus transaksi ${t.desc}`}
                     title={isCF ? "Transaksi ini tidak bisa dihapus" : isTransfer ? "Transfer tidak bisa dihapus per transaksi" : isGoal ? "Transaksi Goal dikelola dari menu Goal" : "Hapus"}
                   >
