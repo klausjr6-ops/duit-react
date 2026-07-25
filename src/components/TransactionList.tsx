@@ -6,6 +6,7 @@ import { useTheme } from "../lib/ThemeContext";
 import { toast } from "../hooks/useToast";
 import ConfirmDialog from "./ConfirmDialog";
 import EditTransactionModal from "./EditTransactionModal";
+import TransactionDetailDrawer from "./TransactionDetailDrawer";
 import EmptyState from "./EmptyState";
 import { IconArrowUp, IconArrowDown, IconTarget, IconEdit, IconTrash, IconTransfer, IconWallet, IconCalendar } from "../utils/icons";
 
@@ -19,6 +20,7 @@ export default function TransactionList({ filterWallet = "all", onAddClick }: Pr
   const { isDark } = useTheme();
   const [transactionToDelete, setTransactionToDelete] = useState<Transaction | null>(null);
   const [transactionToEdit, setTransactionToEdit] = useState<Transaction | null>(null);
+  const [transactionToDetail, setTransactionToDetail] = useState<Transaction | null>(null);
 
   const filtered =
     filterWallet === "all" ? txs : txs.filter((t) => t.walletId === parseInt(filterWallet));
@@ -122,7 +124,11 @@ export default function TransactionList({ filterWallet = "all", onAddClick }: Pr
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, x: -20 }}
-                className={rowBase}
+                onClick={() => setTransactionToDetail(t)}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); setTransactionToDetail(t); } }}
+                className={`${rowBase} cursor-pointer`}
               >
                 <div className="flex items-center gap-3 min-w-0 flex-1">
                   <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${typeClass}`}>
@@ -142,7 +148,7 @@ export default function TransactionList({ filterWallet = "all", onAddClick }: Pr
                   </span>
                   <button
                     type="button"
-                    onClick={() => setTransactionToEdit(t)}
+                    onClick={(event) => { event.stopPropagation(); setTransactionToEdit(t); }}
                     disabled={isGoal || isTransfer || isCF}
                     className={isDark ? "text-slate-500 hover:text-teal-400 transition-colors p-1 disabled:opacity-30 disabled:cursor-not-allowed" : "text-zinc-400 hover:text-teal-600 transition-colors p-1 disabled:opacity-30 disabled:cursor-not-allowed"}
                     aria-label={`Edit transaksi ${t.desc}`}
@@ -152,11 +158,11 @@ export default function TransactionList({ filterWallet = "all", onAddClick }: Pr
                   </button>
                   <button
                     type="button"
-                    onClick={() => setTransactionToDelete(t)}
-                    disabled={isCF || isTransfer}
+                    onClick={(event) => { event.stopPropagation(); setTransactionToDelete(t); }}
+                    disabled={isCF || isTransfer || isGoal}
                     className={isDark ? "text-slate-500 hover:text-rose-400 transition-colors p-1 disabled:opacity-30 disabled:cursor-not-allowed" : "text-zinc-400 hover:text-rose-500 transition-colors p-1 disabled:opacity-30 disabled:cursor-not-allowed"}
                     aria-label={`Hapus transaksi ${t.desc}`}
-                    title={isCF ? "Transaksi ini tidak bisa dihapus" : isTransfer ? "Transfer tidak bisa dihapus per transaksi" : "Hapus"}
+                    title={isCF ? "Transaksi ini tidak bisa dihapus" : isTransfer ? "Transfer tidak bisa dihapus per transaksi" : isGoal ? "Transaksi Goal dikelola dari menu Goal" : "Hapus"}
                   >
                     <IconTrash size={16} />
                   </button>
@@ -169,6 +175,13 @@ export default function TransactionList({ filterWallet = "all", onAddClick }: Pr
       )}
       </div>
       <AnimatePresence>{transactionToEdit && <EditTransactionModal tx={transactionToEdit} onClose={()=>setTransactionToEdit(null)} />}</AnimatePresence>
+      <TransactionDetailDrawer
+        tx={transactionToDetail}
+        walletName={transactionToDetail ? getWalletName(transactionToDetail.walletId) : "—"}
+        onClose={() => setTransactionToDetail(null)}
+        onEdit={(tx) => { setTransactionToDetail(null); setTransactionToEdit(tx); }}
+        onDelete={(tx) => { setTransactionToDetail(null); setTransactionToDelete(tx); }}
+      />
       <ConfirmDialog
         open={Boolean(transactionToDelete)}
         title="Hapus Transaksi?"
