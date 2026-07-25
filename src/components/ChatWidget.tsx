@@ -54,6 +54,7 @@ Kalau data yang ditanyakan belum tercatat (misal user belum input), bilang jujur
 ## Yang JANGAN dilakuin:
 - Jangan paksa bahas keuangan kalau user gak nanya
 - Jangan terlalu formal atau kayak customer service
+- Sebut nama user hanya bila benar-benar natural dan maksimal sekali dalam satu percakapan; jangan mengulang nama di setiap respons
 - Jangan disclaimer berlebihan ("saya AI jadi mungkin...")
 - Jangan lecture panjang lebar kalau user cuma mau ngobrol santai
 - Jangan bilang "aku tidak tahu" soal data user kalau datanya ada di system prompt
@@ -66,8 +67,38 @@ Kalau user nyapa/basa-basi, respons kayak temen — jangan langsung "ada yang bi
 
 const MAX_INPUT_CHARACTERS = 4000;
 const MAX_API_MESSAGES = 16;
+const MAX_STORED_MESSAGES = 32;
 
 const MAX_RENDERED_IMAGE_DATA_URL_LENGTH = 1_500_000;
+
+function defaultGreeting(): Message {
+  return {
+    id: 1,
+    role: "assistant",
+    text: "Halo! 👋 Aku DUIT — bukan cuma soal duit, tapi juga temen ngobrol kamu. Mau curhat, tanya berita, cek keuangan, atau sekadar becanda? Gas aja ✨",
+  };
+}
+
+function chatHistoryKey(uid: string) {
+  return `duit_chat_history_${uid}`;
+}
+
+function readChatHistory(uid: string): Message[] {
+  try {
+    const raw = localStorage.getItem(chatHistoryKey(uid));
+    if (!raw) return [defaultGreeting()];
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed)) return [defaultGreeting()];
+    const valid = parsed
+      .filter((item): item is Message => Boolean(item && typeof item === "object" &&
+        (item as Message).role && ((item as Message).role === "user" || (item as Message).role === "assistant") &&
+        typeof (item as Message).text === "string" && typeof (item as Message).id === "number"))
+      .slice(-MAX_STORED_MESSAGES);
+    return valid.length ? valid : [defaultGreeting()];
+  } catch {
+    return [defaultGreeting()];
+  }
+}
 
 function isSafeImageSource(src: string): boolean {
   const trimmed = src.trim();
@@ -175,15 +206,7 @@ export default function ChatWidget({ open, onClose }: ChatWidgetProps) {
   const { user } = useAuth();
   const { isDark } = useTheme();
 
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: 1,
-      role: "assistant",
-      text: `Halo${
-        settings.name && settings.name !== "Kamu" ? " " + settings.name : ""
-      }! 👋 Aku DUIT — bukan cuma soal duit, tapi juga temen ngobrol kamu. Mau curhat, tanya berita, cek keuangan, atau sekadar becanda? Gas aja ✨`,
-    },
-  ]);
+  const [messages, setMessages] = useState<Message[]>(() => user ? readChatHistory(user.uid) : [defaultGreeting()]);
   const [input, setInput] = useState("");
   const [typing, setTyping] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -191,6 +214,21 @@ export default function ChatWidget({ open, onClose }: ChatWidgetProps) {
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const requestAbortRef = useRef<AbortController | null>(null);
   const { dialogRef, onDialogKeyDown } = useModalDialog(open, onClose, inputRef);
+
+  // A conversation is private to the signed-in browser account and survives
+  // refreshes. It is intentionally capped and never stored in shared state.
+  useEffect(() => {
+    setMessages(user ? readChatHistory(user.uid) : [defaultGreeting()]);
+  }, [user?.uid]);
+
+  useEffect(() => {
+    if (!user || messages.length === 0) return;
+    try {
+      localStorage.setItem(chatHistoryKey(user.uid), JSON.stringify(messages.slice(-MAX_STORED_MESSAGES)));
+    } catch {
+      // History persistence is optional; chat itself still works normally.
+    }
+  }, [messages, user]);
 
   // Auto scroll ke bawah tiap ada pesan baru
   useEffect(() => {
@@ -302,6 +340,15 @@ export default function ChatWidget({ open, onClose }: ChatWidgetProps) {
     }
   };
 
+  const clearConversation = () => {
+    const next = [defaultGreeting()];
+    setMessages(next);
+    setError(null);
+    try {
+      if (user) localStorage.setItem(chatHistoryKey(user.uid), JSON.stringify(next));
+    } catch {}
+  };
+
   const modalBg = isDark ? "bg-[#1a1a1a] md:border-zinc-800" : "bg-white md:border-zinc-200";
   const headerBorder = isDark ? "border-zinc-800" : "border-zinc-200";
   const headerTitle = isDark ? "text-white" : "text-zinc-900";
@@ -370,16 +417,23 @@ export default function ChatWidget({ open, onClose }: ChatWidgetProps) {
                     <p className={`${headerSub} text-xs`}>Teman ngobrol serba bisa</p>
                   </div>
                 </div>
-                <button
-                  onClick={onClose}
-                  className={`w-9 h-9 rounded-full flex items-center justify-center transition-colors ${closeBtn}`}
-                  aria-label="Close chat"
-                >
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <line x1="18" y1="6" x2="6" y2="18" />
-                    <line x1="6" y1="6" x2="18" y2="18" />
-                  </svg>
-                </button>
+                <div className="flex items-center gap-1">
+                  {messages.length > 1 && (
+                    <button onClick={clearConversation} className={`rounded-lg px-2 py-1.5 text-[11px] font-semibold transition-colors ${closeBtn}`} aria-label="Mulai percakapan baru">
+                      Baru
+                    </button>
+                  )}
+                  <button
+                    onClick={onClose}
+                    className={`w-9 h-9 rounded-full flex items-center justify-center transition-colors ${closeBtn}`}
+                    aria-label="Close chat"
+                  >
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <line x1="18" y1="6" x2="6" y2="18" />
+                      <line x1="6" y1="6" x2="18" y2="18" />
+                    </svg>
+                  </button>
+                </div>
               </div>
 
               <div ref={scrollRef} className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
