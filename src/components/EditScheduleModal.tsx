@@ -23,14 +23,14 @@ export default function EditScheduleModal({ sched, onClose }: Props) {
   const [error, setError] = useState<string | null>(null);
   const { dialogRef, onDialogKeyDown } = useModalDialog(true, onClose);
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     setError(null);
     if (!name.trim()) { setError("Nama jadwal harus diisi."); return; }
     if (!date || !start) { setError("Tanggal dan jam mulai harus diisi."); return; }
     if (end && end <= start) { setError("Jam selesai harus setelah jam mulai."); return; }
     if (recurring && !untilDate) { setError("Isi tanggal batas pengulangan."); return; }
     if (recurring && untilDate < date) { setError("Tanggal batas tidak boleh sebelum tanggal mulai."); return; }
-    const result = updateSched(sched.id, { name: name.trim(), desc: desc.trim() || undefined, date, start, end: end || undefined, recurring, untilDate: recurring ? untilDate : undefined, icon });
+    const result = await updateSched(sched.id, { name: name.trim(), desc: desc.trim() || undefined, date, start, end: end || undefined, recurring, untilDate: recurring ? untilDate : undefined, icon });
     if (!result.ok) { setError(result.message || "Jadwal belum berhasil diperbarui."); return; }
     toast.success(`Jadwal "${name.trim()}" berhasil diperbarui`);
     onClose();

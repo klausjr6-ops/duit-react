@@ -9,6 +9,7 @@ import {
   addDaysToDateKey,
   dateKeyInJakarta,
   getNextScheduleOccurrence,
+  removeUndefinedDeep,
   scheduleOccursOnDate,
   type ScheduleItem,
 } from "./store";
@@ -20,6 +21,12 @@ describe("Jakarta financial date helpers", () => {
 
   it("adds calendar days without a timezone shift", () => {
     expect(addDaysToDateKey("2026-12-31", 1)).toBe("2027-01-01");
+  });
+});
+
+describe("Firestore write sanitization", () => {
+  it("removes undefined optional fields while preserving arrays", () => {
+    expect(removeUndefinedDeep({ name: "Jadwal", end: undefined, nested: { note: undefined, icon: "pin" }, values: [1, undefined, 3] })).toEqual({ name: "Jadwal", nested: { icon: "pin" }, values: [1, undefined, 3] });
   });
 });
 

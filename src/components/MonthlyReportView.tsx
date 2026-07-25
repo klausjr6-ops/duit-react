@@ -41,6 +41,9 @@ export default function MonthlyReportView() {
       .sort((a, b) => {
         if (a.tx.date !== b.tx.date) return a.tx.date.localeCompare(b.tx.date);
         if (a.tx.isCarryForward !== b.tx.isCarryForward) return a.tx.isCarryForward ? -1 : 1;
+        if (a.tx.createdAt !== undefined && b.tx.createdAt !== undefined && a.tx.createdAt !== b.tx.createdAt) {
+          return a.tx.createdAt - b.tx.createdAt;
+        }
         return b.index - a.index;
       })
       .map(({ tx }) => tx);

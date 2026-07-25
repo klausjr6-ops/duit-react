@@ -29,7 +29,7 @@ export default function WalletManager({ onClose }: Props) {
   const [transferFrom, setTransferFrom] = useState<Wallet | undefined>(undefined);
   const { dialogRef, onDialogKeyDown } = useModalDialog(true, onClose);
 
-  const handleAdd = () => {
+  const handleAdd = async () => {
     setError(null);
     if (!name.trim()) {
       setError("Nama dompet harus diisi.");
@@ -39,7 +39,7 @@ export default function WalletManager({ onClose }: Props) {
       setError("Nama dompet sudah digunakan.");
       return;
     }
-    const result = addWallet({
+    const result = await addWallet({
       name: name.trim(),
       balance: parseInt(initBalance.replace(/\D/g, "") || "0"),
       icon,

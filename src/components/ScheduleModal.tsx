@@ -26,7 +26,7 @@ export default function ScheduleModal({ onClose }: Props) {
   const [error, setError] = useState<string | null>(null);
   const { dialogRef, onDialogKeyDown } = useModalDialog(true, onClose);
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     setError(null);
     if (!name.trim()) {
       setError("Nama jadwal harus diisi.");
@@ -48,7 +48,7 @@ export default function ScheduleModal({ onClose }: Props) {
       setError("Tanggal batas pengulangan tidak boleh sebelum tanggal mulai.");
       return;
     }
-    const result = addSched({ name: name.trim(), desc: desc.trim() || undefined, date, start, end: end || undefined, recurring, untilDate: recurring ? untilDate : undefined, icon });
+    const result = await addSched({ name: name.trim(), desc: desc.trim() || undefined, date, start, end: end || undefined, recurring, untilDate: recurring ? untilDate : undefined, icon });
     if (!result.ok) { setError(result.message || "Jadwal belum berhasil ditambahkan."); return; }
     toast.success(`Jadwal "${name.trim()}" berhasil ditambahkan`);
     onClose();

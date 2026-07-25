@@ -22,6 +22,8 @@ export interface Transaction {
   cat: string;
   desc: string;
   date: string;
+  /** Stable creation order for reports; legacy records may not have this. */
+  createdAt?: number;
   walletId?: number;
   /** Present when this outgoing transaction is a transfer into a savings goal. */
   goalId?: number;
@@ -287,6 +289,7 @@ function sanitizeTransaction(value: unknown): Transaction | null {
   const goalId = value.goalId === undefined ? undefined : toFiniteNumber(value.goalId, NaN);
   const transferId = value.transferId === undefined ? undefined : toFiniteNumber(value.transferId, NaN);
   const isCarryForward = value.isCarryForward === true;
+  const createdAt = value.createdAt === undefined ? undefined : toFiniteNumber(value.createdAt, NaN);
 
   return {
     id: toFiniteNumber(value.id, createId()),
@@ -295,6 +298,7 @@ function sanitizeTransaction(value: unknown): Transaction | null {
     cat: toStringValue(value.cat, "Lainnya").slice(0, 80),
     desc: toStringValue(value.desc, "").slice(0, 240),
     date: toDateKey(value.date),
+    ...(Number.isFinite(createdAt) ? { createdAt } : {}),
     ...(Number.isFinite(walletId) ? { walletId } : {}),
     ...(Number.isFinite(goalId) ? { goalId } : {}),
     ...(Number.isFinite(transferId) ? { transferId } : {}),
@@ -507,11 +511,13 @@ function normalizeUserData(remote?: Partial<UserData>): UserData {
   return result;
 }
 
-function removeUndefinedDeep<T>(value: T): T {
+export function removeUndefinedDeep<T>(value: T): T {
   if (Array.isArray(value)) {
     return value.map((item) => removeUndefinedDeep(item)) as T;
   }
-  if (value && typeof value === "object") {
+  // Preserve Firestore Timestamp/FieldValue, Date, and any future class
+  // instances. Only plain data objects should be reconstructed.
+  if (value && typeof value === "object" && Object.getPrototypeOf(value) === Object.prototype) {
     return Object.fromEntries(
       Object.entries(value as Record<string, unknown>)
         .filter(([, item]) => item !== undefined)
@@ -847,6 +853,7 @@ function useDuitStoreInternal() {
           if (!existingCF) {
             toCreate.push({
               id: createId(),
+              createdAt: Date.now(),
               type: "in",
               amt: expectedAmt,
               cat: "Saldo Bulan Lalu",
@@ -941,7 +948,7 @@ function useDuitStoreInternal() {
      TRANSACTIONS
      ══════════════════════════════════════════════════════════ */
   const addTx = useCallback(
-    (tx: Omit<Transaction, "id">): { ok: boolean; message?: string } => {
+    async (tx: Omit<Transaction, "id">): Promise<{ ok: boolean; message?: string }> => {
       if ((tx.type !== "in" && tx.type !== "out") || !Number.isFinite(tx.amt) || tx.amt <= 0) {
         return { ok: false, message: "Data transaksi atau nominal tidak valid." };
       }
@@ -962,27 +969,30 @@ function useDuitStoreInternal() {
           return { ok: false, message: "Saldo dompet tidak mencukupi untuk pengeluaran ini." };
         }
       }
-      const transaction: Transaction = { ...tx, id: createId() };
-      updateData((previous) => {
-        // Double-check every invariant against the fresh transaction data.
-        if (
-          (transaction.type !== "in" && transaction.type !== "out") ||
-          !Number.isFinite(transaction.amt) || transaction.amt <= 0 ||
-          !isValidDateKey(transaction.date) ||
-          (transaction.walletId !== undefined && !previous.wallets.some((wallet) => wallet.id === transaction.walletId))
-        ) return previous;
-        if (transaction.type === "out" && transaction.walletId !== undefined) {
-          const bal = getWalletBalance(previous, transaction.walletId);
-          if (bal === null || bal < transaction.amt) return previous;
-        }
-        return {
-          ...previous,
-          txs: [transaction, ...previous.txs],
-        };
-      });
-      return { ok: true };
+      if (!uid || loadedUserId !== uid) return { ok: false, message: "Data akun masih dimuat. Coba lagi sebentar." };
+      const transaction: Transaction = { ...tx, id: createId(), createdAt: Date.now() };
+      try {
+        await enqueueFirestoreUpdate((previous) => {
+          // Double-check every invariant against fresh transaction data.
+          if (
+            (transaction.type !== "in" && transaction.type !== "out") ||
+            !Number.isFinite(transaction.amt) || transaction.amt <= 0 ||
+            !isValidDateKey(transaction.date) ||
+            (transaction.walletId !== undefined && !previous.wallets.some((wallet) => wallet.id === transaction.walletId))
+          ) throw new Error("Data transaksi tidak valid.");
+          if (transaction.type === "out" && transaction.walletId !== undefined) {
+            const bal = getWalletBalance(previous, transaction.walletId);
+            if (bal === null || bal < transaction.amt) throw new Error("Saldo dompet tidak mencukupi.");
+          }
+          return { ...previous, txs: [transaction, ...previous.txs] };
+        });
+        return { ok: true };
+      } catch (error) {
+        console.error("Transaction add error:", error);
+        return { ok: false, message: "Transaksi belum berhasil disimpan ke cloud. Coba lagi saat koneksi stabil." };
+      }
     },
-    [updateData]
+    [enqueueFirestoreUpdate, loadedUserId, uid]
   );
 
   const delTx = useCallback(
@@ -1089,17 +1099,23 @@ function useDuitStoreInternal() {
      SCHEDULES
      ══════════════════════════════════════════════════════════ */
   const addSched = useCallback(
-    (schedule: Omit<ScheduleItem, "id">): { ok: boolean; message?: string } => {
+    async (schedule: Omit<ScheduleItem, "id">): Promise<{ ok: boolean; message?: string }> => {
       const validationError = validateScheduleInput(schedule);
       if (validationError) return { ok: false, message: validationError };
+      if (!uid || loadedUserId !== uid) return { ok: false, message: "Data akun masih dimuat. Coba lagi sebentar." };
       const item: ScheduleItem = { ...schedule, name: schedule.name.trim(), id: createId() };
-      updateData((previous) => {
-        if (validateScheduleInput(schedule)) return previous;
-        return { ...previous, scheds: [...previous.scheds, item] };
-      });
-      return { ok: true };
+      try {
+        await enqueueFirestoreUpdate((previous) => {
+          if (validateScheduleInput(schedule)) throw new Error("Data jadwal tidak valid.");
+          return { ...previous, scheds: [...previous.scheds, item] };
+        });
+        return { ok: true };
+      } catch (error) {
+        console.error("Schedule add error:", error);
+        return { ok: false, message: "Jadwal belum berhasil disimpan ke cloud. Coba lagi saat koneksi stabil." };
+      }
     },
-    [updateData]
+    [enqueueFirestoreUpdate, loadedUserId, uid]
   );
 
   const delSched = useCallback(
@@ -1112,23 +1128,29 @@ function useDuitStoreInternal() {
   );
 
   const updateSched = useCallback(
-    (id: number, patch: Partial<Omit<ScheduleItem, "id">>): { ok: boolean; message?: string } => {
+    async (id: number, patch: Partial<Omit<ScheduleItem, "id">>): Promise<{ ok: boolean; message?: string }> => {
       const existing = dataRef.current.scheds.find((schedule) => schedule.id === id);
       if (!existing) return { ok: false, message: "Jadwal tidak ditemukan." };
       const candidate = { ...existing, ...patch };
       const validationError = validateScheduleInput(candidate);
       if (validationError) return { ok: false, message: validationError };
-      updateData((previous) => {
-        const current = previous.scheds.find((schedule) => schedule.id === id);
-        if (!current || validateScheduleInput({ ...current, ...patch })) return previous;
-        return {
-          ...previous,
-          scheds: previous.scheds.map((schedule) => schedule.id === id ? { ...schedule, ...patch, name: candidate.name.trim() } : schedule),
-        };
-      });
-      return { ok: true };
+      if (!uid || loadedUserId !== uid) return { ok: false, message: "Data akun masih dimuat. Coba lagi sebentar." };
+      try {
+        await enqueueFirestoreUpdate((previous) => {
+          const current = previous.scheds.find((schedule) => schedule.id === id);
+          if (!current || validateScheduleInput({ ...current, ...patch })) throw new Error("Data jadwal tidak valid.");
+          return {
+            ...previous,
+            scheds: previous.scheds.map((schedule) => schedule.id === id ? { ...schedule, ...patch, name: candidate.name.trim() } : schedule),
+          };
+        });
+        return { ok: true };
+      } catch (error) {
+        console.error("Schedule update error:", error);
+        return { ok: false, message: "Jadwal belum berhasil disimpan ke cloud. Coba lagi saat koneksi stabil." };
+      }
     },
-    [updateData]
+    [enqueueFirestoreUpdate, loadedUserId, uid]
   );
 
   /* ══════════════════════════════════════════════════════════
@@ -1167,6 +1189,7 @@ function useDuitStoreInternal() {
       // Create a goal-funding "out" transaction if initial savings > 0
       const fundingTx: Transaction | null = currentAmt > 0 && walletId ? {
         id: createId(),
+        createdAt: Date.now(),
         type: "out",
         amt: currentAmt,
         cat: "Tabungan",
@@ -1255,6 +1278,7 @@ function useDuitStoreInternal() {
       const date = todayStr();
       const savingTransaction: Transaction = {
         id: createId(),
+        createdAt: Date.now(),
         type: "out",
         amt: amount,
         cat: "Tabungan",
@@ -1323,6 +1347,7 @@ function useDuitStoreInternal() {
       const date = todayStr();
       const withdrawTransaction: Transaction = {
         id: createId(),
+        createdAt: Date.now(),
         type: "in",
         amt: amount,
         cat: "Tabungan",
@@ -1380,18 +1405,24 @@ function useDuitStoreInternal() {
      WALLETS
      ══════════════════════════════════════════════════════════ */
   const addWallet = useCallback(
-    (wallet: Omit<Wallet, "id">): { ok: boolean; message?: string } => {
+    async (wallet: Omit<Wallet, "id">): Promise<{ ok: boolean; message?: string }> => {
       if (!wallet.name?.trim() || !Number.isFinite(wallet.balance) || wallet.balance < 0) {
         return { ok: false, message: "Data dompet atau saldo awal tidak valid." };
       }
+      if (!uid || loadedUserId !== uid) return { ok: false, message: "Data akun masih dimuat. Coba lagi sebentar." };
       const item: Wallet = { ...wallet, name: wallet.name.trim(), id: createId() };
-      updateData((previous) => {
-        if (!item.name || !Number.isFinite(item.balance) || item.balance < 0) return previous;
-        return { ...previous, wallets: [...previous.wallets, item] };
-      });
-      return { ok: true };
+      try {
+        await enqueueFirestoreUpdate((previous) => {
+          if (!item.name || !Number.isFinite(item.balance) || item.balance < 0) throw new Error("Data dompet tidak valid.");
+          return { ...previous, wallets: [...previous.wallets, item] };
+        });
+        return { ok: true };
+      } catch (error) {
+        console.error("Wallet add error:", error);
+        return { ok: false, message: "Dompet belum berhasil disimpan ke cloud. Coba lagi saat koneksi stabil." };
+      }
     },
-    [updateData]
+    [enqueueFirestoreUpdate, loadedUserId, uid]
   );
 
   const delWallet = useCallback(
@@ -1506,6 +1537,7 @@ function useDuitStoreInternal() {
       const date = todayStr();
       const outTx: Transaction = {
         id: createId(),
+        createdAt: Date.now(),
         type: "out",
         amt: amount,
         cat: "Transfer",
@@ -1516,6 +1548,7 @@ function useDuitStoreInternal() {
       };
       const inTx: Transaction = {
         id: createId(),
+        createdAt: Date.now(),
         type: "in",
         amt: amount,
         cat: "Transfer",

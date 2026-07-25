@@ -73,7 +73,7 @@ export default function KeuanganView({ quickType, quickNonce, onQuickDone, onRep
     transactionFormRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setFormError(null);
     if (!type || !cat || !walletId || !amt) {
@@ -90,7 +90,7 @@ export default function KeuanganView({ quickType, quickNonce, onQuickDone, onRep
       setFormError("Saldo dompet tidak mencukupi untuk pengeluaran ini.");
       return;
     }
-    const result = addTx({
+    const result = await addTx({
       type,
       cat,
       desc: desc || cat,
