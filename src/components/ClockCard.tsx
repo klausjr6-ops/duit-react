@@ -1,4 +1,5 @@
 import { motion } from "framer-motion";
+import { useEffect, useState } from "react";
 import Card from "./Card";
 import { formatDayDate, formatTime, jakartaTimeParts } from "../lib/format";
 import { useTheme } from "../lib/ThemeContext";
@@ -7,7 +8,18 @@ interface ClockCardProps {
   now: Date;
 }
 
-export default function ClockCard({ now }: ClockCardProps) {
+export default function ClockCard({ now: initialNow }: ClockCardProps) {
+  const [now, setNow] = useState(initialNow);
+
+  useEffect(() => {
+    setNow(initialNow);
+  }, [initialNow]);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(new Date()), 1000);
+    return () => window.clearInterval(timer);
+  }, []);
+
   const { day, full } = formatDayDate(now);
   const { hour, minute, second } = jakartaTimeParts(now);
   const { isDark } = useTheme();

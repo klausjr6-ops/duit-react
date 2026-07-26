@@ -163,7 +163,9 @@ function DashboardApp() {
   } = usePullToRefresh(refreshData);
 
   useEffect(() => {
-    const id = setInterval(() => setNow(new Date()), 1000);
+    // Header/context only needs minute-level freshness. Keep the per-second
+    // ticker isolated inside ClockCard so the full dashboard does not rerender.
+    const id = setInterval(() => setNow(new Date()), 30_000);
     return () => clearInterval(id);
   }, []);
 
@@ -205,7 +207,7 @@ function DashboardApp() {
         {isDark ? (
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(0,229,196,0.08),transparent_45%),radial-gradient(circle_at_80%_0%,rgba(74,158,255,0.1),transparent_40%),radial-gradient(circle_at_50%_100%,rgba(155,111,255,0.06),transparent_40%)]" />
         ) : (
-          <div className="absolute inset-0 opacity-[0.035]" style={{
+          <div className="absolute inset-0 hidden opacity-[0.035] sm:block" style={{
             backgroundImage: `radial-gradient(#0f172a 1px, transparent 1px)`,
             backgroundSize: "24px 24px"
           }} />

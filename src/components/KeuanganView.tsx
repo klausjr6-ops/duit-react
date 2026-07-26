@@ -1,11 +1,11 @@
-import { useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import Card from "./Card";
 import TransactionList from "./TransactionList";
 import WeeklyChart from "./WeeklyChart";
 import WalletManager from "./WalletManager";
 import EditWalletModal from "./EditWalletModal";
-import MonthlyReportView from "./MonthlyReportView";
+const MonthlyReportView = lazy(() => import("./MonthlyReportView"));
 import { formatRupiah } from "../lib/format";
 import { useStore, todayStr, type Wallet } from "../lib/store";
 import { useTheme } from "../lib/ThemeContext";
@@ -134,7 +134,7 @@ export default function KeuanganView({ quickType, quickNonce, onQuickDone, onRep
         </div>
       </div>
 
-      {viewMode === "report" ? <MonthlyReportView /> : <>
+      {viewMode === "report" ? <Suspense fallback={<div className={`rounded-3xl border p-8 text-center text-sm ${isDark ? "border-white/10 bg-slate-900/60 text-slate-400" : "border-zinc-200 bg-white text-zinc-500"}`}>Memuat laporan…</div>}><MonthlyReportView /></Suspense> : <>
       {cfTotal > 0 && (
         <motion.div
           initial={{ opacity: 0, y: -8 }}

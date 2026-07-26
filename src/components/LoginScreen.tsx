@@ -142,20 +142,20 @@ function LoginForm({ onSwitchToRegister }: { onSwitchToRegister: () => void }) {
       <div className={cardCls}>
         <form onSubmit={handleSubmit} className="space-y-4">
           <Input label="Email" type="email" value={email} onChange={setEmail} placeholder="nama@email.com" autoComplete="email" />
-          <div>
-            <div className="flex items-center justify-between mb-1.5">
-              <label className={`text-xs font-medium ${isDark ? "text-zinc-400" : "text-zinc-600"}`}>Password</label>
-              <button
-                type="button"
-                onClick={handleResetPassword}
-                disabled={loading || googleLoading || resetLoading}
-                className="text-xs text-teal-600 hover:text-teal-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              >
-                {resetLoading ? "Mengirim..." : "Lupa?"}
-              </button>
+            <div>
+              <label className={`mb-1.5 block text-xs font-medium ${isDark ? "text-zinc-400" : "text-zinc-600"}`}>Password</label>
+              <PasswordInput value={password} onChange={setPassword} show={showPass} onToggleShow={() => setShowPass(s=>!s)} autoComplete="current-password" />
+              <div className="mt-2 flex justify-end">
+                <button
+                  type="button"
+                  onClick={handleResetPassword}
+                  disabled={loading || googleLoading || resetLoading}
+                  className="text-xs text-teal-600 hover:text-teal-500 disabled:cursor-not-allowed disabled:opacity-50 transition-colors"
+                >
+                  {resetLoading ? "Mengirim link reset..." : "Lupa password?"}
+                </button>
+              </div>
             </div>
-            <PasswordInput value={password} onChange={setPassword} show={showPass} onToggleShow={() => setShowPass(s=>!s)} autoComplete="current-password" />
-          </div>
           <AnimatePresence>
             {error && <ErrorMessage message={error} />}
             {success && <SuccessMessage message={success} />}
