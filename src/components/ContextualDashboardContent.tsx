@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import Card from "./Card";
 import MoodCard from "./MoodCard";
 import { formatRupiah, jakartaTimeParts } from "../lib/format";
-import { dateKeyInJakarta, useStore } from "../lib/store";
+import { addDaysToDateKey, dateKeyInJakarta, useStore } from "../lib/store";
 import { useTheme } from "../lib/ThemeContext";
 import { IconArrowDown, IconArrowUp, IconCalendar, IconWallet } from "../utils/icons";
 
@@ -23,9 +23,10 @@ type Context = "morning" | "afternoon" | "evening" | "monthEnd";
 
 export default function ContextualDashboardContent(props: Props) {
   const { isDark } = useTheme();
-  const { wallets, goals, todaySchedules, todayMood } = useStore();
+  const { wallets, goals, todaySchedules, todayMood, moods } = useStore();
   const { hour } = jakartaTimeParts(props.now);
   const todayKey = dateKeyInJakarta(props.now);
+  const previousNightMood = moods[addDaysToDateKey(todayKey, -1)];
   const day = Number(todayKey.slice(-2));
   const context: Context = day >= 28 ? "monthEnd" : hour >= 18 || hour < 4 ? "evening" : hour >= 12 ? "afternoon" : "morning";
   const label = isDark ? "text-slate-500" : "text-zinc-500";
@@ -37,7 +38,7 @@ export default function ContextualDashboardContent(props: Props) {
 
   const contextTitle = context === "morning" ? "PAGI · MULAI HARI" : context === "afternoon" ? "SIANG · LANJUTKAN DENGAN SADAR" : context === "evening" ? "MALAM · TUTUP HARI" : "AKHIR BULAN · LIHAT GAMBAR BESAR";
   const contextText = context === "morning" ? "Prioritasmu adalah ritme, agenda, dan ruang aman hari ini." : context === "afternoon" ? "Fokus pada apa yang sudah berjalan dan yang masih tersisa hari ini." : context === "evening" ? "Tidak perlu mengejar semuanya. Lihat hari ini dengan tenang." : "Fokus pada arus kas, ruang yang tersisa, dan langkah bulan berikutnya.";
-  const motivation = getContextualMotivation({ context, dateKey: todayKey, scheduleCount: todaySchedules.length, todayExpense: props.todayExpense, inMonth: props.inMonth, outMonth: props.outMonth, moodLabel: todayMood?.label });
+  const motivation = getContextualMotivation({ context, dateKey: todayKey, scheduleCount: todaySchedules.length, todayExpense: props.todayExpense, inMonth: props.inMonth, outMonth: props.outMonth, moodLabel: todayMood?.label, previousMoodLabel: previousNightMood?.label });
 
   return <div className="space-y-6">
     <section className={`rounded-2xl border px-4 py-3 sm:px-5 ${isDark ? "border-white/10 bg-white/5" : "border-teal-100 bg-teal-50/70"}`}>
@@ -82,10 +83,25 @@ function Insight({ label, text, accent }: { label: string; text: string; accent:
 function Wallets({ wallets, main, muted }: { wallets: ReturnType<typeof useStore>["wallets"]; main: string; muted: string }) { return <Card><p className={`text-xs font-semibold tracking-widest ${muted}`}>SNAPSHOT WALLET</p><div className="mt-4 space-y-3">{wallets.slice(0,3).map(w=><div key={w.id} className="flex items-center gap-3"><span className="rounded-lg bg-teal-500/10 p-2 text-teal-600"><IconWallet size={16}/></span><span className={`flex-1 text-sm font-bold ${main}`}>{w.name}</span><span className={`text-sm font-bold ${main}`}>{formatRupiah(w.balance)}</span></div>)}</div></Card>; }
 
 
-function getContextualMotivation({ context, dateKey, scheduleCount, todayExpense, inMonth, outMonth, moodLabel }: { context: Context; dateKey: string; scheduleCount: number; todayExpense: number; inMonth: number; outMonth: number; moodLabel?: string }) {
+function getContextualMotivation({ context, dateKey, scheduleCount, todayExpense, inMonth, outMonth, moodLabel, previousMoodLabel }: { context: Context; dateKey: string; scheduleCount: number; todayExpense: number; inMonth: number; outMonth: number; moodLabel?: string; previousMoodLabel?: string }) {
   const seed = [...dateKey].reduce((total, char) => total + char.charCodeAt(0), 0);
   const choose = (items: string[]) => items[seed % items.length];
   if (context === "morning") {
+    // Mood malam sebelumnya menjadi nada motivasi pagi, bukan diagnosis.
+    if (previousMoodLabel === "Ngantuk" || previousMoodLabel === "Lesu") {
+      return choose([
+        "Tadi malam kamu merasa cukup lelah. Pagi ini tidak harus luar biasa—mulai pelan dan jaga energimu.",
+        "Tidak apa-apa bila kamu butuh ritme yang lebih ringan hari ini. Satu hal kecil yang selesai sudah cukup baik.",
+        "Bawa dirimu pelan-pelan pagi ini. Fokus pada yang penting, bukan pada banyaknya hal yang harus dilakukan.",
+      ]);
+    }
+    if (previousMoodLabel === "Baik" || previousMoodLabel === "Semangat") {
+      return choose([
+        "Kamu menutup kemarin dengan energi yang baik. Pilih satu langkah nyata untuk membawa momentum itu ke hari ini.",
+        "Ada ritme baik yang kamu bawa dari kemarin. Gunakan untuk memulai, tanpa perlu memaksa diri terlalu jauh.",
+        "Kemarin kamu punya ruang yang cukup baik. Hari ini, coba jaga satu hal yang membuatmu tetap bertumbuh.",
+      ]);
+    }
     if (scheduleCount >= 3) return "Harimu cukup penuh. Kamu tidak harus mengerjakan semuanya sekaligus—mulai dari satu hal yang paling penting.";
     return choose(["Kamu tidak perlu mengejar pagi yang sempurna. Satu langkah kecil yang selesai tetap berarti.", "Jaga ritmemu, bukan hanya daftar tugasmu. Hari yang tenang juga bisa menjadi hari yang baik.", "Mulai dengan yang penting, lalu biarkan sisanya menemukan tempatnya sendiri."]);
   }
