@@ -124,6 +124,8 @@ export default function AccountModal({ open, onClose }: AccountModalProps) {
   const [calendarCopied, setCalendarCopied] = useState(false);
   const [calendarNotice, setCalendarNotice] = useState<string | null>(null);
   const [avatarSaving, setAvatarSaving] = useState(false);
+  const [avatarMenuOpen, setAvatarMenuOpen] = useState(false);
+  const [avatarPreviewOpen, setAvatarPreviewOpen] = useState(false);
   const [avatarError, setAvatarError] = useState<string | null>(null);
   const [backupNotice, setBackupNotice] = useState<string | null>(null);
   const [backupError, setBackupError] = useState<string | null>(null);
@@ -400,27 +402,37 @@ export default function AccountModal({ open, onClose }: AccountModalProps) {
                 >
                   {/* Avatar */}
                   <div className="mb-5 flex flex-col items-center">
-                    <button
-                      type="button"
-                      disabled={avatarSaving}
-                      aria-label="Ganti foto avatar"
-                      onClick={() => fileRef.current?.click()}
-                      className="group relative h-20 w-20 overflow-hidden rounded-full ring-2 ring-teal-400/40 disabled:cursor-wait disabled:opacity-70"
-                    >
-                      {settings.avatar ? (
-                        <img src={settings.avatar} alt="Avatar" className="h-full w-full object-cover" />
-                      ) : (
-                        <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-teal-400 to-blue-500 text-xl font-bold text-zinc-900">
-                          {name ? name[0].toUpperCase() : "?"}
+                    <div className="relative">
+                      <button
+                        type="button"
+                        disabled={avatarSaving}
+                        aria-label={settings.avatar ? "Opsi foto avatar" : "Ganti foto avatar"}
+                        onClick={() => settings.avatar ? setAvatarMenuOpen((open) => !open) : fileRef.current?.click()}
+                        className="group relative h-20 w-20 overflow-hidden rounded-full ring-2 ring-teal-400/40 disabled:cursor-wait disabled:opacity-70"
+                      >
+                        {settings.avatar ? (
+                          <img src={settings.avatar} alt="Avatar" className="h-full w-full object-cover" />
+                        ) : (
+                          <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-teal-400 to-blue-500 text-xl font-bold text-zinc-900">
+                            {name ? name[0].toUpperCase() : "?"}
+                          </div>
+                        )}
+                        <div className={`absolute inset-0 flex items-center justify-center bg-black/40 text-lg transition-opacity ${avatarSaving ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}>
+                          {avatarSaving ? <span className="h-5 w-5 animate-spin rounded-full border-2 border-white/30 border-t-white" /> : <IconCamera size={22} className="text-white" />}
                         </div>
-                      )}
-                      <div className={`absolute inset-0 flex items-center justify-center bg-black/40 text-lg transition-opacity ${avatarSaving ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}>
-                        {avatarSaving ? <span className="h-5 w-5 animate-spin rounded-full border-2 border-white/30 border-t-white" /> : <IconCamera size={22} className="text-white" />}
-                      </div>
-                    </button>
+                      </button>
+                      <AnimatePresence>
+                        {settings.avatar && avatarMenuOpen && (
+                          <motion.div initial={{ opacity: 0, y: -4, scale: 0.96 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: -4, scale: 0.96 }} className={`absolute left-1/2 top-full z-20 mt-3 w-40 -translate-x-1/2 overflow-hidden rounded-xl border p-1 shadow-xl ${isDark ? "border-white/10 bg-slate-800" : "border-zinc-200 bg-white"}`}>
+                            <button type="button" onClick={() => { setAvatarMenuOpen(false); setAvatarPreviewOpen(true); }} className={`w-full rounded-lg px-3 py-2 text-left text-xs font-semibold ${isDark ? "text-slate-200 hover:bg-white/10" : "text-zinc-700 hover:bg-zinc-100"}`}>Lihat foto</button>
+                            <button type="button" onClick={() => { setAvatarMenuOpen(false); fileRef.current?.click(); }} className={`w-full rounded-lg px-3 py-2 text-left text-xs font-semibold ${isDark ? "text-slate-200 hover:bg-white/10" : "text-zinc-700 hover:bg-zinc-100"}`}>Ganti foto</button>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </div>
                     <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={handleAvatarPick} />
                     <p className={`mt-2 text-xs ${isDark ? "text-slate-500" : "text-zinc-500"}`}>
-                      {avatarSaving ? "Menyiapkan foto..." : "Klik foto untuk ganti avatar"}
+                      {avatarSaving ? "Menyiapkan foto..." : settings.avatar ? "Klik foto untuk melihat atau mengganti avatar" : "Klik foto untuk ganti avatar"}
                     </p>
                     {avatarError && (
                       <p role="alert" className="mt-2 max-w-xs text-center text-xs text-rose-500">{avatarError}</p>
@@ -739,6 +751,17 @@ export default function AccountModal({ open, onClose }: AccountModalProps) {
           </motion.div>
         </motion.div>
       )}
+      </AnimatePresence>
+      <AnimatePresence>
+        {avatarPreviewOpen && settings.avatar && (
+          <>
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setAvatarPreviewOpen(false)} className="fixed inset-0 z-[80] bg-black/75 backdrop-blur-sm" />
+            <motion.div initial={{ opacity: 0, scale: 0.94, y: 16 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.96, y: 8 }} className={`fixed left-1/2 top-1/2 z-[81] w-[calc(100%-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 rounded-3xl border p-5 shadow-2xl ${isDark ? "border-white/10 bg-slate-900" : "border-zinc-200 bg-white"}`}>
+              <div className="mb-4 flex items-center justify-between"><h2 className={isDark ? "text-lg font-bold text-white" : "text-lg font-bold text-zinc-900"}>Foto Profil</h2><button type="button" onClick={() => setAvatarPreviewOpen(false)} aria-label="Tutup foto profil" className={isDark ? "text-slate-400 hover:text-white" : "text-zinc-500 hover:text-zinc-900"}><IconClose size={20}/></button></div>
+              <img src={settings.avatar} alt="Foto profil" className="max-h-[65vh] w-full rounded-2xl object-contain" />
+            </motion.div>
+          </>
+        )}
       </AnimatePresence>
       <ConfirmDialog
         open={open && confirmCalendarReset}
