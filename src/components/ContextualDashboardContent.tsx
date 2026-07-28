@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import Card from "./Card";
+import ReportCard from "./ReportCard";
 import MoodCard from "./MoodCard";
 import { formatRupiah, jakartaTimeParts } from "../lib/format";
 import { addDaysToDateKey, dateKeyInJakarta, useStore } from "../lib/store";
@@ -71,7 +72,7 @@ export default function ContextualDashboardContent(props: Props) {
     </>}
 
     {context === "monthEnd" && <>
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2"><Card accent={accent}><p className={`text-xs font-semibold tracking-widest ${label}`}>ARUS KAS BULAN INI</p><p className={`mt-2 text-3xl font-extrabold ${main}`}>{formatRupiah(props.inMonth - props.outMonth)}</p><p className={`mt-2 text-xs ${muted}`}>Masuk {formatRupiah(props.inMonth)} · Keluar {formatRupiah(props.outMonth)}</p></Card><Card><p className={`text-xs font-semibold tracking-widest ${label}`}>RUANG PENGELUARAN TERSISA</p><p className={`mt-2 text-3xl font-extrabold ${main}`}>{formatRupiah(Math.max(0, props.inMonth - props.outMonth))}</p><div className={`mt-4 h-2 overflow-hidden rounded-full ${isDark ? "bg-white/10" : "bg-zinc-100"}`}><div className="h-full rounded-full bg-gradient-to-r from-amber-400 to-orange-500" style={{width:`${Math.min(100, props.inMonth ? props.outMonth / props.inMonth * 100 : 100)}%`}}/></div></Card></div>
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2"><Card accent={accent}><p className={`text-xs font-semibold tracking-widest ${label}`}>ARUS KAS BULAN INI</p><p className={`mt-2 text-3xl font-extrabold ${main}`}>{formatRupiah(props.inMonth - props.outMonth)}</p><p className={`mt-2 text-xs ${muted}`}>Masuk {formatRupiah(props.inMonth)} · Keluar {formatRupiah(props.outMonth)}</p></Card><ReportCard income={props.inMonth} expense={props.outMonth} /></div>
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2"><Insight label="PENUTUP BULAN" text={motivation} accent="linear-gradient(90deg,#f59e0b,#fb7185)"/>{topGoal ? <Card><p className={`text-xs font-semibold tracking-widest ${label}`}>GOAL TERDEKAT</p><p className={`mt-3 text-lg font-bold ${main}`}>{topGoal.name}</p><div className={`mt-3 h-2 overflow-hidden rounded-full ${isDark ? "bg-white/10" : "bg-zinc-100"}`}><div className="h-full rounded-full bg-blue-500" style={{width:`${Math.min(100,topGoal.current/topGoal.target*100)}%`}}/></div><p className={`mt-2 text-xs ${muted}`}>{formatRupiah(topGoal.current)} dari {formatRupiah(topGoal.target)}</p><button onClick={props.onGoalClick} className="mt-4 text-xs font-bold text-teal-600">Buka goal →</button></Card> : <Wallets wallets={wallets} main={main} muted={muted}/>}</div>
     </>}
   </div>;
