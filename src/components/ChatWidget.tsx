@@ -5,10 +5,15 @@ import { useTheme } from "../lib/ThemeContext";
 import { useAuth } from "../lib/AuthContext";
 import { useModalDialog } from "../hooks/useModalDialog";
 
+type AssistantAction =
+  | { type: "schedule"; name: string; date: string; start: string; end?: string; desc?: string; recurring?: boolean; untilDate?: string }
+  | { type: "transaction"; transactionType: "in" | "out"; amount: number; category: string; walletName: string; date: string; desc?: string };
+
 interface Message {
   id: number;
   role: "user" | "assistant";
   text: string;
+  action?: AssistantAction;
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -58,6 +63,17 @@ Kalau data yang ditanyakan belum tercatat (misal user belum input), bilang jujur
 - Jangan disclaimer berlebihan ("saya AI jadi mungkin...")
 - Jangan lecture panjang lebar kalau user cuma mau ngobrol santai
 - Jangan bilang "aku tidak tahu" soal data user kalau datanya ada di system prompt
+
+## Aksi DUIT (jadwal dan transaksi)
+Jika—dan hanya jika—user secara eksplisit meminta menambahkan jadwal atau mencatat transaksi, buat respons natural singkat lalu tambahkan action machine-readable di baris paling akhir. Aksi selalu menunggu konfirmasi user; jangan pernah bilang aksi sudah tersimpan.
+
+Format jadwal:
+<duit-action>{"type":"schedule","name":"...","date":"YYYY-MM-DD","start":"HH:MM","end":"HH:MM opsional","desc":"opsional","recurring":false}</duit-action>
+
+Format transaksi:
+<duit-action>{"type":"transaction","transactionType":"in atau out","amount":angka_positif,"category":"kategori","walletName":"nama dompet persis dari data user","date":"YYYY-MM-DD","desc":"opsional"}</duit-action>
+
+Gunakan tanggal Asia/Jakarta yang ada di data user. Bila informasi wajib belum ada—misalnya dompet, nominal, tanggal, atau jam—tanyakan dulu dan JANGAN buat action. Jangan membuat action untuk sekadar pertanyaan, saran, atau contoh.
 
 Kalau user nyapa/basa-basi, respons kayak temen — jangan langsung "ada yang bisa saya bantu?"`;
 
@@ -177,6 +193,25 @@ function renderInlineMarkdown(text: string, keyPrefix: string, isDark: boolean):
   return nodes;
 }
 
+function extractAssistantAction(text: string): { text: string; action?: AssistantAction } {
+  const match = /<duit-action>\s*([\s\S]*?)\s*<\/duit-action>/i.exec(text);
+  if (!match) return { text };
+
+  const cleanText = text.replace(match[0], "").trim();
+  try {
+    const raw = JSON.parse(match[1]) as Record<string, unknown>;
+    if (raw.type === "schedule" && typeof raw.name === "string" && /^\d{4}-\d{2}-\d{2}$/.test(String(raw.date)) && /^\d{2}:\d{2}$/.test(String(raw.start))) {
+      return { text: cleanText, action: { type: "schedule", name: raw.name, date: String(raw.date), start: String(raw.start), ...(typeof raw.end === "string" ? { end: raw.end } : {}), ...(typeof raw.desc === "string" ? { desc: raw.desc } : {}), recurring: raw.recurring === true, ...(typeof raw.untilDate === "string" ? { untilDate: raw.untilDate } : {}) } };
+    }
+    if (raw.type === "transaction" && (raw.transactionType === "in" || raw.transactionType === "out") && Number.isFinite(Number(raw.amount)) && Number(raw.amount) > 0 && typeof raw.category === "string" && typeof raw.walletName === "string" && /^\d{4}-\d{2}-\d{2}$/.test(String(raw.date))) {
+      return { text: cleanText, action: { type: "transaction", transactionType: raw.transactionType, amount: Number(raw.amount), category: raw.category, walletName: raw.walletName, date: String(raw.date), ...(typeof raw.desc === "string" ? { desc: raw.desc } : {}) } };
+    }
+  } catch {
+    // Treat malformed model output as normal chat text without exposing JSON.
+  }
+  return { text: cleanText };
+}
+
 function ChatMessageText({ text, rich, isDark }: { text: string; rich: boolean; isDark: boolean }) {
   if (!rich) return <>{text}</>;
 
@@ -193,6 +228,18 @@ function ChatMessageText({ text, rich, isDark }: { text: string; rich: boolean; 
   );
 }
 
+function ActionPreview({ action, isDark, saving, onConfirm }: { action: AssistantAction; isDark: boolean; saving: boolean; onConfirm: () => void }) {
+  const isSchedule = action.type === "schedule";
+  const panel = isDark ? "border-teal-400/25 bg-teal-400/10" : "border-teal-200 bg-teal-50";
+  const title = isDark ? "text-teal-200" : "text-teal-800";
+  const detail = isDark ? "text-slate-300" : "text-zinc-700";
+  return <div className={`mt-2 rounded-2xl border p-3 ${panel}`}>
+    <p className={`text-[10px] font-extrabold tracking-[0.12em] ${title}`}>{isSchedule ? "PREVIEW JADWAL BARU" : "PREVIEW TRANSAKSI BARU"}</p>
+    {isSchedule ? <div className={`mt-2 text-xs leading-relaxed ${detail}`}><b className="block text-sm">{action.name}</b><span>{action.date} · {action.start}{action.end ? `–${action.end}` : ""}</span>{action.desc && <span className="block">{action.desc}</span>}</div> : <div className={`mt-2 text-xs leading-relaxed ${detail}`}><b className="block text-sm">{action.transactionType === "in" ? "Pemasukan" : "Pengeluaran"} · Rp{action.amount.toLocaleString("id-ID")}</b><span>{action.category} · {action.walletName} · {action.date}</span>{action.desc && <span className="block">{action.desc}</span>}</div>}
+    <button type="button" onClick={onConfirm} disabled={saving} className="mt-3 w-full rounded-xl bg-gradient-to-br from-teal-400 to-blue-500 py-2.5 text-xs font-extrabold text-zinc-900 disabled:cursor-not-allowed disabled:opacity-60">{saving ? "Menyimpan ke DUIT…" : isSchedule ? "Tambahkan Jadwal" : "Simpan Transaksi"}</button>
+  </div>;
+}
+
 // ═══════════════════════════════════════════════════════════════
 // COMPONENT — Modal Popup Chat AI
 // ═══════════════════════════════════════════════════════════════
@@ -202,13 +249,14 @@ interface ChatWidgetProps {
 }
 
 export default function ChatWidget({ open, onClose }: ChatWidgetProps) {
-  const { buildAIContext, settings, score, inMonth, outMonth } = useStore();
+  const { buildAIContext, settings, score, inMonth, outMonth, wallets, addSched, addTx } = useStore();
   const { user } = useAuth();
   const { isDark } = useTheme();
 
   const [messages, setMessages] = useState<Message[]>(() => user ? readChatHistory(user.uid) : [defaultGreeting()]);
   const [input, setInput] = useState("");
   const [typing, setTyping] = useState(false);
+  const [actionSavingId, setActionSavingId] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -311,9 +359,10 @@ export default function ChatWidget({ open, onClose }: ChatWidgetProps) {
       }
 
       if (!controller.signal.aborted) {
+        const parsed = extractAssistantAction(aiText);
         setMessages((previous) => [
           ...previous,
-          { id: Date.now() + 1, role: "assistant", text: aiText },
+          { id: Date.now() + 1, role: "assistant", text: parsed.text || "Siap, cek preview tindakan di bawah ya.", ...(parsed.action ? { action: parsed.action } : {}) },
         ]);
       }
     } catch (err: unknown) {
@@ -347,6 +396,31 @@ export default function ChatWidget({ open, onClose }: ChatWidgetProps) {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       send(input);
+    }
+  };
+
+  const confirmAction = async (messageId: number, action: AssistantAction) => {
+    if (actionSavingId !== null) return;
+    setActionSavingId(messageId);
+    setError(null);
+    try {
+      const result = await (action.type === "schedule"
+        ? addSched({ name: action.name.trim(), date: action.date, start: action.start, ...(action.end ? { end: action.end } : {}), ...(action.desc ? { desc: action.desc } : {}), recurring: action.recurring === true, ...(action.untilDate ? { untilDate: action.untilDate } : {}), icon: "pin" })
+        : (() => {
+            const wallet = wallets.find((item) => item.name.trim().toLocaleLowerCase("id-ID") === action.walletName.trim().toLocaleLowerCase("id-ID"));
+            if (!wallet) return Promise.resolve({ ok: false, message: `Dompet “${action.walletName}” tidak ditemukan. Pilih dompet yang tersedia dulu ya.` });
+            return addTx({ type: action.transactionType, amt: action.amount, cat: action.category.trim() || "Lainnya", desc: action.desc?.trim() || action.category, date: action.date, walletId: wallet.id });
+          })());
+      if (!result.ok) {
+        setError(result.message || "Tindakan belum berhasil disimpan.");
+        return;
+      }
+      setMessages((previous) => [
+        ...previous.map((message) => message.id === messageId ? { ...message, action: undefined } : message),
+        { id: Date.now() + 4, role: "assistant", text: action.type === "schedule" ? "Jadwalnya sudah ditambahkan ke DUIT. ✅" : "Transaksinya sudah dicatat ke DUIT. ✅" },
+      ]);
+    } finally {
+      setActionSavingId(null);
     }
   };
 
@@ -439,14 +513,19 @@ export default function ChatWidget({ open, onClose }: ChatWidgetProps) {
                     transition={{ duration: 0.2 }}
                     className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
                   >
-                    <div
-                      className={`max-w-[85%] px-4 py-3 rounded-2xl text-sm leading-relaxed break-words ${
-                        msg.role === "user"
-                          ? "whitespace-pre-wrap bg-gradient-to-br from-teal-400 to-blue-500 text-zinc-900 font-medium rounded-br-sm"
-                          : `${msgAssistant} rounded-bl-sm`
-                      }`}
-                    >
-                      <ChatMessageText text={msg.text} rich={msg.role === "assistant"} isDark={isDark} />
+                    <div className="max-w-[85%]">
+                      <div
+                        className={`px-4 py-3 rounded-2xl text-sm leading-relaxed break-words ${
+                          msg.role === "user"
+                            ? "whitespace-pre-wrap bg-gradient-to-br from-teal-400 to-blue-500 text-zinc-900 font-medium rounded-br-sm"
+                            : `${msgAssistant} rounded-bl-sm`
+                        }`}
+                      >
+                        <ChatMessageText text={msg.text} rich={msg.role === "assistant"} isDark={isDark} />
+                      </div>
+                      {msg.action && (
+                        <ActionPreview action={msg.action} isDark={isDark} saving={actionSavingId === msg.id} onConfirm={() => confirmAction(msg.id, msg.action!)} />
+                      )}
                     </div>
                   </motion.div>
                 ))}
