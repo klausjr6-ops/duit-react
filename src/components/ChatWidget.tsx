@@ -277,28 +277,38 @@ export default function ChatWidget({ open, onClose }: ChatWidgetProps) {
       requestAbortRef.current = controller;
 
       const idToken = await user?.getIdToken();
-      const res = await fetch("/api/chat", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(idToken ? { Authorization: `Bearer ${idToken}` } : {}),
-        },
-        signal: controller.signal,
-        body: JSON.stringify({
-          system: fullSystem,
-          messages: apiMessages.map((message) => ({
-            role: message.role,
-            content: message.text,
-          })),
-          max_tokens: 1200,
-        }),
-      });
+      const requestChat = async (requestMessages: Message[]) => {
+        const res = await fetch("/api/chat", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            ...(idToken ? { Authorization: `Bearer ${idToken}` } : {}),
+          },
+          signal: controller!.signal,
+          body: JSON.stringify({
+            system: fullSystem,
+            messages: requestMessages.map((message) => ({ role: message.role, content: message.text })),
+            max_tokens: 1800,
+          }),
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return res.json();
+      };
 
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json();
-      const aiText =
-        data?.content?.[0]?.text ||
-        "Hmm, aku bingung mau jawab apa 😅 Coba tanya lagi ya.";
+      const data = await requestChat(apiMessages);
+      let aiText = data?.content?.[0]?.text || "Hmm, aku bingung mau jawab apa 😅 Coba tanya lagi ya.";
+
+      // When the model hits its output limit, silently ask it to continue once.
+      // The partial answer is supplied as assistant context so it resumes instead
+      // of restarting or repeating the answer.
+      if (data?._meta?.truncated && !controller.signal.aborted) {
+        const continuationAssistant: Message = { id: Date.now() + 2, role: "assistant", text: aiText };
+        const continuationPrompt: Message = { id: Date.now() + 3, role: "user", text: "Lanjutkan jawaban terakhir dari bagian yang terpotong. Jangan mengulang bagian sebelumnya." };
+        const continuationMessages: Message[] = [...apiMessages, continuationAssistant, continuationPrompt].slice(-MAX_API_MESSAGES);
+        const continuation = await requestChat(continuationMessages);
+        const continuationText = continuation?.content?.[0]?.text || "";
+        if (continuationText) aiText += `\n\n${continuationText}`;
+      }
 
       if (!controller.signal.aborted) {
         setMessages((previous) => [

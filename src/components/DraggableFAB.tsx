@@ -10,7 +10,8 @@ import { useTheme } from "../lib/ThemeContext";
 
 /* ═══════════════════ CONSTANTS ═══════════════════ */
 const DRAG_THRESHOLD = 8;
-const EDGE_PAD = 16;
+const EDGE_PAD_MOBILE = 16;
+const EDGE_PAD_DESKTOP = 32;
 const TOP_PAD_MOBILE = 24;
 const TOP_PAD_DESKTOP = 32;
 const BOT_PAD_MOBILE = 88;
@@ -26,13 +27,14 @@ function getCornerXY(c: FabCorner): { x: number; y: number } {
   const vh = window.innerHeight;
   const s = getFabSize();
   const desk = vw >= 768;
+  const edge = desk ? EDGE_PAD_DESKTOP : EDGE_PAD_MOBILE;
   const tp = desk ? TOP_PAD_DESKTOP : TOP_PAD_MOBILE;
   const bp = desk ? BOT_PAD_DESKTOP : BOT_PAD_MOBILE;
   switch (c) {
-    case "top-left":     return { x: EDGE_PAD, y: tp };
-    case "top-right":    return { x: vw - EDGE_PAD - s, y: tp };
-    case "bottom-left":  return { x: EDGE_PAD, y: vh - bp - s };
-    case "bottom-right": return { x: vw - EDGE_PAD - s, y: vh - bp - s };
+    case "top-left":     return { x: edge, y: tp };
+    case "top-right":    return { x: vw - edge - s, y: tp };
+    case "bottom-left":  return { x: edge, y: vh - bp - s };
+    case "bottom-right": return { x: vw - edge - s, y: vh - bp - s };
   }
 }
 

@@ -9,6 +9,7 @@ import { getAuth } from "firebase-admin/auth";
 const MAX_MESSAGES_PER_REQUEST = 16;
 const MAX_MESSAGE_CHARACTERS = 5000;
 const MAX_SYSTEM_CHARACTERS = 18000;
+const MAX_OUTPUT_TOKENS = 1800;
 const RATE_LIMIT_WINDOW_MS = 60_000;
 const RATE_LIMIT_MAX_REQUESTS = 12;
 const requestBuckets = new Map();
@@ -126,7 +127,7 @@ function sanitizeRequest(body) {
   return {
     system: typeof body.system === "string" ? body.system.slice(0, MAX_SYSTEM_CHARACTERS) : "",
     messages,
-    max_tokens: Math.min(Math.max(Number(body.max_tokens) || 1200, 1), 1200),
+    max_tokens: Math.min(Math.max(Number(body.max_tokens) || MAX_OUTPUT_TOKENS, 1), MAX_OUTPUT_TOKENS),
   };
 }
 
@@ -220,7 +221,7 @@ async function callGemini({ system, messages, max_tokens }) {
     throw new Error('Gemini empty response');
   }
 
-  return { text, provider: 'gemini' };
+  return { text, provider: 'gemini', truncated: candidate?.finishReason === 'MAX_TOKENS' };
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -287,7 +288,7 @@ async function callGroq({ system, messages, max_tokens }) {
     throw new Error('Groq empty response');
   }
 
-  return { text, provider: 'groq' };
+  return { text, provider: 'groq', truncated: choice?.finish_reason === 'length' };
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -329,6 +330,7 @@ export default async function handler(req, res) {
 
   let usedProvider = null;
   let finalText = null;
+  let truncated = false;
   const errors = [];
 
   // ═══ ATTEMPT 1: Gemini (Primary) ═══
@@ -338,6 +340,7 @@ export default async function handler(req, res) {
       const result = await withTimeout(callGemini(params), 15000, 'Gemini');
       finalText = result.text;
       usedProvider = result.provider;
+      truncated = Boolean(result.truncated);
       console.log('[AI] ✅ Gemini success');
     } catch (err) {
       const msg = err.message || 'unknown error';
@@ -356,6 +359,7 @@ export default async function handler(req, res) {
       const result = await withTimeout(callGroq(params), 15000, 'Groq');
       finalText = result.text;
       usedProvider = result.provider;
+      truncated = Boolean(result.truncated);
       console.log('[AI] ✅ Groq success (fallback)');
     } catch (err) {
       const msg = err.message || 'unknown error';
@@ -371,7 +375,7 @@ export default async function handler(req, res) {
   if (finalText) {
     res.status(200).json({
       content: [{ type: 'text', text: finalText }],
-      _meta: { provider: usedProvider },
+      _meta: { provider: usedProvider, truncated },
     });
   } else {
     console.error('[AI] All providers failed:', errors);
