@@ -7,7 +7,11 @@ import { useModalDialog } from "../hooks/useModalDialog";
 
 type AssistantAction =
   | { type: "schedule"; name: string; date: string; start: string; end?: string; desc?: string; recurring?: boolean; untilDate?: string }
-  | { type: "transaction"; transactionType: "in" | "out"; amount: number; category: string; walletName: string; date: string; desc?: string };
+  | { type: "transaction"; transactionType: "in" | "out"; amount: number; category: string; walletName: string; date: string; desc?: string }
+  | { type: "goalFund"; goalName: string; walletName: string; amount: number }
+  | { type: "transfer"; fromWalletName: string; toWalletName: string; amount: number }
+  | { type: "scheduleUpdate"; scheduleName: string; date?: string; start?: string; end?: string; desc?: string; recurring?: boolean; untilDate?: string }
+  | { type: "scheduleDelete"; scheduleName: string; date?: string; start?: string };
 
 interface Message {
   id: number;
@@ -73,7 +77,19 @@ Format jadwal:
 Format transaksi:
 <duit-action>{"type":"transaction","transactionType":"in atau out","amount":angka_positif,"category":"kategori","walletName":"nama dompet persis dari data user","date":"YYYY-MM-DD","desc":"opsional"}</duit-action>
 
-Gunakan tanggal Asia/Jakarta yang ada di data user. Bila informasi wajib belum ada—misalnya dompet, nominal, tanggal, atau jam—tanyakan dulu dan JANGAN buat action. Jangan membuat action untuk sekadar pertanyaan, saran, atau contoh.
+Format nabung goal:
+<duit-action>{"type":"goalFund","goalName":"nama goal persis dari data user","walletName":"nama dompet persis dari data user","amount":angka_positif}</duit-action>
+
+Format transfer wallet:
+<duit-action>{"type":"transfer","fromWalletName":"dompet asal","toWalletName":"dompet tujuan","amount":angka_positif}</duit-action>
+
+Format ubah jadwal (hanya isi field yang diminta untuk diubah):
+<duit-action>{"type":"scheduleUpdate","scheduleName":"nama jadwal persis","date":"YYYY-MM-DD opsional","start":"HH:MM opsional","end":"HH:MM opsional","desc":"opsional","recurring":true atau false,"untilDate":"YYYY-MM-DD opsional"}</duit-action>
+
+Format hapus jadwal:
+<duit-action>{"type":"scheduleDelete","scheduleName":"nama jadwal persis","date":"YYYY-MM-DD opsional","start":"HH:MM opsional"}</duit-action>
+
+Gunakan nama wallet, goal, dan jadwal persis dari data user. Bila ada lebih dari satu jadwal dengan nama sama atau informasi wajib belum ada—misalnya dompet, nominal, tanggal, atau jam—tanyakan dulu dan JANGAN buat action. Jangan membuat action untuk sekadar pertanyaan, saran, atau contoh.
 
 Kalau user nyapa/basa-basi, respons kayak temen — jangan langsung "ada yang bisa saya bantu?"`;
 
@@ -206,6 +222,18 @@ function extractAssistantAction(text: string): { text: string; action?: Assistan
     if (raw.type === "transaction" && (raw.transactionType === "in" || raw.transactionType === "out") && Number.isFinite(Number(raw.amount)) && Number(raw.amount) > 0 && typeof raw.category === "string" && typeof raw.walletName === "string" && /^\d{4}-\d{2}-\d{2}$/.test(String(raw.date))) {
       return { text: cleanText, action: { type: "transaction", transactionType: raw.transactionType, amount: Number(raw.amount), category: raw.category, walletName: raw.walletName, date: String(raw.date), ...(typeof raw.desc === "string" ? { desc: raw.desc } : {}) } };
     }
+    if (raw.type === "goalFund" && typeof raw.goalName === "string" && typeof raw.walletName === "string" && Number.isFinite(Number(raw.amount)) && Number(raw.amount) > 0) {
+      return { text: cleanText, action: { type: "goalFund", goalName: raw.goalName, walletName: raw.walletName, amount: Number(raw.amount) } };
+    }
+    if (raw.type === "transfer" && typeof raw.fromWalletName === "string" && typeof raw.toWalletName === "string" && Number.isFinite(Number(raw.amount)) && Number(raw.amount) > 0) {
+      return { text: cleanText, action: { type: "transfer", fromWalletName: raw.fromWalletName, toWalletName: raw.toWalletName, amount: Number(raw.amount) } };
+    }
+    if (raw.type === "scheduleUpdate" && typeof raw.scheduleName === "string") {
+      return { text: cleanText, action: { type: "scheduleUpdate", scheduleName: raw.scheduleName, ...(typeof raw.date === "string" ? { date: raw.date } : {}), ...(typeof raw.start === "string" ? { start: raw.start } : {}), ...(typeof raw.end === "string" ? { end: raw.end } : {}), ...(typeof raw.desc === "string" ? { desc: raw.desc } : {}), ...(typeof raw.recurring === "boolean" ? { recurring: raw.recurring } : {}), ...(typeof raw.untilDate === "string" ? { untilDate: raw.untilDate } : {}) } };
+    }
+    if (raw.type === "scheduleDelete" && typeof raw.scheduleName === "string") {
+      return { text: cleanText, action: { type: "scheduleDelete", scheduleName: raw.scheduleName, ...(typeof raw.date === "string" ? { date: raw.date } : {}), ...(typeof raw.start === "string" ? { start: raw.start } : {}) } };
+    }
   } catch {
     // Treat malformed model output as normal chat text without exposing JSON.
   }
@@ -229,15 +257,32 @@ function ChatMessageText({ text, rich, isDark }: { text: string; rich: boolean; 
 }
 
 function ActionPreview({ action, isDark, saving, onConfirm }: { action: AssistantAction; isDark: boolean; saving: boolean; onConfirm: () => void }) {
-  const isSchedule = action.type === "schedule";
   const panel = isDark ? "border-teal-400/25 bg-teal-400/10" : "border-teal-200 bg-teal-50";
   const title = isDark ? "text-teal-200" : "text-teal-800";
   const detail = isDark ? "text-slate-300" : "text-zinc-700";
-  return <div className={`mt-2 rounded-2xl border p-3 ${panel}`}>
-    <p className={`text-[10px] font-extrabold tracking-[0.12em] ${title}`}>{isSchedule ? "PREVIEW JADWAL BARU" : "PREVIEW TRANSAKSI BARU"}</p>
-    {isSchedule ? <div className={`mt-2 text-xs leading-relaxed ${detail}`}><b className="block text-sm">{action.name}</b><span>{action.date} · {action.start}{action.end ? `–${action.end}` : ""}</span>{action.desc && <span className="block">{action.desc}</span>}</div> : <div className={`mt-2 text-xs leading-relaxed ${detail}`}><b className="block text-sm">{action.transactionType === "in" ? "Pemasukan" : "Pengeluaran"} · Rp{action.amount.toLocaleString("id-ID")}</b><span>{action.category} · {action.walletName} · {action.date}</span>{action.desc && <span className="block">{action.desc}</span>}</div>}
-    <button type="button" onClick={onConfirm} disabled={saving} className="mt-3 w-full rounded-xl bg-gradient-to-br from-teal-400 to-blue-500 py-2.5 text-xs font-extrabold text-zinc-900 disabled:cursor-not-allowed disabled:opacity-60">{saving ? "Menyimpan ke DUIT…" : isSchedule ? "Tambahkan Jadwal" : "Simpan Transaksi"}</button>
-  </div>;
+  let heading = "PREVIEW TINDAKAN";
+  let button = "Konfirmasi Tindakan";
+  let body: React.ReactNode;
+  if (action.type === "schedule") {
+    heading = "PREVIEW JADWAL BARU"; button = "Tambahkan Jadwal";
+    body = <><b className="block text-sm">{action.name}</b><span>{action.date} · {action.start}{action.end ? `–${action.end}` : ""}</span>{action.desc && <span className="block">{action.desc}</span>}</>;
+  } else if (action.type === "transaction") {
+    heading = "PREVIEW TRANSAKSI BARU"; button = "Simpan Transaksi";
+    body = <><b className="block text-sm">{action.transactionType === "in" ? "Pemasukan" : "Pengeluaran"} · Rp{action.amount.toLocaleString("id-ID")}</b><span>{action.category} · {action.walletName} · {action.date}</span>{action.desc && <span className="block">{action.desc}</span>}</>;
+  } else if (action.type === "goalFund") {
+    heading = "PREVIEW TABUNGAN GOAL"; button = "Tambahkan ke Goal";
+    body = <><b className="block text-sm">{action.goalName} · Rp{action.amount.toLocaleString("id-ID")}</b><span>Sumber dana: {action.walletName}</span></>;
+  } else if (action.type === "transfer") {
+    heading = "PREVIEW TRANSFER WALLET"; button = "Konfirmasi Transfer";
+    body = <><b className="block text-sm">Rp{action.amount.toLocaleString("id-ID")}</b><span>{action.fromWalletName} → {action.toWalletName}</span></>;
+  } else if (action.type === "scheduleUpdate") {
+    heading = "PREVIEW UBAH JADWAL"; button = "Perbarui Jadwal";
+    body = <><b className="block text-sm">{action.scheduleName}</b><span>{action.date || "Tanggal tetap"} · {action.start || "Jam tetap"}{action.end ? `–${action.end}` : ""}</span></>;
+  } else {
+    heading = "PREVIEW HAPUS JADWAL"; button = "Hapus Jadwal";
+    body = <><b className="block text-sm">{action.scheduleName}</b><span>{action.date || "Tanggal sesuai jadwal"}{action.start ? ` · ${action.start}` : ""}</span></>;
+  }
+  return <div className={`mt-2 rounded-2xl border p-3 ${panel}`}><p className={`text-[10px] font-extrabold tracking-[0.12em] ${title}`}>{heading}</p><div className={`mt-2 text-xs leading-relaxed ${detail}`}>{body}</div><button type="button" onClick={onConfirm} disabled={saving} className="mt-3 w-full rounded-xl bg-gradient-to-br from-teal-400 to-blue-500 py-2.5 text-xs font-extrabold text-zinc-900 disabled:cursor-not-allowed disabled:opacity-60">{saving ? "Menyimpan ke DUIT…" : button}</button></div>;
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -249,7 +294,7 @@ interface ChatWidgetProps {
 }
 
 export default function ChatWidget({ open, onClose }: ChatWidgetProps) {
-  const { buildAIContext, settings, score, inMonth, outMonth, wallets, addSched, addTx } = useStore();
+  const { buildAIContext, settings, score, inMonth, outMonth, wallets, goals, scheds, addSched, addTx, fundGoal, transferWallet, updateSched, delSched } = useStore();
   const { user } = useAuth();
   const { isDark } = useTheme();
 
@@ -404,20 +449,43 @@ export default function ChatWidget({ open, onClose }: ChatWidgetProps) {
     setActionSavingId(messageId);
     setError(null);
     try {
-      const result = await (action.type === "schedule"
-        ? addSched({ name: action.name.trim(), date: action.date, start: action.start, ...(action.end ? { end: action.end } : {}), ...(action.desc ? { desc: action.desc } : {}), recurring: action.recurring === true, ...(action.untilDate ? { untilDate: action.untilDate } : {}), icon: "pin" })
-        : (() => {
-            const wallet = wallets.find((item) => item.name.trim().toLocaleLowerCase("id-ID") === action.walletName.trim().toLocaleLowerCase("id-ID"));
-            if (!wallet) return Promise.resolve({ ok: false, message: `Dompet “${action.walletName}” tidak ditemukan. Pilih dompet yang tersedia dulu ya.` });
-            return addTx({ type: action.transactionType, amt: action.amount, cat: action.category.trim() || "Lainnya", desc: action.desc?.trim() || action.category, date: action.date, walletId: wallet.id });
-          })());
+      const byName = (name: string) => name.trim().toLocaleLowerCase("id-ID");
+      const findWallet = (name: string) => wallets.find((item) => byName(item.name) === byName(name));
+      const findSchedule = (name: string, date?: string, start?: string) => {
+        const matches = scheds.filter((item) => byName(item.name) === byName(name) && (!date || item.date === date) && (!start || item.start === start));
+        return matches.length === 1 ? matches[0] : null;
+      };
+      let result: { ok: boolean; message?: string };
+      if (action.type === "schedule") {
+        result = await addSched({ name: action.name.trim(), date: action.date, start: action.start, ...(action.end ? { end: action.end } : {}), ...(action.desc ? { desc: action.desc } : {}), recurring: action.recurring === true, ...(action.untilDate ? { untilDate: action.untilDate } : {}), icon: "pin" });
+      } else if (action.type === "transaction") {
+        const wallet = findWallet(action.walletName);
+        result = !wallet ? { ok: false, message: `Dompet “${action.walletName}” tidak ditemukan. Pilih dompet yang tersedia dulu ya.` } : await addTx({ type: action.transactionType, amt: action.amount, cat: action.category.trim() || "Lainnya", desc: action.desc?.trim() || action.category, date: action.date, walletId: wallet.id });
+      } else if (action.type === "goalFund") {
+        const goal = goals.find((item) => byName(item.name) === byName(action.goalName));
+        const wallet = findWallet(action.walletName);
+        result = !goal ? { ok: false, message: `Goal “${action.goalName}” tidak ditemukan.` } : !wallet ? { ok: false, message: `Dompet “${action.walletName}” tidak ditemukan.` } : await fundGoal(goal.id, wallet.id, action.amount);
+      } else if (action.type === "transfer") {
+        const from = findWallet(action.fromWalletName);
+        const to = findWallet(action.toWalletName);
+        result = !from ? { ok: false, message: `Dompet asal “${action.fromWalletName}” tidak ditemukan.` } : !to ? { ok: false, message: `Dompet tujuan “${action.toWalletName}” tidak ditemukan.` } : transferWallet(from.id, to.id, action.amount);
+      } else {
+        const schedule = findSchedule(action.scheduleName, action.date, action.start);
+        if (!schedule) {
+          result = { ok: false, message: `Jadwal “${action.scheduleName}” tidak ditemukan atau ada lebih dari satu jadwal dengan nama tersebut.` };
+        } else if (action.type === "scheduleUpdate") {
+          result = await updateSched(schedule.id, { ...(action.date ? { date: action.date } : {}), ...(action.start ? { start: action.start } : {}), ...(action.end ? { end: action.end } : {}), ...(action.desc ? { desc: action.desc } : {}), ...(action.recurring !== undefined ? { recurring: action.recurring } : {}), ...(action.untilDate ? { untilDate: action.untilDate } : {}) });
+        } else {
+          result = await delSched(schedule.id);
+        }
+      }
       if (!result.ok) {
         setError(result.message || "Tindakan belum berhasil disimpan.");
         return;
       }
       setMessages((previous) => [
         ...previous.map((message) => message.id === messageId ? { ...message, action: undefined } : message),
-        { id: Date.now() + 4, role: "assistant", text: action.type === "schedule" ? "Jadwalnya sudah ditambahkan ke DUIT. ✅" : "Transaksinya sudah dicatat ke DUIT. ✅" },
+        { id: Date.now() + 4, role: "assistant", text: action.type === "schedule" ? "Jadwalnya sudah ditambahkan ke DUIT. ✅" : action.type === "transaction" ? "Transaksinya sudah dicatat ke DUIT. ✅" : action.type === "goalFund" ? "Dana sudah ditambahkan ke goal. ✅" : action.type === "transfer" ? "Transfer antar dompet sudah dibuat. ✅" : action.type === "scheduleUpdate" ? "Jadwalnya sudah diperbarui. ✅" : "Jadwalnya sudah dihapus. ✅" },
       ]);
     } finally {
       setActionSavingId(null);

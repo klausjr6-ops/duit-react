@@ -1119,12 +1119,20 @@ function useDuitStoreInternal() {
   );
 
   const delSched = useCallback(
-    (id: number) =>
-      updateData((previous) => ({
-        ...previous,
-        scheds: previous.scheds.filter((schedule) => schedule.id !== id),
-      })),
-    [updateData]
+    async (id: number): Promise<{ ok: boolean; message?: string }> => {
+      if (!uid || loadedUserId !== uid) return { ok: false, message: "Data akun masih dimuat. Coba lagi sebentar." };
+      try {
+        await enqueueFirestoreUpdate((previous) => {
+          if (!previous.scheds.some((schedule) => schedule.id === id)) throw new Error("Jadwal tidak ditemukan.");
+          return { ...previous, scheds: previous.scheds.filter((schedule) => schedule.id !== id) };
+        });
+        return { ok: true };
+      } catch (error) {
+        console.error("Schedule delete error:", error);
+        return { ok: false, message: "Jadwal belum berhasil dihapus dari cloud. Coba lagi saat koneksi stabil." };
+      }
+    },
+    [enqueueFirestoreUpdate, loadedUserId, uid]
   );
 
   const updateSched = useCallback(

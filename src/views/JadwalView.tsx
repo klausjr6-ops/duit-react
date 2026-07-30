@@ -213,10 +213,11 @@ export default function JadwalView() {
         message={scheduleToDelete ? `Jadwal “${scheduleToDelete.name}” akan dihapus permanen.` : ""}
         confirmLabel="Ya, Hapus"
         onClose={() => setScheduleToDelete(null)}
-        onConfirm={() => {
+        onConfirm={async () => {
           if (scheduleToDelete) {
-            delSched(scheduleToDelete.id);
-            toast.success(`Jadwal "${scheduleToDelete.name}" dihapus`);
+            const result = await delSched(scheduleToDelete.id);
+            if (result.ok) toast.success(`Jadwal "${scheduleToDelete.name}" dihapus`);
+            else toast.error(result.message || "Jadwal belum berhasil dihapus.");
           }
           setScheduleToDelete(null);
         }}
