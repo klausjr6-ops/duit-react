@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { useStore } from "../lib/store";
+import { useStore, type ScheduleItem } from "../lib/store";
 import { useTheme } from "../lib/ThemeContext";
 import { useAuth } from "../lib/AuthContext";
 import { useModalDialog } from "../hooks/useModalDialog";
@@ -10,8 +10,8 @@ type AssistantAction =
   | { type: "transaction"; transactionType: "in" | "out"; amount: number; category: string; walletName: string; date: string; desc?: string }
   | { type: "goalFund"; goalName: string; walletName: string; amount: number }
   | { type: "transfer"; fromWalletName: string; toWalletName: string; amount: number }
-  | { type: "scheduleUpdate"; scheduleName: string; targetDate?: string; targetStart?: string; date?: string; start?: string; end?: string; desc?: string; recurring?: boolean; untilDate?: string }
-  | { type: "scheduleDelete"; scheduleName: string; targetDate?: string; targetStart?: string };
+  | { type: "scheduleUpdate"; scheduleName: string; scheduleId?: number; targetDate?: string; targetStart?: string; date?: string; start?: string; end?: string; desc?: string; recurring?: boolean; untilDate?: string }
+  | { type: "scheduleDelete"; scheduleName: string; scheduleId?: number; targetDate?: string; targetStart?: string };
 
 interface Message {
   id: number;
@@ -129,8 +129,10 @@ function readChatHistory(uid: string): Message[] {
     if (envelope?.savedAt && typeof envelope.savedAt === "number" && Date.now() - envelope.savedAt > CHAT_HISTORY_MAX_AGE_MS) {
       return [defaultGreeting()];
     }
-    // Backward-compatible with the old array-only history format.
-    const items = Array.isArray(parsed) ? parsed : envelope?.messages;
+    // Legacy array-only history has no trustworthy savedAt, so do not reuse
+    // it as AI context after this privacy/TTL upgrade.
+    if (Array.isArray(parsed)) return [defaultGreeting()];
+    const items = envelope?.messages;
     if (!Array.isArray(items)) return [defaultGreeting()];
     // Deliberately restore only chat text. Pending AI actions are one-time
     // confirmations and must never survive a refresh.
@@ -254,6 +256,19 @@ export function extractAssistantAction(text: string): { text: string; action?: A
     // Treat malformed model output as normal chat text without exposing JSON.
   }
   return { text: cleanText };
+}
+
+export function resolveScheduleAction(action: AssistantAction, scheds: ScheduleItem[]): AssistantAction | null {
+  if (action.type !== "scheduleUpdate" && action.type !== "scheduleDelete") return action;
+  const normalize = (value: string) => value.trim().toLocaleLowerCase("id-ID");
+  const matches = scheds.filter((schedule) =>
+    normalize(schedule.name) === normalize(action.scheduleName) &&
+    (!action.targetDate || schedule.date === action.targetDate) &&
+    (!action.targetStart || schedule.start === action.targetStart)
+  );
+  if (matches.length !== 1) return null;
+  const target = matches[0];
+  return { ...action, scheduleId: target.id, targetDate: target.date, targetStart: target.start };
 }
 
 function ChatMessageText({ text, rich, isDark }: { text: string; rich: boolean; isDark: boolean }) {
@@ -425,9 +440,18 @@ export default function ChatWidget({ open, onClose }: ChatWidgetProps) {
 
       if (!controller.signal.aborted) {
         const parsed = extractAssistantAction(aiText);
+        const resolvedAction = parsed.action ? resolveScheduleAction(parsed.action, scheds) : undefined;
+        const needsScheduleClarification = parsed.action && !resolvedAction && (parsed.action.type === "scheduleUpdate" || parsed.action.type === "scheduleDelete");
         setMessages((previous) => [
           ...previous,
-          { id: Date.now() + 1, role: "assistant", text: parsed.text || "Siap, cek preview tindakan di bawah ya.", ...(parsed.action ? { action: parsed.action } : {}) },
+          {
+            id: Date.now() + 1,
+            role: "assistant",
+            text: needsScheduleClarification
+              ? `${parsed.text || "Aku menemukan jadwal dengan nama yang belum cukup spesifik."}\n\nSebutkan tanggal atau jam jadwal yang ingin diubah/dihapus ya.`
+              : parsed.text || "Siap, cek preview tindakan di bawah ya.",
+            ...(resolvedAction ? { action: resolvedAction } : {}),
+          },
         ]);
       }
     } catch (err: unknown) {
@@ -490,7 +514,9 @@ export default function ChatWidget({ open, onClose }: ChatWidgetProps) {
         const to = findWallet(action.toWalletName);
         result = !from ? { ok: false, message: `Dompet asal “${action.fromWalletName}” tidak ditemukan.` } : !to ? { ok: false, message: `Dompet tujuan “${action.toWalletName}” tidak ditemukan.` } : await transferWallet(from.id, to.id, action.amount);
       } else {
-        const schedule = findSchedule(action.scheduleName, action.targetDate, action.targetStart);
+        const schedule = action.scheduleId !== undefined
+          ? scheds.find((item) => item.id === action.scheduleId) ?? null
+          : findSchedule(action.scheduleName, action.targetDate, action.targetStart);
         if (!schedule) {
           result = { ok: false, message: `Jadwal “${action.scheduleName}” tidak ditemukan atau ada lebih dari satu jadwal dengan nama tersebut.` };
         } else if (action.type === "scheduleUpdate") {
@@ -613,7 +639,10 @@ export default function ChatWidget({ open, onClose }: ChatWidgetProps) {
                         <ChatMessageText text={msg.text} rich={msg.role === "assistant"} isDark={isDark} />
                       </div>
                       {msg.action && (
-                        <ActionPreview action={msg.action} isDark={isDark} saving={actionSavingId === msg.id} onConfirm={() => confirmAction(msg.id, msg.action!)} onCancel={() => setMessages((previous) => previous.map((message) => message.id === msg.id ? { ...message, action: undefined } : message))} />
+                        <ActionPreview action={msg.action} isDark={isDark} saving={actionSavingId === msg.id} onConfirm={() => confirmAction(msg.id, msg.action!)} onCancel={() => setMessages((previous) => [
+                          ...previous.map((message) => message.id === msg.id ? { ...message, action: undefined } : message),
+                          { id: Date.now() + 5, role: "assistant", text: "Tindakan dibatalkan. Tidak ada data yang diubah." },
+                        ])} />
                       )}
                     </div>
                   </motion.div>

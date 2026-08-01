@@ -133,6 +133,7 @@ export default function AccountModal({ open, onClose }: AccountModalProps) {
   const [subView, setSubView] = useState<SubView>("main");
   const fileRef = useRef<HTMLInputElement>(null);
   const backupInputRef = useRef<HTMLInputElement>(null);
+  const avatarMenuRef = useRef<HTMLDivElement>(null);
 
   // Cek apakah user login pakai Google (gak bisa ganti email/pass)
   const isGoogleUser = user?.providerData[0]?.providerId === "google.com";
@@ -140,6 +141,15 @@ export default function AccountModal({ open, onClose }: AccountModalProps) {
   useEffect(() => {
     if (open) setName(settings.name);
   }, [open, settings.name]);
+
+  useEffect(() => {
+    if (!avatarMenuOpen) return;
+    const closeMenu = (event: MouseEvent) => {
+      if (!avatarMenuRef.current?.contains(event.target as Node)) setAvatarMenuOpen(false);
+    };
+    document.addEventListener("mousedown", closeMenu);
+    return () => document.removeEventListener("mousedown", closeMenu);
+  }, [avatarMenuOpen]);
 
   const handleAvatarPick = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -402,7 +412,7 @@ export default function AccountModal({ open, onClose }: AccountModalProps) {
                 >
                   {/* Avatar */}
                   <div className="mb-5 flex flex-col items-center">
-                    <div className="relative">
+                    <div ref={avatarMenuRef} className="relative">
                       <button
                         type="button"
                         disabled={avatarSaving}
@@ -752,17 +762,7 @@ export default function AccountModal({ open, onClose }: AccountModalProps) {
         </motion.div>
       )}
       </AnimatePresence>
-      <AnimatePresence>
-        {avatarPreviewOpen && settings.avatar && (
-          <>
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setAvatarPreviewOpen(false)} className="fixed inset-0 z-[80] bg-black/75 backdrop-blur-sm" />
-            <motion.div initial={{ opacity: 0, scale: 0.94, y: 16 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.96, y: 8 }} className={`fixed left-1/2 top-1/2 z-[81] w-[calc(100%-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 rounded-3xl border p-5 shadow-2xl ${isDark ? "border-white/10 bg-slate-900" : "border-zinc-200 bg-white"}`}>
-              <div className="mb-4 flex items-center justify-between"><h2 className={isDark ? "text-lg font-bold text-white" : "text-lg font-bold text-zinc-900"}>Foto Profil</h2><button type="button" onClick={() => setAvatarPreviewOpen(false)} aria-label="Tutup foto profil" className={isDark ? "text-slate-400 hover:text-white" : "text-zinc-500 hover:text-zinc-900"}><IconClose size={20}/></button></div>
-              <img src={settings.avatar} alt="Foto profil" className="max-h-[65vh] w-full rounded-2xl object-contain" />
-            </motion.div>
-          </>
-        )}
-      </AnimatePresence>
+      <AvatarPreviewModal open={avatarPreviewOpen && Boolean(settings.avatar)} avatar={settings.avatar} onClose={() => setAvatarPreviewOpen(false)} isDark={isDark} />
       <ConfirmDialog
         open={open && confirmCalendarReset}
         title="Buat Ulang Link Kalender?"
@@ -804,6 +804,19 @@ export default function AccountModal({ open, onClose }: AccountModalProps) {
       />
     </>
   );
+}
+
+function AvatarPreviewModal({ open, avatar, onClose, isDark }: { open: boolean; avatar?: string; onClose: () => void; isDark: boolean }) {
+  const closeRef = useRef<HTMLButtonElement>(null);
+  const { dialogRef, onDialogKeyDown } = useModalDialog(open, onClose, closeRef);
+  if (!open || !avatar) return null;
+  return <AnimatePresence>{open && <>
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={onClose} className="fixed inset-0 z-[80] bg-black/75 backdrop-blur-sm" />
+    <motion.div ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby="avatar-preview-title" onKeyDown={onDialogKeyDown} initial={{ opacity: 0, scale: 0.94, y: 16 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.96, y: 8 }} className={`fixed left-1/2 top-1/2 z-[81] w-[calc(100%-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 rounded-3xl border p-5 shadow-2xl ${isDark ? "border-white/10 bg-slate-900" : "border-zinc-200 bg-white"}`}>
+      <div className="mb-4 flex items-center justify-between"><h2 id="avatar-preview-title" className={isDark ? "text-lg font-bold text-white" : "text-lg font-bold text-zinc-900"}>Foto Profil</h2><button ref={closeRef} type="button" onClick={onClose} aria-label="Tutup foto profil" className={isDark ? "text-slate-400 hover:text-white" : "text-zinc-500 hover:text-zinc-900"}><IconClose size={20}/></button></div>
+      <img src={avatar} alt="Foto profil" className="max-h-[65vh] w-full rounded-2xl object-contain" />
+    </motion.div>
+  </>}</AnimatePresence>;
 }
 
 function safeTimestamp(): string {
