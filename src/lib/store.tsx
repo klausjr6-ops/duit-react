@@ -1542,10 +1542,11 @@ function useDuitStoreInternal() {
       }
 
       const transferId = createId();
+      const createdAt = Date.now();
       const date = todayStr();
       const outTx: Transaction = {
         id: createId(),
-        createdAt: Date.now(),
+        createdAt,
         type: "out",
         amt: amount,
         cat: "Transfer",
@@ -1556,7 +1557,7 @@ function useDuitStoreInternal() {
       };
       const inTx: Transaction = {
         id: createId(),
-        createdAt: Date.now(),
+        createdAt,
         type: "in",
         amt: amount,
         cat: "Transfer",
