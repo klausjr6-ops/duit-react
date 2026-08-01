@@ -13,7 +13,7 @@ interface Props {
  */
 export default function ViewTransitionLoader({ active, kind }: Props) {
   return <AnimatePresence mode="wait">{active && (
-    <motion.div key={kind} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.16 }} className="pointer-events-none fixed inset-0 z-[90] overflow-hidden">
+    <motion.div key={kind} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.16 }} className="pointer-events-auto fixed inset-0 z-[90] overflow-hidden">
       {kind === "dashboard" ? <LiquidMorph /> : kind === "themeToDark" ? <Sunset /> : <Moonrise />}
     </motion.div>
   )}</AnimatePresence>;

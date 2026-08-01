@@ -10,7 +10,7 @@ type AssistantAction =
   | { type: "transaction"; transactionType: "in" | "out"; amount: number; category: string; walletName: string; date: string; desc?: string }
   | { type: "goalFund"; goalName: string; walletName: string; amount: number }
   | { type: "transfer"; fromWalletName: string; toWalletName: string; amount: number }
-  | { type: "scheduleUpdate"; scheduleName: string; scheduleId?: number; targetDate?: string; targetStart?: string; date?: string; start?: string; end?: string; desc?: string; recurring?: boolean; untilDate?: string }
+  | { type: "scheduleUpdate"; scheduleName: string; scheduleId?: number; targetDate?: string; targetStart?: string; date?: string; start?: string; end?: string; desc?: string; recurring?: boolean; untilDate?: string; clearEnd?: boolean; clearDescription?: boolean; clearUntilDate?: boolean }
   | { type: "scheduleDelete"; scheduleName: string; scheduleId?: number; targetDate?: string; targetStart?: string };
 
 interface Message {
@@ -84,7 +84,7 @@ Format transfer wallet:
 <duit-action>{"type":"transfer","fromWalletName":"dompet asal","toWalletName":"dompet tujuan","amount":angka_positif}</duit-action>
 
 Format ubah jadwal: selector jadwal lama HARUS dipisahkan dari nilai baru.
-<duit-action>{"type":"scheduleUpdate","scheduleName":"nama jadwal persis","targetDate":"tanggal jadwal lama jika diketahui","targetStart":"jam jadwal lama jika diketahui","date":"tanggal baru opsional","start":"jam baru opsional","end":"HH:MM baru opsional","desc":"deskripsi baru opsional","recurring":true atau false,"untilDate":"YYYY-MM-DD baru opsional"}</duit-action>
+<duit-action>{"type":"scheduleUpdate","scheduleName":"nama jadwal persis","targetDate":"tanggal jadwal lama jika diketahui","targetStart":"jam jadwal lama jika diketahui","date":"tanggal baru opsional","start":"jam baru opsional","end":"HH:MM baru opsional","desc":"deskripsi baru opsional","recurring":true atau false,"untilDate":"YYYY-MM-DD baru opsional","clearEnd":true jika ingin menghapus jam selesai,"clearDescription":true jika ingin menghapus deskripsi,"clearUntilDate":true jika ingin menghapus batas pengulangan}</duit-action>
 
 Format hapus jadwal:
 <duit-action>{"type":"scheduleDelete","scheduleName":"nama jadwal persis","targetDate":"tanggal jadwal target jika diketahui","targetStart":"jam jadwal target jika diketahui"}</duit-action>
@@ -245,9 +245,9 @@ export function extractAssistantAction(text: string): { text: string; action?: A
       return { text: cleanText, action: { type: "transfer", fromWalletName: raw.fromWalletName, toWalletName: raw.toWalletName, amount: Number(raw.amount) } };
     }
     if (raw.type === "scheduleUpdate" && typeof raw.scheduleName === "string") {
-      const hasPatch = typeof raw.date === "string" || typeof raw.start === "string" || typeof raw.end === "string" || typeof raw.desc === "string" || typeof raw.recurring === "boolean" || typeof raw.untilDate === "string";
+      const hasPatch = typeof raw.date === "string" || typeof raw.start === "string" || typeof raw.end === "string" || typeof raw.desc === "string" || typeof raw.recurring === "boolean" || typeof raw.untilDate === "string" || raw.clearEnd === true || raw.clearDescription === true || raw.clearUntilDate === true;
       if (!hasPatch) return { text: cleanText };
-      return { text: cleanText, action: { type: "scheduleUpdate", scheduleName: raw.scheduleName, ...(typeof raw.targetDate === "string" ? { targetDate: raw.targetDate } : {}), ...(typeof raw.targetStart === "string" ? { targetStart: raw.targetStart } : {}), ...(typeof raw.date === "string" ? { date: raw.date } : {}), ...(typeof raw.start === "string" ? { start: raw.start } : {}), ...(typeof raw.end === "string" ? { end: raw.end } : {}), ...(typeof raw.desc === "string" ? { desc: raw.desc } : {}), ...(typeof raw.recurring === "boolean" ? { recurring: raw.recurring } : {}), ...(typeof raw.untilDate === "string" ? { untilDate: raw.untilDate } : {}) } };
+      return { text: cleanText, action: { type: "scheduleUpdate", scheduleName: raw.scheduleName, ...(typeof raw.targetDate === "string" ? { targetDate: raw.targetDate } : {}), ...(typeof raw.targetStart === "string" ? { targetStart: raw.targetStart } : {}), ...(typeof raw.date === "string" ? { date: raw.date } : {}), ...(typeof raw.start === "string" ? { start: raw.start } : {}), ...(typeof raw.end === "string" ? { end: raw.end } : {}), ...(typeof raw.desc === "string" ? { desc: raw.desc } : {}), ...(typeof raw.recurring === "boolean" ? { recurring: raw.recurring } : {}), ...(typeof raw.untilDate === "string" ? { untilDate: raw.untilDate } : {}), ...(raw.clearEnd === true ? { clearEnd: true } : {}), ...(raw.clearDescription === true ? { clearDescription: true } : {}), ...(raw.clearUntilDate === true ? { clearUntilDate: true } : {}) } };
     }
     if (raw.type === "scheduleDelete" && typeof raw.scheduleName === "string") {
       return { text: cleanText, action: { type: "scheduleDelete", scheduleName: raw.scheduleName, ...(typeof raw.targetDate === "string" ? { targetDate: raw.targetDate } : {}), ...(typeof raw.targetStart === "string" ? { targetStart: raw.targetStart } : {}) } };
@@ -308,7 +308,7 @@ function ActionPreview({ action, isDark, saving, onConfirm, onCancel }: { action
     body = <><b className="block text-sm">Rp{action.amount.toLocaleString("id-ID")}</b><span>{action.fromWalletName} → {action.toWalletName}</span></>;
   } else if (action.type === "scheduleUpdate") {
     heading = "PREVIEW UBAH JADWAL"; button = "Perbarui Jadwal";
-    body = <><b className="block text-sm">{action.scheduleName}</b><span className="block">Target: {action.targetDate || "tanggal tidak disebut"} · {action.targetStart || "jam tidak disebut"}</span><span>Menjadi: {action.date || "tanggal tetap"} · {action.start || "jam tetap"}{action.end ? `–${action.end}` : ""}</span></>;
+    body = <><b className="block text-sm">{action.scheduleName}</b><span className="block">Target: {action.targetDate || "tanggal tidak disebut"} · {action.targetStart || "jam tidak disebut"}</span><span>Menjadi: {action.date || "tanggal tetap"} · {action.start || "jam tetap"}{action.clearEnd ? " · jam selesai dihapus" : action.end ? `–${action.end}` : ""}</span>{(action.clearDescription || action.clearUntilDate) && <span className="block">{action.clearDescription ? "Deskripsi dihapus" : ""}{action.clearDescription && action.clearUntilDate ? " · " : ""}{action.clearUntilDate ? "Batas pengulangan dihapus" : ""}</span>}</>;
   } else {
     heading = "PREVIEW HAPUS JADWAL"; button = "Hapus Jadwal";
     body = <><b className="block text-sm">{action.scheduleName}</b><span>Target: {action.targetDate || "tanggal sesuai jadwal"}{action.targetStart ? ` · ${action.targetStart}` : ""}</span></>;
@@ -520,8 +520,8 @@ export default function ChatWidget({ open, onClose }: ChatWidgetProps) {
         if (!schedule) {
           result = { ok: false, message: `Jadwal “${action.scheduleName}” tidak ditemukan atau ada lebih dari satu jadwal dengan nama tersebut.` };
         } else if (action.type === "scheduleUpdate") {
-          const hasPatch = Boolean(action.date || action.start || action.end || action.desc || action.recurring !== undefined || action.untilDate);
-          result = !hasPatch ? { ok: false, message: "Belum ada perubahan jadwal yang dapat diterapkan." } : await updateSched(schedule.id, { ...(action.date ? { date: action.date } : {}), ...(action.start ? { start: action.start } : {}), ...(action.end ? { end: action.end } : {}), ...(action.desc ? { desc: action.desc } : {}), ...(action.recurring !== undefined ? { recurring: action.recurring } : {}), ...(action.untilDate ? { untilDate: action.untilDate } : {}) });
+          const hasPatch = Boolean(action.date || action.start || action.end || action.desc || action.recurring !== undefined || action.untilDate || action.clearEnd || action.clearDescription || action.clearUntilDate);
+          result = !hasPatch ? { ok: false, message: "Belum ada perubahan jadwal yang dapat diterapkan." } : await updateSched(schedule.id, { ...(action.date ? { date: action.date } : {}), ...(action.start ? { start: action.start } : {}), ...(action.clearEnd ? { end: undefined } : action.end ? { end: action.end } : {}), ...(action.clearDescription ? { desc: undefined } : action.desc ? { desc: action.desc } : {}), ...(action.recurring !== undefined ? { recurring: action.recurring } : {}), ...(action.clearUntilDate ? { untilDate: undefined } : action.untilDate ? { untilDate: action.untilDate } : {}) });
         } else {
           result = await delSched(schedule.id);
         }
