@@ -1520,7 +1520,7 @@ function useDuitStoreInternal() {
   );
 
   const transferWallet = useCallback(
-    (fromId: number, toId: number, amount: number): { ok: boolean; message?: string } => {
+    async (fromId: number, toId: number, amount: number): Promise<{ ok: boolean; message?: string }> => {
       if (!Number.isFinite(amount) || amount <= 0) {
         return { ok: false, message: "Jumlah transfer tidak valid." };
       }
@@ -1565,22 +1565,24 @@ function useDuitStoreInternal() {
         walletId: toId,
         transferId,
       };
-      updateData((previous) => {
-        // Double-check every invariant against the current transaction data.
-        const bal = getWalletBalance(previous, fromId);
-        const destinationExists = previous.wallets.some((wallet) => wallet.id === toId);
-        if (
-          !Number.isFinite(amount) || amount <= 0 || fromId === toId ||
-          bal === null || !destinationExists || bal < amount
-        ) return previous;
-        return {
-          ...previous,
-          txs: [outTx, inTx, ...previous.txs],
-        };
-      });
-      return { ok: true };
+      if (!uid || loadedUserId !== uid) return { ok: false, message: "Data akun masih dimuat. Coba lagi sebentar." };
+      try {
+        await enqueueFirestoreUpdate((previous) => {
+          // Double-check every invariant against fresh transaction data.
+          const bal = getWalletBalance(previous, fromId);
+          const destinationExists = previous.wallets.some((wallet) => wallet.id === toId);
+          if (!Number.isFinite(amount) || amount <= 0 || fromId === toId || bal === null || !destinationExists || bal < amount) {
+            throw new Error("Transfer tidak valid atau saldo tidak mencukupi.");
+          }
+          return { ...previous, txs: [outTx, inTx, ...previous.txs] };
+        });
+        return { ok: true };
+      } catch (error) {
+        console.error("Wallet transfer error:", error);
+        return { ok: false, message: "Transfer belum berhasil disimpan ke cloud. Coba lagi saat koneksi stabil." };
+      }
     },
-    [updateData]
+    [enqueueFirestoreUpdate, loadedUserId, uid]
   );
 
   /* ══════════════════════════════════════════════════════════

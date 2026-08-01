@@ -100,6 +100,7 @@ Kalau user nyapa/basa-basi, respons kayak temen — jangan langsung "ada yang bi
 const MAX_INPUT_CHARACTERS = 4000;
 const MAX_API_MESSAGES = 16;
 const MAX_STORED_MESSAGES = 32;
+const CHAT_HISTORY_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
 
 const MAX_RENDERED_IMAGE_DATA_URL_LENGTH = 1_500_000;
 
@@ -120,12 +121,23 @@ function readChatHistory(uid: string): Message[] {
     const raw = localStorage.getItem(chatHistoryKey(uid));
     if (!raw) return [defaultGreeting()];
     const parsed = JSON.parse(raw) as unknown;
-    if (!Array.isArray(parsed)) return [defaultGreeting()];
-    const valid = parsed
+    const envelope = parsed && typeof parsed === "object" && !Array.isArray(parsed)
+      ? parsed as { savedAt?: unknown; messages?: unknown }
+      : null;
+    if (envelope?.savedAt && typeof envelope.savedAt === "number" && Date.now() - envelope.savedAt > CHAT_HISTORY_MAX_AGE_MS) {
+      return [defaultGreeting()];
+    }
+    // Backward-compatible with the old array-only history format.
+    const items = Array.isArray(parsed) ? parsed : envelope?.messages;
+    if (!Array.isArray(items)) return [defaultGreeting()];
+    // Deliberately restore only chat text. Pending AI actions are one-time
+    // confirmations and must never survive a refresh.
+    const valid = items
       .filter((item): item is Message => Boolean(item && typeof item === "object" &&
         (item as Message).role && ((item as Message).role === "user" || (item as Message).role === "assistant") &&
         typeof (item as Message).text === "string" && typeof (item as Message).id === "number"))
-      .slice(-MAX_STORED_MESSAGES);
+      .slice(-MAX_STORED_MESSAGES)
+      .map(({ id, role, text }) => ({ id, role, text }));
     return valid.length ? valid : [defaultGreeting()];
   } catch {
     return [defaultGreeting()];
@@ -209,7 +221,7 @@ function renderInlineMarkdown(text: string, keyPrefix: string, isDark: boolean):
   return nodes;
 }
 
-function extractAssistantAction(text: string): { text: string; action?: AssistantAction } {
+export function extractAssistantAction(text: string): { text: string; action?: AssistantAction } {
   const match = /<duit-action>\s*([\s\S]*?)\s*<\/duit-action>/i.exec(text);
   if (!match) return { text };
 
@@ -229,6 +241,8 @@ function extractAssistantAction(text: string): { text: string; action?: Assistan
       return { text: cleanText, action: { type: "transfer", fromWalletName: raw.fromWalletName, toWalletName: raw.toWalletName, amount: Number(raw.amount) } };
     }
     if (raw.type === "scheduleUpdate" && typeof raw.scheduleName === "string") {
+      const hasPatch = typeof raw.date === "string" || typeof raw.start === "string" || typeof raw.end === "string" || typeof raw.desc === "string" || typeof raw.recurring === "boolean" || typeof raw.untilDate === "string";
+      if (!hasPatch) return { text: cleanText };
       return { text: cleanText, action: { type: "scheduleUpdate", scheduleName: raw.scheduleName, ...(typeof raw.date === "string" ? { date: raw.date } : {}), ...(typeof raw.start === "string" ? { start: raw.start } : {}), ...(typeof raw.end === "string" ? { end: raw.end } : {}), ...(typeof raw.desc === "string" ? { desc: raw.desc } : {}), ...(typeof raw.recurring === "boolean" ? { recurring: raw.recurring } : {}), ...(typeof raw.untilDate === "string" ? { untilDate: raw.untilDate } : {}) } };
     }
     if (raw.type === "scheduleDelete" && typeof raw.scheduleName === "string") {
@@ -317,7 +331,10 @@ export default function ChatWidget({ open, onClose }: ChatWidgetProps) {
   useEffect(() => {
     if (!user || messages.length === 0) return;
     try {
-      localStorage.setItem(chatHistoryKey(user.uid), JSON.stringify(messages.slice(-MAX_STORED_MESSAGES)));
+      localStorage.setItem(chatHistoryKey(user.uid), JSON.stringify({
+        savedAt: Date.now(),
+        messages: messages.slice(-MAX_STORED_MESSAGES).map(({ id, role, text }) => ({ id, role, text })),
+      }));
     } catch {
       // History persistence is optional; chat itself still works normally.
     }
@@ -468,13 +485,14 @@ export default function ChatWidget({ open, onClose }: ChatWidgetProps) {
       } else if (action.type === "transfer") {
         const from = findWallet(action.fromWalletName);
         const to = findWallet(action.toWalletName);
-        result = !from ? { ok: false, message: `Dompet asal “${action.fromWalletName}” tidak ditemukan.` } : !to ? { ok: false, message: `Dompet tujuan “${action.toWalletName}” tidak ditemukan.` } : transferWallet(from.id, to.id, action.amount);
+        result = !from ? { ok: false, message: `Dompet asal “${action.fromWalletName}” tidak ditemukan.` } : !to ? { ok: false, message: `Dompet tujuan “${action.toWalletName}” tidak ditemukan.` } : await transferWallet(from.id, to.id, action.amount);
       } else {
         const schedule = findSchedule(action.scheduleName, action.date, action.start);
         if (!schedule) {
           result = { ok: false, message: `Jadwal “${action.scheduleName}” tidak ditemukan atau ada lebih dari satu jadwal dengan nama tersebut.` };
         } else if (action.type === "scheduleUpdate") {
-          result = await updateSched(schedule.id, { ...(action.date ? { date: action.date } : {}), ...(action.start ? { start: action.start } : {}), ...(action.end ? { end: action.end } : {}), ...(action.desc ? { desc: action.desc } : {}), ...(action.recurring !== undefined ? { recurring: action.recurring } : {}), ...(action.untilDate ? { untilDate: action.untilDate } : {}) });
+          const hasPatch = Boolean(action.date || action.start || action.end || action.desc || action.recurring !== undefined || action.untilDate);
+          result = !hasPatch ? { ok: false, message: "Belum ada perubahan jadwal yang dapat diterapkan." } : await updateSched(schedule.id, { ...(action.date ? { date: action.date } : {}), ...(action.start ? { start: action.start } : {}), ...(action.end ? { end: action.end } : {}), ...(action.desc ? { desc: action.desc } : {}), ...(action.recurring !== undefined ? { recurring: action.recurring } : {}), ...(action.untilDate ? { untilDate: action.untilDate } : {}) });
         } else {
           result = await delSched(schedule.id);
         }

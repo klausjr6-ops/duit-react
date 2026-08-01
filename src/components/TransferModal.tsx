@@ -22,7 +22,7 @@ export default function TransferModal({ fromWallet, onClose }: Props) {
   const [error, setError] = useState<string | null>(null);
   const { dialogRef, onDialogKeyDown } = useModalDialog(true, onClose);
 
-  const handleTransfer = () => {
+  const handleTransfer = async () => {
     setError(null);
     if (!fromId || !toId) {
       setError("Pilih dompet asal dan tujuan.");
@@ -42,7 +42,7 @@ export default function TransferModal({ fromWallet, onClose }: Props) {
       setError(`Saldo ${source.name} tidak mencukupi. Saldo: ${formatRupiah(source.balance)}`);
       return;
     }
-    const result = transferWallet(parseInt(fromId, 10), parseInt(toId, 10), numAmt);
+    const result = await transferWallet(parseInt(fromId, 10), parseInt(toId, 10), numAmt);
     if (!result.ok) {
       setError(result.message || "Transfer gagal.");
       toast.error(result.message || "Transfer gagal.");

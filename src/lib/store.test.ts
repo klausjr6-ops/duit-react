@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { extractAssistantAction } from "../components/ChatWidget";
 
 // Store date/schedule helpers are pure, but the module also exports the React
 // store. Keep Firebase/Auth out of this unit-test environment.
@@ -27,6 +28,19 @@ describe("Jakarta financial date helpers", () => {
 describe("Firestore write sanitization", () => {
   it("removes undefined optional fields while preserving arrays", () => {
     expect(removeUndefinedDeep({ name: "Jadwal", end: undefined, nested: { note: undefined, icon: "pin" }, values: [1, undefined, 3] })).toEqual({ name: "Jadwal", nested: { icon: "pin" }, values: [1, undefined, 3] });
+  });
+});
+
+describe("AI action parser", () => {
+  it("rejects an empty schedule update action", () => {
+    const parsed = extractAssistantAction('Siap.<duit-action>{"type":"scheduleUpdate","scheduleName":"Olahraga"}</duit-action>');
+    expect(parsed.action).toBeUndefined();
+    expect(parsed.text).toBe("Siap.");
+  });
+
+  it("parses a valid transfer action", () => {
+    const parsed = extractAssistantAction('<duit-action>{"type":"transfer","fromWalletName":"BCA","toWalletName":"Cash","amount":100000}</duit-action>');
+    expect(parsed.action).toEqual({ type: "transfer", fromWalletName: "BCA", toWalletName: "Cash", amount: 100000 });
   });
 });
 
