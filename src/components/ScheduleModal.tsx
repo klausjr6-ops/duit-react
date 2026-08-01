@@ -73,7 +73,7 @@ export default function ScheduleModal({ onClose }: Props) {
   const checkText = isDark ? "text-sm text-white font-medium" : "text-sm text-zinc-900 font-medium";
 
   return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={onClose} className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => { if (!saving) onClose(); }} className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
       <motion.div
         ref={dialogRef}
         role="dialog"
@@ -88,7 +88,7 @@ export default function ScheduleModal({ onClose }: Props) {
       >
         <div className="flex justify-between items-center mb-6">
           <h2 id="schedule-dialog-title" className={titleCls}>Tambah Jadwal</h2>
-          <button aria-label="Tutup modal tambah jadwal" onClick={onClose} className={closeCls}><IconClose size={20} /></button>
+          <button aria-label="Tutup modal tambah jadwal" onClick={onClose} disabled={saving} className={`${closeCls} disabled:cursor-not-allowed disabled:opacity-40`}><IconClose size={20} /></button>
         </div>
         <div className="space-y-4">
           <div>

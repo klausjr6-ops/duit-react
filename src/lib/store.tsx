@@ -1629,12 +1629,20 @@ function useDuitStoreInternal() {
      SETTINGS
      ══════════════════════════════════════════════════════════ */
   const updateSettings = useCallback(
-    (patch: Partial<Settings>) =>
-      updateData((previous) => ({
-        ...previous,
-        settings: { ...previous.settings, ...patch },
-      })),
-    [updateData]
+    async (patch: Partial<Settings>): Promise<{ ok: boolean; message?: string }> => {
+      if (!uid || loadedUserId !== uid) return { ok: false, message: "Data akun masih dimuat. Coba lagi sebentar." };
+      try {
+        await enqueueFirestoreUpdate((previous) => ({
+          ...previous,
+          settings: { ...previous.settings, ...patch },
+        }));
+        return { ok: true };
+      } catch (error) {
+        console.error("Settings update error:", error);
+        return { ok: false, message: "Pengaturan belum berhasil disimpan ke cloud. Coba lagi saat koneksi stabil." };
+      }
+    },
+    [enqueueFirestoreUpdate, loadedUserId, uid]
   );
 
   /* ══════════════════════════════════════════════════════════

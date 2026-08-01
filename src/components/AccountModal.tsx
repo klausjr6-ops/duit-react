@@ -124,6 +124,7 @@ export default function AccountModal({ open, onClose }: AccountModalProps) {
   const [calendarCopied, setCalendarCopied] = useState(false);
   const [calendarNotice, setCalendarNotice] = useState<string | null>(null);
   const [avatarSaving, setAvatarSaving] = useState(false);
+  const [settingsSaving, setSettingsSaving] = useState(false);
   const [avatarMenuOpen, setAvatarMenuOpen] = useState(false);
   const [avatarPreviewOpen, setAvatarPreviewOpen] = useState(false);
   const [avatarError, setAvatarError] = useState<string | null>(null);
@@ -159,7 +160,8 @@ export default function AccountModal({ open, onClose }: AccountModalProps) {
     setAvatarSaving(true);
     try {
       const avatar = await prepareAvatar(file);
-      updateSettings({ avatar });
+      const result = await updateSettings({ avatar });
+      if (!result.ok) throw new Error(result.message);
     } catch (error) {
       setAvatarError(error instanceof Error ? error.message : "Foto gagal diproses.");
     } finally {
@@ -169,16 +171,31 @@ export default function AccountModal({ open, onClose }: AccountModalProps) {
     }
   };
 
-  const saveName = () => {
-    updateSettings({ name: name.trim() || "Kamu" });
-    toast.success("Nama berhasil disimpan");
+  const saveName = async () => {
+    setSettingsSaving(true);
+    const result = await updateSettings({ name: name.trim() || "Kamu" });
+    setSettingsSaving(false);
+    if (result.ok) toast.success("Nama berhasil disimpan");
+    else toast.error(result.message || "Nama belum berhasil disimpan.");
+  };
+
+  const saveAccountSetting = async (patch: Partial<Parameters<typeof updateSettings>[0]>) => {
+    const result = await updateSettings(patch);
+    if (!result.ok) toast.error(result.message || "Pengaturan belum berhasil disimpan.");
+    return result;
   };
 
   const copyCalendarFeedUrl = async () => {
     if (!user) return;
 
     const token = settings.calendarToken || createCalendarToken();
-    if (!settings.calendarToken) updateSettings({ calendarToken: token });
+    if (!settings.calendarToken) {
+      const result = await updateSettings({ calendarToken: token });
+      if (!result.ok) {
+        setCalendarNotice(result.message || "Link kalender belum berhasil disimpan.");
+        return;
+      }
+    }
 
     const url = `${window.location.origin}/api/calendar.ics?uid=${encodeURIComponent(user.uid)}&token=${encodeURIComponent(token)}`;
     try {
@@ -197,10 +214,11 @@ export default function AccountModal({ open, onClose }: AccountModalProps) {
     window.setTimeout(() => setCalendarNotice(null), 3200);
   };
 
-  const regenerateCalendarFeedUrl = () => {
-    updateSettings({ calendarToken: createCalendarToken() });
+  const regenerateCalendarFeedUrl = async () => {
+    const result = await updateSettings({ calendarToken: createCalendarToken() });
     setConfirmCalendarReset(false);
-    showCalendarNotice("Link kalender lama sudah dicabut. Salin link baru untuk subscribe ulang.");
+    if (result.ok) showCalendarNotice("Link kalender lama sudah dicabut. Salin link baru untuk subscribe ulang.");
+    else showCalendarNotice(result.message || "Link kalender belum berhasil diperbarui.");
   };
 
   const showBackupNotice = (message: string) => {
@@ -461,8 +479,8 @@ export default function AccountModal({ open, onClose }: AccountModalProps) {
                         className={inputClass}
                         placeholder="Nama kamu"
                       />
-                      <button onClick={saveName} className={btnPrimary}>
-                        Simpan
+                      <button onClick={saveName} disabled={settingsSaving} className={`${btnPrimary} disabled:cursor-not-allowed disabled:opacity-60`}>
+                        {settingsSaving ? "Menyimpan…" : "Simpan"}
                       </button>
                     </div>
                   </div>
@@ -478,7 +496,7 @@ export default function AccountModal({ open, onClose }: AccountModalProps) {
                         return (
                           <button
                             key={opt.id}
-                            onClick={() => { setThemeMode(opt.id); updateSettings({ themeMode: opt.id }); }}
+                            onClick={() => { setThemeMode(opt.id); void saveAccountSetting({ themeMode: opt.id }); }}
                             className={
                               active
                                 ? "flex flex-col items-center justify-center gap-1 rounded-xl bg-white py-3 shadow-sm border border-zinc-200 text-zinc-900 transition-all " +
@@ -514,7 +532,7 @@ export default function AccountModal({ open, onClose }: AccountModalProps) {
                           <button
                             key={option.id}
                             type="button"
-                            onClick={() => updateSettings({ dashboardMode: option.id })}
+                            onClick={() => { void saveAccountSetting({ dashboardMode: option.id }); }}
                             className={`w-full rounded-xl px-3 py-3 text-left transition-all ${active
                               ? isDark ? "bg-teal-400/15 text-white shadow-sm" : "bg-white text-zinc-900 shadow-sm"
                               : isDark ? "text-slate-400 hover:bg-white/5" : "text-zinc-600 hover:bg-white/70"}`}

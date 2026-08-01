@@ -145,6 +145,21 @@ function DashboardApp() {
 
   useEffect(() => () => { if (transitionTimerRef.current) clearTimeout(transitionTimerRef.current); }, []);
 
+  // The visual transition also blocks keyboard activation behind the overlay.
+  useEffect(() => {
+    if (!showTransition) return;
+    const activeElement = document.activeElement;
+    if (activeElement instanceof HTMLElement) activeElement.blur();
+    const blockKeys = (event: KeyboardEvent) => {
+      if (["Tab", "Enter", " ", "Spacebar"].includes(event.key)) {
+        event.preventDefault();
+        event.stopPropagation();
+      }
+    };
+    window.addEventListener("keydown", blockKeys, true);
+    return () => window.removeEventListener("keydown", blockKeys, true);
+  }, [showTransition]);
+
   // Pull-to-refresh: force Firestore to re-read by briefly detaching and
   // re-attaching the snapshot listener (toggle loadedUserId off then on).
   const refreshData = useCallback(async () => {

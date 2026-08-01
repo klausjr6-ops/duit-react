@@ -91,7 +91,7 @@ export default function TransferModal({ fromWallet, onClose }: Props) {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      onClick={onClose}
+      onClick={() => { if (!saving) onClose(); }}
       className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[70] flex items-center justify-center p-4"
     >
       <motion.div
@@ -108,7 +108,7 @@ export default function TransferModal({ fromWallet, onClose }: Props) {
       >
         <div className="flex justify-between items-center mb-6">
           <h2 className={titleCls}>Transfer Antar Dompet</h2>
-          <button aria-label="Tutup" onClick={onClose} className={closeCls}>
+          <button aria-label="Tutup" onClick={onClose} disabled={saving} className={`${closeCls} disabled:cursor-not-allowed disabled:opacity-40`}>
             <IconClose size={20} />
           </button>
         </div>
