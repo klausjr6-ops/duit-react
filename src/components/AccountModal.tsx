@@ -318,6 +318,8 @@ export default function AccountModal({ open, onClose }: AccountModalProps) {
     setCalendarNotice(null);
     setBackupError(null);
     setBackupNotice(null);
+    setAvatarMenuOpen(false);
+    setAvatarPreviewOpen(false);
     onClose();
   };
 

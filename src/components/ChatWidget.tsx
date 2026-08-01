@@ -10,8 +10,8 @@ type AssistantAction =
   | { type: "transaction"; transactionType: "in" | "out"; amount: number; category: string; walletName: string; date: string; desc?: string }
   | { type: "goalFund"; goalName: string; walletName: string; amount: number }
   | { type: "transfer"; fromWalletName: string; toWalletName: string; amount: number }
-  | { type: "scheduleUpdate"; scheduleName: string; scheduleId?: number; targetDate?: string; targetStart?: string; date?: string; start?: string; end?: string; desc?: string; recurring?: boolean; untilDate?: string; clearEnd?: boolean; clearDescription?: boolean; clearUntilDate?: boolean }
-  | { type: "scheduleDelete"; scheduleName: string; scheduleId?: number; targetDate?: string; targetStart?: string };
+  | { type: "scheduleUpdate"; scheduleName: string; scheduleId?: number; targetDate?: string; targetStart?: string; targetRecurring?: boolean; date?: string; start?: string; end?: string; desc?: string; recurring?: boolean; untilDate?: string; clearEnd?: boolean; clearDescription?: boolean; clearUntilDate?: boolean }
+  | { type: "scheduleDelete"; scheduleName: string; scheduleId?: number; targetDate?: string; targetStart?: string; targetRecurring?: boolean };
 
 interface Message {
   id: number;
@@ -268,7 +268,7 @@ export function resolveScheduleAction(action: AssistantAction, scheds: ScheduleI
   );
   if (matches.length !== 1) return null;
   const target = matches[0];
-  return { ...action, scheduleId: target.id, targetDate: target.date, targetStart: target.start };
+  return { ...action, scheduleId: target.id, targetDate: target.date, targetStart: target.start, targetRecurring: Boolean(target.recurring) };
 }
 
 function ChatMessageText({ text, rich, isDark }: { text: string; rich: boolean; isDark: boolean }) {
@@ -308,10 +308,10 @@ function ActionPreview({ action, isDark, saving, onConfirm, onCancel }: { action
     body = <><b className="block text-sm">Rp{action.amount.toLocaleString("id-ID")}</b><span>{action.fromWalletName} → {action.toWalletName}</span></>;
   } else if (action.type === "scheduleUpdate") {
     heading = "PREVIEW UBAH JADWAL"; button = "Perbarui Jadwal";
-    body = <><b className="block text-sm">{action.scheduleName}</b><span className="block">Target: {action.targetDate || "tanggal tidak disebut"} · {action.targetStart || "jam tidak disebut"}</span><span>Menjadi: {action.date || "tanggal tetap"} · {action.start || "jam tetap"}{action.clearEnd ? " · jam selesai dihapus" : action.end ? `–${action.end}` : ""}</span>{(action.clearDescription || action.clearUntilDate) && <span className="block">{action.clearDescription ? "Deskripsi dihapus" : ""}{action.clearDescription && action.clearUntilDate ? " · " : ""}{action.clearUntilDate ? "Batas pengulangan dihapus" : ""}</span>}</>;
+    body = <><b className="block text-sm">{action.scheduleName}</b><span className="block">Target: {action.targetDate || "tanggal tidak disebut"} · {action.targetStart || "jam tidak disebut"}{action.targetRecurring ? " · Berulang mingguan" : ""}</span><span>Menjadi: {action.date || "tanggal tetap"} · {action.start || "jam tetap"}{action.clearEnd ? " · jam selesai dihapus" : action.end ? `–${action.end}` : ""}</span>{(action.clearDescription || action.clearUntilDate) && <span className="block">{action.clearDescription ? "Deskripsi dihapus" : ""}{action.clearDescription && action.clearUntilDate ? " · " : ""}{action.clearUntilDate ? "Batas pengulangan dihapus" : ""}</span>}</>;
   } else {
     heading = "PREVIEW HAPUS JADWAL"; button = "Hapus Jadwal";
-    body = <><b className="block text-sm">{action.scheduleName}</b><span>Target: {action.targetDate || "tanggal sesuai jadwal"}{action.targetStart ? ` · ${action.targetStart}` : ""}</span></>;
+    body = <><b className="block text-sm">{action.scheduleName}</b><span>Target: {action.targetDate || "tanggal sesuai jadwal"}{action.targetStart ? ` · ${action.targetStart}` : ""}{action.targetRecurring ? " · Berulang mingguan" : ""}</span></>;
   }
   const isDelete = action.type === "scheduleDelete";
   return <div className={`mt-2 rounded-2xl border p-3 ${panel}`}><p className={`text-[10px] font-extrabold tracking-[0.12em] ${isDelete ? "text-rose-500" : title}`}>{heading}</p><div className={`mt-2 text-xs leading-relaxed ${detail}`}>{body}</div><div className="mt-3 grid grid-cols-2 gap-2"><button type="button" onClick={onCancel} disabled={saving} className={`rounded-xl border py-2.5 text-xs font-extrabold disabled:opacity-60 ${isDark ? "border-white/10 text-slate-200" : "border-zinc-200 text-zinc-700"}`}>Batal</button><button type="button" onClick={onConfirm} disabled={saving} className={`rounded-xl py-2.5 text-xs font-extrabold disabled:cursor-not-allowed disabled:opacity-60 ${isDelete ? "bg-rose-500 text-white" : "bg-gradient-to-br from-teal-400 to-blue-500 text-zinc-900"}`}>{saving ? "Menyimpan…" : button}</button></div></div>;

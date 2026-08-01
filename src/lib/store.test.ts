@@ -43,10 +43,15 @@ describe("AI action parser", () => {
     expect(parsed.action).toEqual({ type: "transfer", fromWalletName: "BCA", toWalletName: "Cash", amount: 100000 });
   });
 
+  it("parses clear-field schedule updates", () => {
+    const parsed = extractAssistantAction('<duit-action>{"type":"scheduleUpdate","scheduleName":"Olahraga","clearEnd":true}</duit-action>');
+    expect(parsed.action).toMatchObject({ type: "scheduleUpdate", scheduleName: "Olahraga", clearEnd: true });
+  });
+
   it("binds an update action to one stable schedule id", () => {
     const schedules = [{ id: 7, name: "Olahraga", date: "2026-08-05", start: "19:00" }];
     const action = { type: "scheduleUpdate" as const, scheduleName: "Olahraga", targetDate: "2026-08-05", targetStart: "19:00", date: "2026-08-08" };
-    expect(resolveScheduleAction(action, schedules)).toMatchObject({ scheduleId: 7, targetDate: "2026-08-05", date: "2026-08-08" });
+    expect(resolveScheduleAction(action, schedules)).toMatchObject({ scheduleId: 7, targetDate: "2026-08-05", targetRecurring: false, date: "2026-08-08" });
   });
 });
 
