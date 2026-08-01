@@ -120,6 +120,7 @@ export default function AccountModal({ open, onClose }: AccountModalProps) {
   const [confirmImport, setConfirmImport] = useState(false);
   const [importingBackup, setImportingBackup] = useState(false);
   const [confirmCalendarReset, setConfirmCalendarReset] = useState(false);
+  const [calendarRegenerating, setCalendarRegenerating] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
   const [calendarCopied, setCalendarCopied] = useState(false);
   const [calendarNotice, setCalendarNotice] = useState<string | null>(null);
@@ -215,10 +216,16 @@ export default function AccountModal({ open, onClose }: AccountModalProps) {
   };
 
   const regenerateCalendarFeedUrl = async () => {
-    const result = await updateSettings({ calendarToken: createCalendarToken() });
-    setConfirmCalendarReset(false);
-    if (result.ok) showCalendarNotice("Link kalender lama sudah dicabut. Salin link baru untuk subscribe ulang.");
-    else showCalendarNotice(result.message || "Link kalender belum berhasil diperbarui.");
+    if (calendarRegenerating) return;
+    setCalendarRegenerating(true);
+    try {
+      const result = await updateSettings({ calendarToken: createCalendarToken() });
+      setConfirmCalendarReset(false);
+      if (result.ok) showCalendarNotice("Link kalender lama sudah dicabut. Salin link baru untuk subscribe ulang.");
+      else showCalendarNotice(result.message || "Link kalender belum berhasil diperbarui.");
+    } finally {
+      setCalendarRegenerating(false);
+    }
   };
 
   const showBackupNotice = (message: string) => {
@@ -496,7 +503,7 @@ export default function AccountModal({ open, onClose }: AccountModalProps) {
                         return (
                           <button
                             key={opt.id}
-                            onClick={() => { setThemeMode(opt.id); void saveAccountSetting({ themeMode: opt.id }); }}
+                            onClick={async () => { const result = await saveAccountSetting({ themeMode: opt.id }); if (result.ok) setThemeMode(opt.id); }}
                             className={
                               active
                                 ? "flex flex-col items-center justify-center gap-1 rounded-xl bg-white py-3 shadow-sm border border-zinc-200 text-zinc-900 transition-all " +
@@ -790,7 +797,8 @@ export default function AccountModal({ open, onClose }: AccountModalProps) {
         confirmLabel="Ya, Buat Ulang"
         tone="danger"
         onClose={() => setConfirmCalendarReset(false)}
-        onConfirm={regenerateCalendarFeedUrl}
+        onConfirm={() => { void regenerateCalendarFeedUrl(); }}
+        busy={calendarRegenerating}
         isDark={isDark}
       />
       <ConfirmDialog

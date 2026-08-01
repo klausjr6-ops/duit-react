@@ -21,7 +21,8 @@ export default function TransferModal({ fromWallet, onClose }: Props) {
   const [amt, setAmt] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const { dialogRef, onDialogKeyDown } = useModalDialog(true, onClose);
+  const guardedClose = () => { if (!saving) onClose(); };
+  const { dialogRef, onDialogKeyDown } = useModalDialog(true, guardedClose);
 
   const handleTransfer = async () => {
     setError(null);
@@ -91,7 +92,7 @@ export default function TransferModal({ fromWallet, onClose }: Props) {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      onClick={() => { if (!saving) onClose(); }}
+      onClick={guardedClose}
       className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[70] flex items-center justify-center p-4"
     >
       <motion.div
@@ -108,7 +109,7 @@ export default function TransferModal({ fromWallet, onClose }: Props) {
       >
         <div className="flex justify-between items-center mb-6">
           <h2 className={titleCls}>Transfer Antar Dompet</h2>
-          <button aria-label="Tutup" onClick={onClose} disabled={saving} className={`${closeCls} disabled:cursor-not-allowed disabled:opacity-40`}>
+          <button aria-label="Tutup" onClick={guardedClose} disabled={saving} className={`${closeCls} disabled:cursor-not-allowed disabled:opacity-40`}>
             <IconClose size={20} />
           </button>
         </div>

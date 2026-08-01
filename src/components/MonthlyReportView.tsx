@@ -41,8 +41,11 @@ export default function MonthlyReportView() {
       .sort((a, b) => {
         if (a.tx.date !== b.tx.date) return a.tx.date.localeCompare(b.tx.date);
         if (a.tx.isCarryForward !== b.tx.isCarryForward) return a.tx.isCarryForward ? -1 : 1;
-        if (a.tx.createdAt !== undefined && b.tx.createdAt !== undefined && a.tx.createdAt !== b.tx.createdAt) {
-          return a.tx.createdAt - b.tx.createdAt;
+        if (a.tx.createdAt !== undefined && b.tx.createdAt !== undefined) {
+          if (a.tx.createdAt !== b.tx.createdAt) return a.tx.createdAt - b.tx.createdAt;
+          if (a.tx.transferId && a.tx.transferId === b.tx.transferId && a.tx.type !== b.tx.type) {
+            return a.tx.type === "out" ? -1 : 1;
+          }
         }
         return b.index - a.index;
       })

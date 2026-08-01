@@ -22,7 +22,8 @@ export default function EditScheduleModal({ sched, onClose }: Props) {
   const [icon, setIcon] = useState(sched.icon || SCHEDULE_ICONS[0].key);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const { dialogRef, onDialogKeyDown } = useModalDialog(true, onClose);
+  const guardedClose = () => { if (!saving) onClose(); };
+  const { dialogRef, onDialogKeyDown } = useModalDialog(true, guardedClose);
 
   const handleSubmit = async () => {
     setError(null);
@@ -49,9 +50,9 @@ export default function EditScheduleModal({ sched, onClose }: Props) {
   const closeCls = isDark ? "text-slate-400 hover:text-white" : "text-zinc-500 hover:text-zinc-900";
 
   return (
-    <motion.div initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}} onClick={() => { if (!saving) onClose(); }} className="fixed inset-0 z-[70] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+    <motion.div initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}} onClick={guardedClose} className="fixed inset-0 z-[70] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
       <motion.div ref={dialogRef} role="dialog" aria-modal="true" onKeyDown={onDialogKeyDown} initial={{scale:0.95,y:20}} animate={{scale:1,y:0}} exit={{scale:0.95,y:20}} onClick={e=>e.stopPropagation()} className={panel}>
-        <div className="flex justify-between items-center mb-5"><h2 className={titleCls}>Edit Jadwal</h2><button onClick={onClose} disabled={saving} className={`${closeCls} disabled:cursor-not-allowed disabled:opacity-40`}><IconClose size={20} /></button></div>
+        <div className="flex justify-between items-center mb-5"><h2 className={titleCls}>Edit Jadwal</h2><button onClick={guardedClose} disabled={saving} className={`${closeCls} disabled:cursor-not-allowed disabled:opacity-40`}><IconClose size={20} /></button></div>
         <div className="space-y-4">
           <div><label className={labelCls}>Nama Kegiatan</label><input value={name} onChange={e=>setName(e.target.value)} className={inputCls} /></div>
           <div><label className={labelCls}>Icon</label>

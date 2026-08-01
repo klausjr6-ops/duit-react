@@ -28,7 +28,8 @@ export default function WalletManager({ onClose }: Props) {
   const [walletToEdit, setWalletToEdit] = useState<Wallet | null>(null);
   const [showTransfer, setShowTransfer] = useState(false);
   const [transferFrom, setTransferFrom] = useState<Wallet | undefined>(undefined);
-  const { dialogRef, onDialogKeyDown } = useModalDialog(true, onClose);
+  const guardedClose = () => { if (!saving) onClose(); };
+  const { dialogRef, onDialogKeyDown } = useModalDialog(true, guardedClose);
 
   const handleAdd = async () => {
     setError(null);
@@ -75,7 +76,7 @@ export default function WalletManager({ onClose }: Props) {
 
   return (
     <>
-      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => { if (!saving) onClose(); }} className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={guardedClose} className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
       <motion.div
         ref={dialogRef}
         role="dialog"
@@ -90,7 +91,7 @@ export default function WalletManager({ onClose }: Props) {
       >
         <div className="flex justify-between items-center mb-4">
           <h2 id="wallet-dialog-title" className={titleCls}>Dompet</h2>
-          <button aria-label="Tutup dompet" onClick={onClose} disabled={saving} className={`${closeCls} disabled:cursor-not-allowed disabled:opacity-40`}><IconClose size={20} /></button>
+          <button aria-label="Tutup dompet" onClick={guardedClose} disabled={saving} className={`${closeCls} disabled:cursor-not-allowed disabled:opacity-40`}><IconClose size={20} /></button>
         </div>
 
         {wallets.length >= 2 && (
