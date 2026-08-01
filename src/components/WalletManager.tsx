@@ -22,6 +22,7 @@ export default function WalletManager({ onClose }: Props) {
   const [icon, setIcon] = useState(WALLET_ICONS[0].key);
   const [color, setColor] = useState<string>(WALLET_COLORS[0].key);
   const [initBalance, setInitBalance] = useState("");
+  const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [walletToDelete, setWalletToDelete] = useState<Wallet | null>(null);
   const [walletToEdit, setWalletToEdit] = useState<Wallet | null>(null);
@@ -39,15 +40,20 @@ export default function WalletManager({ onClose }: Props) {
       setError("Nama dompet sudah digunakan.");
       return;
     }
-    const result = await addWallet({
-      name: name.trim(),
-      balance: parseInt(initBalance.replace(/\D/g, "") || "0"),
-      icon,
-      color,
-    });
-    if (!result.ok) { setError(result.message || "Dompet belum berhasil ditambahkan."); return; }
-    toast.success(`Dompet "${name.trim()}" berhasil ditambahkan`);
-    setName(""); setIcon(WALLET_ICONS[0].key); setColor(WALLET_COLORS[0].key); setInitBalance("");
+    setSaving(true);
+    try {
+      const result = await addWallet({
+        name: name.trim(),
+        balance: parseInt(initBalance.replace(/\D/g, "") || "0"),
+        icon,
+        color,
+      });
+      if (!result.ok) { setError(result.message || "Dompet belum berhasil ditambahkan."); return; }
+      toast.success(`Dompet "${name.trim()}" berhasil ditambahkan`);
+      setName(""); setIcon(WALLET_ICONS[0].key); setColor(WALLET_COLORS[0].key); setInitBalance("");
+    } finally {
+      setSaving(false);
+    }
   };
 
   const openTransfer = (from?: Wallet) => {
@@ -212,8 +218,8 @@ export default function WalletManager({ onClose }: Props) {
           {error && (
             <p role="alert" className="rounded-lg border border-rose-400/30 bg-rose-400/10 px-3 py-2 text-xs text-rose-500">{error}</p>
           )}
-          <button type="button" onClick={handleAdd} className="w-full bg-gradient-to-br from-teal-400 to-blue-500 text-zinc-900 font-bold py-3 rounded-xl hover:brightness-105 transition-all">
-            + Tambah Dompet
+          <button type="button" onClick={handleAdd} disabled={saving} className="w-full bg-gradient-to-br from-teal-400 to-blue-500 text-zinc-900 font-bold py-3 rounded-xl hover:brightness-105 transition-all disabled:cursor-not-allowed disabled:opacity-60">
+            {saving ? "Menyimpan Dompet…" : "+ Tambah Dompet"}
           </button>
         </div>
       </motion.div>

@@ -23,6 +23,7 @@ export default function ScheduleModal({ onClose }: Props) {
   const [recurring, setRecurring] = useState(false);
   const [untilDate, setUntilDate] = useState("");
   const [icon, setIcon] = useState(SCHEDULE_ICONS[0].key);
+  const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { dialogRef, onDialogKeyDown } = useModalDialog(true, onClose);
 
@@ -48,10 +49,15 @@ export default function ScheduleModal({ onClose }: Props) {
       setError("Tanggal batas pengulangan tidak boleh sebelum tanggal mulai.");
       return;
     }
-    const result = await addSched({ name: name.trim(), desc: desc.trim() || undefined, date, start, end: end || undefined, recurring, untilDate: recurring ? untilDate : undefined, icon });
-    if (!result.ok) { setError(result.message || "Jadwal belum berhasil ditambahkan."); return; }
-    toast.success(`Jadwal "${name.trim()}" berhasil ditambahkan`);
-    onClose();
+    setSaving(true);
+    try {
+      const result = await addSched({ name: name.trim(), desc: desc.trim() || undefined, date, start, end: end || undefined, recurring, untilDate: recurring ? untilDate : undefined, icon });
+      if (!result.ok) { setError(result.message || "Jadwal belum berhasil ditambahkan."); return; }
+      toast.success(`Jadwal "${name.trim()}" berhasil ditambahkan`);
+      onClose();
+    } finally {
+      setSaving(false);
+    }
   };
 
   const panel = isDark
@@ -143,8 +149,8 @@ export default function ScheduleModal({ onClose }: Props) {
           {error && (
             <p role="alert" className="rounded-lg border border-rose-400/30 bg-rose-400/10 px-3 py-2 text-xs text-rose-500">{error}</p>
           )}
-          <button type="button" onClick={handleSubmit} className="w-full bg-gradient-to-br from-teal-400 to-blue-500 text-zinc-900 font-bold py-3 rounded-xl hover:brightness-105 transition-all">
-            Simpan Jadwal
+          <button type="button" onClick={handleSubmit} disabled={saving} className="w-full bg-gradient-to-br from-teal-400 to-blue-500 text-zinc-900 font-bold py-3 rounded-xl hover:brightness-105 transition-all disabled:cursor-not-allowed disabled:opacity-60">
+            {saving ? "Menyimpan Jadwal…" : "Simpan Jadwal"}
           </button>
         </div>
       </motion.div>

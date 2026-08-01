@@ -20,6 +20,7 @@ export default function EditScheduleModal({ sched, onClose }: Props) {
   const [recurring, setRecurring] = useState(!!sched.recurring);
   const [untilDate, setUntilDate] = useState(sched.untilDate || "");
   const [icon, setIcon] = useState(sched.icon || SCHEDULE_ICONS[0].key);
+  const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { dialogRef, onDialogKeyDown } = useModalDialog(true, onClose);
 
@@ -30,10 +31,15 @@ export default function EditScheduleModal({ sched, onClose }: Props) {
     if (end && end <= start) { setError("Jam selesai harus setelah jam mulai."); return; }
     if (recurring && !untilDate) { setError("Isi tanggal batas pengulangan."); return; }
     if (recurring && untilDate < date) { setError("Tanggal batas tidak boleh sebelum tanggal mulai."); return; }
-    const result = await updateSched(sched.id, { name: name.trim(), desc: desc.trim() || undefined, date, start, end: end || undefined, recurring, untilDate: recurring ? untilDate : undefined, icon });
-    if (!result.ok) { setError(result.message || "Jadwal belum berhasil diperbarui."); return; }
-    toast.success(`Jadwal "${name.trim()}" berhasil diperbarui`);
-    onClose();
+    setSaving(true);
+    try {
+      const result = await updateSched(sched.id, { name: name.trim(), desc: desc.trim() || undefined, date, start, end: end || undefined, recurring, untilDate: recurring ? untilDate : undefined, icon });
+      if (!result.ok) { setError(result.message || "Jadwal belum berhasil diperbarui."); return; }
+      toast.success(`Jadwal "${name.trim()}" berhasil diperbarui`);
+      onClose();
+    } finally {
+      setSaving(false);
+    }
   };
 
   const panel = isDark ? "bg-slate-900 border border-white/10 rounded-3xl p-6 max-w-md w-full max-h-[85vh] overflow-y-auto" : "bg-white border border-zinc-200 rounded-3xl p-6 max-w-md w-full max-h-[85vh] overflow-y-auto shadow-xl";
@@ -89,7 +95,7 @@ export default function EditScheduleModal({ sched, onClose }: Props) {
           </label>
           {recurring && <div><label className={labelCls}>Berulang Sampai</label><input type="date" value={untilDate} onChange={e=>setUntilDate(e.target.value)} min={date} className={inputCls} /></div>}
           {error && <p role="alert" className="rounded-lg border border-rose-400/30 bg-rose-400/10 px-3 py-2 text-xs text-rose-500">{error}</p>}
-          <button onClick={handleSubmit} className="w-full bg-gradient-to-br from-teal-400 to-blue-500 text-zinc-900 font-bold py-3 rounded-xl hover:brightness-105">Simpan Perubahan</button>
+          <button onClick={handleSubmit} disabled={saving} className="w-full bg-gradient-to-br from-teal-400 to-blue-500 text-zinc-900 font-bold py-3 rounded-xl hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-60">{saving ? "Menyimpan…" : "Simpan Perubahan"}</button>
         </div>
       </motion.div>
     </motion.div>

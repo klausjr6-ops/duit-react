@@ -19,6 +19,7 @@ export default function TransferModal({ fromWallet, onClose }: Props) {
   const [fromId, setFromId] = useState<string>(fromWallet ? String(fromWallet.id) : "");
   const [toId, setToId] = useState<string>("");
   const [amt, setAmt] = useState("");
+  const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { dialogRef, onDialogKeyDown } = useModalDialog(true, onClose);
 
@@ -42,14 +43,19 @@ export default function TransferModal({ fromWallet, onClose }: Props) {
       setError(`Saldo ${source.name} tidak mencukupi. Saldo: ${formatRupiah(source.balance)}`);
       return;
     }
-    const result = await transferWallet(parseInt(fromId, 10), parseInt(toId, 10), numAmt);
-    if (!result.ok) {
-      setError(result.message || "Transfer gagal.");
-      toast.error(result.message || "Transfer gagal.");
-      return;
+    setSaving(true);
+    try {
+      const result = await transferWallet(parseInt(fromId, 10), parseInt(toId, 10), numAmt);
+      if (!result.ok) {
+        setError(result.message || "Transfer gagal.");
+        toast.error(result.message || "Transfer gagal.");
+        return;
+      }
+      toast.success("Transfer berhasil");
+      onClose();
+    } finally {
+      setSaving(false);
     }
-    toast.success("Transfer berhasil");
-    onClose();
   };
 
   const swapWallets = () => {
@@ -113,6 +119,7 @@ export default function TransferModal({ fromWallet, onClose }: Props) {
             <label className={labelCls}>Dari Dompet</label>
             <select
               value={fromId}
+              disabled={saving}
               onChange={(e) => {
                 setFromId(e.target.value);
                 if (toId === e.target.value) setToId("");
@@ -132,6 +139,7 @@ export default function TransferModal({ fromWallet, onClose }: Props) {
           <div className="flex items-center -my-1">
             <button
               type="button"
+              disabled={saving}
               onClick={swapWallets}
               className={swapBtnCls}
               aria-label="Tukar dompet asal dan tujuan"
@@ -158,6 +166,7 @@ export default function TransferModal({ fromWallet, onClose }: Props) {
             <label className={labelCls}>Ke Dompet</label>
             <select
               value={toId}
+              disabled={saving}
               onChange={(e) => setToId(e.target.value)}
               className={inputCls}
             >
@@ -179,6 +188,7 @@ export default function TransferModal({ fromWallet, onClose }: Props) {
               type="text"
               inputMode="numeric"
               value={amt ? `Rp ${formatInputRupiah(amt)}` : ""}
+              disabled={saving}
               onChange={(e) => setAmt(e.target.value.replace(/\D/g, ""))}
               placeholder="Rp 0"
               className={inputCls}
@@ -198,9 +208,10 @@ export default function TransferModal({ fromWallet, onClose }: Props) {
           <button
             type="button"
             onClick={handleTransfer}
-            className="w-full bg-gradient-to-br from-teal-400 to-blue-500 text-zinc-900 font-bold py-3 rounded-xl hover:brightness-105 transition-all"
+            disabled={saving}
+            className="w-full bg-gradient-to-br from-teal-400 to-blue-500 text-zinc-900 font-bold py-3 rounded-xl hover:brightness-105 transition-all disabled:cursor-not-allowed disabled:opacity-60"
           >
-            Transfer Sekarang
+            {saving ? "Memindahkan Dana…" : "Transfer Sekarang"}
           </button>
         </div>
       </motion.div>

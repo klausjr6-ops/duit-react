@@ -73,6 +73,14 @@
 
 ---
 
-## Status
+## Status perbaikan — 2026-08-01
 
-Audit Round 17: **belum clean** — 2 MEDIUM dan 3 LOW. Tidak ada source aplikasi yang diubah oleh audit ini.
+| ID | Status | Perbaikan |
+|---|---|---|
+| R17-01 | Fixed | Transition overlay sekarang menyerap pointer events selama animasi. |
+| R17-02 | Fixed | AI dapat memakai `clearEnd`, `clearDescription`, dan `clearUntilDate`. |
+| R17-03 | Fixed | `handleClose()` mereset state menu dan preview avatar secara eksplisit. |
+| R17-04 | Fixed | Preview update/delete menampilkan badge `Berulang mingguan` untuk target recurring. |
+| R17-05 | Fixed | Ditambahkan test parser clear field dan resolver schedule recurring. |
+
+Validasi pascaperbaikan: `npm test` **9/9 lulus**, TypeScript, production build, dan `git diff --check` semuanya lulus. Dependency audit tetap 8 moderate transitif Firebase Admin, tanpa high/critical.
