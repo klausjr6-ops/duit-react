@@ -1,5 +1,5 @@
 // src/components/LoginScreen.tsx
-import { useState, useEffect } from "react";
+import { useState, useEffect, useId } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "../lib/AuthContext";
 import { useTheme } from "../lib/ThemeContext";
@@ -280,10 +280,12 @@ function Input({ label, type, value, onChange, placeholder, autoComplete }: {
   label: string; type: string; value: string; onChange: (v: string) => void; placeholder?: string; autoComplete?: string;
 }) {
   const { isDark } = useTheme();
+  const inputId = useId();
   return (
     <div>
-      <label className={`text-xs font-medium mb-1.5 block ${isDark ? "text-zinc-400" : "text-zinc-600"}`}>{label}</label>
+      <label htmlFor={inputId} className={`text-xs font-medium mb-1.5 block ${isDark ? "text-zinc-400" : "text-zinc-600"}`}>{label}</label>
       <input
+        id={inputId}
         type={type}
         value={value}
         onChange={(e) => onChange(e.target.value)}
@@ -302,9 +304,12 @@ function PasswordInput({ value, onChange, show, onToggleShow, placeholder, autoC
   value: string; onChange: (v: string) => void; show: boolean; onToggleShow: () => void; placeholder?: string; autoComplete?: string;
 }) {
   const { isDark } = useTheme();
+  const inputId = useId();
   return (
     <div className="relative">
       <input
+        id={inputId}
+        aria-label="Password"
         type={show ? "text" : "password"}
         value={value}
         onChange={(e) => onChange(e.target.value)}

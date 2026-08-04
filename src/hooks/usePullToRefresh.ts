@@ -19,12 +19,16 @@ export function usePullToRefresh(onRefresh: () => Promise<void>) {
   const [pullDist, setPullDist] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
   const startY = useRef(0);
+  const startX = useRef(0);
+  const horizontalGesture = useRef(false);
   const pulling = pullDist > 0 && !refreshing;
 
   const onTouchStart = useCallback((e: React.TouchEvent) => {
     // Only activate when scrolled to the very top
     if (window.scrollY > 0) return;
     startY.current = e.touches[0].clientY;
+    startX.current = e.touches[0].clientX;
+    horizontalGesture.current = false;
   }, []);
 
   const onTouchMove = useCallback(
@@ -34,8 +38,15 @@ export function usePullToRefresh(onRefresh: () => Promise<void>) {
         setPullDist(0);
         return;
       }
+      const dx = e.touches[0].clientX - startX.current;
       const dy = e.touches[0].clientY - startY.current;
-      if (dy <= 0) {
+      // Horizontal swipes belong to report tables/charts, not refresh.
+      if (!horizontalGesture.current && Math.abs(dx) > 8 && Math.abs(dx) > Math.abs(dy)) {
+        horizontalGesture.current = true;
+        setPullDist(0);
+        return;
+      }
+      if (horizontalGesture.current || dy <= 0) {
         setPullDist(0);
         return;
       }

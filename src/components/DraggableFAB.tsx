@@ -79,6 +79,7 @@ export default function DraggableFAB({ onOpenChat, inMonth, outMonth, score, hid
   const btnRef = useRef<HTMLButtonElement>(null);
   const cornerRef = useRef(corner);
   cornerRef.current = corner;
+  const suppressClickRef = useRef(false);
 
   const onOpenChatRef = useRef(onOpenChat);
   onOpenChatRef.current = onOpenChat;
@@ -232,6 +233,9 @@ export default function DraggableFAB({ onOpenChat, inMonth, outMonth, score, hid
         // Direct Firestore write — bypasses store syncing indicator
         saveCornerDirectRef.current(nc);
       } else {
+        // Pointer release opens chat directly; ignore the synthetic click that
+        // browsers may emit afterwards so it does not open twice.
+        suppressClickRef.current = true;
         onOpenChatRef.current();
       }
     };
@@ -300,6 +304,13 @@ export default function DraggableFAB({ onOpenChat, inMonth, outMonth, score, hid
 
       <button
         ref={btnRef}
+        onClick={() => {
+          if (suppressClickRef.current) {
+            suppressClickRef.current = false;
+            return;
+          }
+          onOpenChat();
+        }}
         className={`group/fab fab-btn flex ${desk ? "h-14 w-14" : "h-12 w-12"} items-center justify-center rounded-full bg-gradient-to-br ${gradient} text-zinc-900 shadow-lg ${glow} transition-shadow select-none outline-none ${
           dragging ? "cursor-grabbing fab-dragging" : "cursor-grab"
         } ${shouldPulse ? "fab-pulse" : ""}`}
