@@ -1165,75 +1165,41 @@ function useDuitStoreInternal() {
      GOALS
      ══════════════════════════════════════════════════════════ */
   const addGoal = useCallback(
-    (goal: Omit<Goal, "id"> & { walletId?: number }): { ok: boolean; message?: string } => {
+    async (goal: Omit<Goal, "id"> & { walletId?: number }): Promise<{ ok: boolean; message?: string }> => {
       const currentAmt = goal.current || 0;
       const walletId = goal.walletId;
-      if (!goal.name?.trim() || !Number.isFinite(goal.target) || goal.target <= 0 ||
-        !Number.isFinite(currentAmt) || currentAmt < 0 || currentAmt > goal.target) {
+      if (!goal.name?.trim() || !Number.isFinite(goal.target) || goal.target <= 0 || !Number.isFinite(currentAmt) || currentAmt < 0 || currentAmt > goal.target) {
         return { ok: false, message: "Data goal tidak valid." };
       }
-      if (goal.deadline && !isValidDateKey(goal.deadline)) {
-        return { ok: false, message: "Tanggal target goal tidak valid." };
-      }
-
-      // If initial savings > 0, wallet must be specified and have sufficient balance
-      if (currentAmt > 0) {
-        if (!walletId) {
-          return { ok: false, message: "Pilih dompet sumber untuk tabungan awal." };
-        }
-        const sourceBalance = getWalletBalance(dataRef.current, walletId);
-        if (sourceBalance === null) {
-          return { ok: false, message: "Dompet sumber tidak ditemukan." };
-        }
-        if (sourceBalance < currentAmt) {
-          return { ok: false, message: `Saldo dompet tidak mencukupi. Saldo: Rp${sourceBalance.toLocaleString("id-ID")}` };
-        }
-      }
+      if (goal.deadline && !isValidDateKey(goal.deadline)) return { ok: false, message: "Tanggal target goal tidak valid." };
+      if (currentAmt > 0 && !walletId) return { ok: false, message: "Pilih dompet sumber untuk tabungan awal." };
+      if (!uid || loadedUserId !== uid) return { ok: false, message: "Data akun masih dimuat. Coba lagi sebentar." };
 
       const goalId = createId();
       const { walletId: _sourceWalletId, ...goalFields } = goal;
       const item: Goal = { ...goalFields, id: goalId };
-
-      // Create a goal-funding "out" transaction if initial savings > 0
       const fundingTx: Transaction | null = currentAmt > 0 && walletId ? {
-        id: createId(),
-        createdAt: Date.now(),
-        type: "out",
-        amt: currentAmt,
-        cat: "Tabungan",
-        desc: `Tabungan Goal: ${goal.name}`,
-        date: todayStr(),
-        walletId,
-        goalId,
+        id: createId(), createdAt: Date.now(), type: "out", amt: currentAmt, cat: "Tabungan",
+        desc: `Tabungan Goal: ${goal.name}`, date: todayStr(), walletId, goalId,
       } : null;
 
-      updateData((previous) => {
-        // Double-check invariant and balance inside updater for race safety.
-        if (!item.name.trim() || !Number.isFinite(item.target) || item.target <= 0 ||
-          !Number.isFinite(item.current) || item.current < 0 || item.current > item.target ||
-          (item.deadline && !isValidDateKey(item.deadline))) return previous;
-        if (fundingTx && fundingTx.walletId) {
-          const bal = getWalletBalance(previous, fundingTx.walletId);
-          if (bal === null || bal < fundingTx.amt) {
-            // Silently return — the pre-check already warned the user
-            return previous;
+      try {
+        await enqueueFirestoreUpdate((previous) => {
+          if (fundingTx) {
+            const bal = getWalletBalance(previous, fundingTx.walletId!);
+            if (bal === null) throw new GoalFundingError("Dompet sumber tidak ditemukan.");
+            if (bal < fundingTx.amt) throw new GoalFundingError(`Saldo dompet tidak mencukupi. Saldo: Rp${bal.toLocaleString("id-ID")}`);
           }
-        }
-
-        const txs = fundingTx
-          ? [fundingTx, ...previous.txs]
-          : previous.txs;
-
-        return {
-          ...previous,
-          goals: [...previous.goals, item],
-          txs,
-        };
-      });
-
-      return { ok: true };
+          return { ...previous, goals: [...previous.goals, item], txs: fundingTx ? [fundingTx, ...previous.txs] : previous.txs };
+        });
+        return { ok: true };
+      } catch (error) {
+        if (error instanceof GoalFundingError) return { ok: false, message: error.message };
+        console.error("Goal add error:", error);
+        return { ok: false, message: "Goal belum berhasil disimpan ke cloud. Coba lagi saat koneksi stabil." };
+      }
     },
-    [updateData]
+    [enqueueFirestoreUpdate, loadedUserId, uid]
   );
 
   const delGoal = useCallback(
@@ -1249,29 +1215,27 @@ function useDuitStoreInternal() {
   );
 
   const updateGoal = useCallback(
-    (id: number, patch: Partial<Omit<Goal, "id" | "current">>): { ok: boolean; message?: string } => {
+    async (id: number, patch: Partial<Omit<Goal, "id" | "current">>): Promise<{ ok: boolean; message?: string }> => {
       const existing = dataRef.current.goals.find((goal) => goal.id === id);
       if (!existing) return { ok: false, message: "Goal tidak ditemukan." };
       const target = patch.target ?? existing.target;
-      if (!Number.isFinite(target) || target <= 0 || target < existing.current) {
-        return { ok: false, message: "Target goal tidak valid atau lebih kecil dari tabungan terkumpul." };
+      if (!Number.isFinite(target) || target <= 0 || target < existing.current) return { ok: false, message: "Target goal tidak valid atau lebih kecil dari tabungan terkumpul." };
+      if (!uid || loadedUserId !== uid) return { ok: false, message: "Data akun masih dimuat. Coba lagi sebentar." };
+      try {
+        await enqueueFirestoreUpdate((previous) => {
+          const current = previous.goals.find((goal) => goal.id === id);
+          if (!current) throw new Error("Goal tidak valid.");
+          const finalTarget = patch.target ?? current.target;
+          if (!Number.isFinite(finalTarget) || finalTarget <= 0 || finalTarget < current.current) throw new Error("Goal tidak valid.");
+          return { ...previous, goals: previous.goals.map((goal) => goal.id === id ? { ...goal, ...patch } : goal) };
+        });
+        return { ok: true };
+      } catch (error) {
+        console.error("Goal update error:", error);
+        return { ok: false, message: "Goal belum berhasil disimpan ke cloud. Coba lagi saat koneksi stabil." };
       }
-
-      updateData((previous) => {
-        const current = previous.goals.find((goal) => goal.id === id);
-        if (!current) return previous;
-        const finalTarget = patch.target ?? current.target;
-        if (!Number.isFinite(finalTarget) || finalTarget <= 0 || finalTarget < current.current) {
-          return previous;
-        }
-        return {
-          ...previous,
-          goals: previous.goals.map((goal) => (goal.id === id ? { ...goal, ...patch } : goal)),
-        };
-      });
-      return { ok: true };
     },
-    [updateData]
+    [enqueueFirestoreUpdate, loadedUserId, uid]
   );
 
   const fundGoal = useCallback(
@@ -1494,29 +1458,27 @@ function useDuitStoreInternal() {
   );
 
   const updateWallet = useCallback(
-    (id: number, patch: Partial<Omit<Wallet, "id">>): { ok: boolean; message?: string } => {
+    async (id: number, patch: Partial<Omit<Wallet, "id">>): Promise<{ ok: boolean; message?: string }> => {
       const existing = dataRef.current.wallets.find((wallet) => wallet.id === id);
       if (!existing) return { ok: false, message: "Dompet tidak ditemukan." };
       const balance = patch.balance ?? existing.balance;
-      if (!Number.isFinite(balance) || balance < 0) {
-        return { ok: false, message: "Saldo awal dompet tidak valid." };
+      if (!Number.isFinite(balance) || balance < 0) return { ok: false, message: "Saldo awal dompet tidak valid." };
+      if (!uid || loadedUserId !== uid) return { ok: false, message: "Data akun masih dimuat. Coba lagi sebentar." };
+      try {
+        await enqueueFirestoreUpdate((previous) => {
+          const current = previous.wallets.find((wallet) => wallet.id === id);
+          if (!current) throw new Error("Dompet tidak valid.");
+          const finalBalance = patch.balance ?? current.balance;
+          if (!Number.isFinite(finalBalance) || finalBalance < 0) throw new Error("Dompet tidak valid.");
+          return { ...previous, wallets: previous.wallets.map((wallet) => wallet.id === id ? { ...wallet, ...patch } : wallet) };
+        });
+        return { ok: true };
+      } catch (error) {
+        console.error("Wallet update error:", error);
+        return { ok: false, message: "Dompet belum berhasil disimpan ke cloud. Coba lagi saat koneksi stabil." };
       }
-
-      updateData((previous) => {
-        const current = previous.wallets.find((wallet) => wallet.id === id);
-        if (!current) return previous;
-        const finalBalance = patch.balance ?? current.balance;
-        if (!Number.isFinite(finalBalance) || finalBalance < 0) return previous;
-        return {
-          ...previous,
-          wallets: previous.wallets.map((wallet) =>
-            wallet.id === id ? { ...wallet, ...patch } : wallet
-          ),
-        };
-      });
-      return { ok: true };
     },
-    [updateData]
+    [enqueueFirestoreUpdate, loadedUserId, uid]
   );
 
   const transferWallet = useCallback(
@@ -1649,8 +1611,17 @@ function useDuitStoreInternal() {
      RESET
      ══════════════════════════════════════════════════════════ */
   const resetAll = useCallback(
-    () => updateData(() => createDefaultData()),
-    [updateData]
+    async (): Promise<{ ok: boolean; message?: string }> => {
+      if (!uid || loadedUserId !== uid) return { ok: false, message: "Data akun masih dimuat. Coba lagi sebentar." };
+      try {
+        await enqueueFirestoreUpdate(() => createDefaultData());
+        return { ok: true };
+      } catch (error) {
+        console.error("Reset data error:", error);
+        return { ok: false, message: "Reset belum berhasil disimpan ke cloud. Coba lagi saat koneksi stabil." };
+      }
+    },
+    [enqueueFirestoreUpdate, loadedUserId, uid]
   );
 
   const replaceAll = useCallback(

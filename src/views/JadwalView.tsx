@@ -49,6 +49,7 @@ export default function JadwalView() {
   const { scheds, delSched } = useStore();
   const { isDark } = useTheme();
   const [showModal, setShowModal] = useState(false);
+  const [deletingSchedule, setDeletingSchedule] = useState(false);
   const [scheduleToDelete, setScheduleToDelete] = useState<ScheduleItem | null>(null);
   const [scheduleToEdit, setScheduleToEdit] = useState<ScheduleItem | null>(null);
   const today = todayStr();
@@ -213,14 +214,21 @@ export default function JadwalView() {
         message={scheduleToDelete ? `Jadwal “${scheduleToDelete.name}” akan dihapus permanen.` : ""}
         confirmLabel="Ya, Hapus"
         onClose={() => setScheduleToDelete(null)}
-        onConfirm={async () => {
-          if (scheduleToDelete) {
+        onConfirm={() => {
+          void (async () => {
+            if (!scheduleToDelete || deletingSchedule) return;
+            setDeletingSchedule(true);
             const result = await delSched(scheduleToDelete.id);
-            if (result.ok) toast.success(`Jadwal "${scheduleToDelete.name}" dihapus`);
-            else toast.error(result.message || "Jadwal belum berhasil dihapus.");
-          }
-          setScheduleToDelete(null);
+            setDeletingSchedule(false);
+            if (result.ok) {
+              toast.success(`Jadwal "${scheduleToDelete.name}" dihapus`);
+              setScheduleToDelete(null);
+            } else {
+              toast.error(result.message || "Jadwal belum berhasil dihapus.");
+            }
+          })();
         }}
+        busy={deletingSchedule}
         isDark={isDark}
       />
     </motion.div>

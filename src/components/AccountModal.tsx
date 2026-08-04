@@ -117,6 +117,7 @@ export default function AccountModal({ open, onClose }: AccountModalProps) {
   const [name, setName] = useState(settings.name);
   const [confirmLogout, setConfirmLogout] = useState(false);
   const [confirmReset, setConfirmReset] = useState(false);
+  const [resettingData, setResettingData] = useState(false);
   const [confirmImport, setConfirmImport] = useState(false);
   const [importingBackup, setImportingBackup] = useState(false);
   const [confirmCalendarReset, setConfirmCalendarReset] = useState(false);
@@ -824,10 +825,20 @@ export default function AccountModal({ open, onClose }: AccountModalProps) {
         tone="danger"
         onClose={() => setConfirmReset(false)}
         onConfirm={() => {
-          resetAll();
-          toast.success("Semua data berhasil direset");
-          handleClose();
+          void (async () => {
+            if (resettingData) return;
+            setResettingData(true);
+            const result = await resetAll();
+            setResettingData(false);
+            if (result.ok) {
+              toast.success("Semua data berhasil direset");
+              handleClose();
+            } else {
+              toast.error(result.message || "Reset data belum berhasil.");
+            }
+          })();
         }}
+        busy={resettingData}
         isDark={isDark}
       />
     </>

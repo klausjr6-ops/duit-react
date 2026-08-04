@@ -29,7 +29,7 @@ export default function GoalModal({ onClose }: Props) {
     return num ? parseInt(num).toLocaleString("id-ID") : "";
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     setError(null);
     if (!name.trim()) {
       setError("Nama goal harus diisi.");
@@ -50,7 +50,7 @@ export default function GoalModal({ onClose }: Props) {
       return;
     }
 
-    const result = addGoal({
+    const result = await addGoal({
       name: name.trim(),
       target: targetNum,
       current: currentNum,

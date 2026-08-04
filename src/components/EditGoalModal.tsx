@@ -21,13 +21,13 @@ export default function EditGoalModal({ goal, onClose }: Props) {
 
   const formatInputRupiah = (val: string) => { const num = val.replace(/\D/g, ""); return num ? parseInt(num).toLocaleString("id-ID") : ""; };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     setError(null);
     if (!name.trim()) { setError("Nama goal harus diisi."); return; }
     const targetNum = parseInt(target.replace(/\D/g, ""), 10);
     if (Number.isNaN(targetNum) || targetNum <= 0) { setError("Target tidak valid."); return; }
     if (targetNum < goal.current) { setError(`Target tidak boleh kurang dari tabungan terkumpul (${goal.current.toLocaleString("id-ID")}).`); return; }
-    const result = updateGoal(goal.id, { name: name.trim(), target: targetNum, deadline: deadline || undefined, icon });
+    const result = await updateGoal(goal.id, { name: name.trim(), target: targetNum, deadline: deadline || undefined, icon });
     if (!result.ok) { setError(result.message || "Goal belum berhasil diperbarui."); return; }
     toast.success(`Goal "${name.trim()}" berhasil diperbarui`);
     onClose();
