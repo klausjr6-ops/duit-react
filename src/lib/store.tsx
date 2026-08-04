@@ -8,7 +8,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { doc, onSnapshot, runTransaction } from "firebase/firestore";
+import { doc, getDocFromServer, onSnapshot, runTransaction } from "firebase/firestore";
 import { db } from "./firebaseDb";
 import { useAuth } from "./AuthContext";
 
@@ -718,6 +718,13 @@ function useDuitStoreInternal() {
       active = false;
       unsub();
     };
+  }, [uid]);
+
+  const refreshFromServer = useCallback(async (): Promise<void> => {
+    if (!uid) return;
+    const ref = doc(db, "users", uid, "data", "main");
+    const snapshot = await getDocFromServer(ref);
+    if (snapshot.exists()) setData(normalizeUserData(snapshot.data() as Partial<UserData>));
   }, [uid]);
 
   /* ─── Serialized, transactional Firestore updates ───────── */
@@ -1933,6 +1940,7 @@ function useDuitStoreInternal() {
     // Loading & sync states
     loading,
     loadedUserId,
+    refreshFromServer,
     syncing,
     syncError,
     // Mutators

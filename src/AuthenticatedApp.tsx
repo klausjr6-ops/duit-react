@@ -108,6 +108,7 @@ function DashboardApp() {
     inMonth,
     loading: storeLoading,
     loadedUserId,
+    refreshFromServer,
     syncing,
     syncError,
     settings,
@@ -160,13 +161,11 @@ function DashboardApp() {
     return () => window.removeEventListener("keydown", blockKeys, true);
   }, [showTransition]);
 
-  // Pull-to-refresh: force Firestore to re-read by briefly detaching and
-  // re-attaching the snapshot listener (toggle loadedUserId off then on).
+  // Pull-to-refresh asks Firestore for a fresh server document instead of
+  // merely replaying a local animation.
   const refreshData = useCallback(async () => {
-    // Firestore onSnapshot is already real-time, so we just add a small
-    // delay to give visual feedback that a refresh happened.
-    await new Promise((r) => setTimeout(r, 600));
-  }, []);
+    await refreshFromServer();
+  }, [refreshFromServer]);
 
   const {
     pulling: ptrPulling,

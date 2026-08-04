@@ -61,13 +61,20 @@ export function isSessionStale(): boolean {
  */
 export function useAutoLogout(onLogout: () => Promise<void>) {
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastTimerResetRef = useRef(0);
   const logoutRef = useRef(onLogout);
   logoutRef.current = onLogout;
 
-  const resetTimer = useCallback(() => {
-    if (timerRef.current) {
-      clearTimeout(timerRef.current);
+  const resetTimer = useCallback((force = false) => {
+    const now = Date.now();
+    // Mousemove/scroll can fire dozens of times per second. Updating a 5 min
+    // timer once per second is sufficient and avoids needless timer churn.
+    if (!force && now - lastTimerResetRef.current < 1000) {
+      stampActivity();
+      return;
     }
+    lastTimerResetRef.current = now;
+    if (timerRef.current) clearTimeout(timerRef.current);
 
     // Stamp activity to localStorage for cross-session detection (throttled)
     stampActivity();
@@ -87,10 +94,10 @@ export function useAutoLogout(onLogout: () => Promise<void>) {
   }, []);
 
   useEffect(() => {
-    resetTimer();
+    resetTimer(true);
 
-    const handleActivity = () => {
-      resetTimer();
+    const handleActivity = (event: Event) => {
+      resetTimer(event.type !== "mousemove" && event.type !== "scroll");
     };
 
     for (const event of EVENTS) {

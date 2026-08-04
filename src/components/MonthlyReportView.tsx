@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import Card from "./Card";
 import { formatRupiah } from "../lib/format";
 import { useStore, type Transaction } from "../lib/store";
@@ -26,7 +26,10 @@ export default function MonthlyReportView() {
   const { isDark } = useTheme();
   const current = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Jakarta", year: "numeric", month: "2-digit" }).format(new Date());
   const [month, setMonth] = useState(current);
+  const [visibleRows, setVisibleRows] = useState(100);
   const canGoNext = month < current;
+
+  useEffect(() => setVisibleRows(100), [month]);
 
   const report = useMemo(() => {
     const inMonth = txs.filter((t) => t.date.startsWith(month));
@@ -87,7 +90,7 @@ export default function MonthlyReportView() {
 
     <Card accent="linear-gradient(90deg,#2dd4bf,#60a5fa)">
       <div className="mb-5 flex flex-wrap items-baseline gap-x-3 gap-y-1"><h3 className={`text-lg font-extrabold ${text}`}>Rincian Transaksi — {monthLabel(month)}</h3><span className={`text-sm ${muted}`}>{report.rows.length} transaksi · Saldo awal {formatRupiah(report.opening)}</span></div>
-      <div className="overflow-x-auto"><table className="w-full min-w-[830px] text-left"><thead className={`border-b ${isDark ? "border-white/10 text-slate-500" : "border-zinc-200 text-zinc-500"}`}><tr className="text-[10px] font-extrabold tracking-widest"><th className="px-2 py-3">NO</th><th className="px-2 py-3">TANGGAL</th><th className="px-2 py-3">KETERANGAN</th><th className="px-2 py-3">KATEGORI</th><th className="px-2 py-3 text-right">MASUK</th><th className="px-2 py-3 text-right">KELUAR</th><th className="px-2 py-3 text-right">SALDO</th></tr></thead><tbody>{report.rows.length ? report.rows.map(({ tx, balance }, index) => <Row key={tx.id} index={index} tx={tx} balance={balance} isDark={isDark}/>) : <tr><td colSpan={7} className={`px-2 py-14 text-center text-sm ${muted}`}>Belum ada transaksi pada bulan ini.</td></tr>}</tbody></table></div>
+      <div className="overflow-x-auto"><table className="w-full min-w-[830px] text-left"><thead className={`border-b ${isDark ? "border-white/10 text-slate-500" : "border-zinc-200 text-zinc-500"}`}><tr className="text-[10px] font-extrabold tracking-widest"><th className="px-2 py-3">NO</th><th className="px-2 py-3">TANGGAL</th><th className="px-2 py-3">KETERANGAN</th><th className="px-2 py-3">KATEGORI</th><th className="px-2 py-3 text-right">MASUK</th><th className="px-2 py-3 text-right">KELUAR</th><th className="px-2 py-3 text-right">SALDO</th></tr></thead><tbody>{report.rows.length ? report.rows.slice(0, visibleRows).map(({ tx, balance }, index) => <Row key={tx.id} index={index} tx={tx} balance={balance} isDark={isDark}/>) : <tr><td colSpan={7} className={`px-2 py-14 text-center text-sm ${muted}`}>Belum ada transaksi pada bulan ini.</td></tr>}</tbody></table></div>{report.rows.length > visibleRows && <button type="button" onClick={() => setVisibleRows((count) => count + 100)} className={`mx-auto mt-5 block rounded-xl border px-4 py-2 text-sm font-bold ${button}`}>Muat 100 transaksi lagi</button>}
     </Card>
   </div>;
 }
