@@ -25,7 +25,8 @@ export default function ConfirmDialog({
   tone = "danger",
   busy = false,
 }: ConfirmDialogProps) {
-  const { dialogRef, onDialogKeyDown } = useModalDialog(open, onClose);
+  const guardedClose = () => { if (!busy) onClose(); };
+  const { dialogRef, onDialogKeyDown } = useModalDialog(open, guardedClose);
   const confirmClass = tone === "warning"
     ? "bg-amber-500 text-zinc-900 hover:bg-amber-400"
     : "bg-rose-500 text-white hover:bg-rose-400";
@@ -48,7 +49,7 @@ export default function ConfirmDialog({
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          onClick={onClose}
+          onClick={guardedClose}
           className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
         >
           <motion.div
@@ -71,7 +72,7 @@ export default function ConfirmDialog({
             <p id="confirm-dialog-message" className={`mt-2 text-sm leading-relaxed ${textClass}`}>{message}</p>
 
             <div className="mt-6 flex gap-3">
-              <button type="button" onClick={onClose} disabled={busy} className={`${cancelClass} disabled:cursor-not-allowed disabled:opacity-50`}>Batal</button>
+              <button type="button" onClick={guardedClose} disabled={busy} className={`${cancelClass} disabled:cursor-not-allowed disabled:opacity-50`}>Batal</button>
               <button
                 type="button"
                 onClick={onConfirm}

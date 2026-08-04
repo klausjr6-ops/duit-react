@@ -21,6 +21,7 @@ export default function TransactionList({ filterWallet = "all", onAddClick }: Pr
   const [transactionToDelete, setTransactionToDelete] = useState<Transaction | null>(null);
   const [transactionToEdit, setTransactionToEdit] = useState<Transaction | null>(null);
   const [transactionToDetail, setTransactionToDetail] = useState<Transaction | null>(null);
+  const [deletingTransaction, setDeletingTransaction] = useState(false);
 
   const filtered =
     filterWallet === "all" ? txs : txs.filter((t) => t.walletId === parseInt(filterWallet));
@@ -198,18 +199,24 @@ export default function TransactionList({ filterWallet = "all", onAddClick }: Pr
         confirmLabel="Ya, Hapus"
         onClose={() => setTransactionToDelete(null)}
         onConfirm={() => {
-          if (transactionToDelete) {
-            if (transactionToDelete.isCarryForward) {
-              toast.error("Transaksi Saldo Bulan Lalu tidak bisa dihapus. Entri ini dibuat otomatis.");
-            } else if (transactionToDelete.transferId) {
-              toast.error("Transfer tidak bisa dihapus per transaksi. Hapus melalui pengaturan dompet.");
-            } else {
-              delTx(transactionToDelete.id);
-              toast.success("Transaksi dihapus");
+          void (async () => {
+            if (!transactionToDelete || deletingTransaction) return;
+            if (transactionToDelete.isCarryForward || transactionToDelete.transferId || transactionToDelete.goalId) {
+              toast.error("Transaksi ini tidak dapat dihapus dari sini.");
+              return;
             }
-          }
-          setTransactionToDelete(null);
+            setDeletingTransaction(true);
+            const result = await delTx(transactionToDelete.id);
+            setDeletingTransaction(false);
+            if (result.ok) {
+              toast.success("Transaksi dihapus");
+              setTransactionToDelete(null);
+            } else {
+              toast.error(result.message || "Transaksi belum berhasil dihapus.");
+            }
+          })();
         }}
+        busy={deletingTransaction}
         isDark={isDark}
       />
     </>

@@ -19,6 +19,7 @@ export default function MoodCard() {
   const [selected, setSelected] = useState(todayMood?.mood ?? "😊");
   const [note, setNote] = useState(todayMood?.note ?? "");
   const [saved, setSaved] = useState(false);
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (todayMood) {
@@ -27,13 +28,24 @@ export default function MoodCard() {
     }
   }, [todayMood]);
 
-  const pickMood = (key: string, label: string) => {
-    setSelected(key);
-    setTodayMood(key, label);
+  const pickMood = async (key: string, label: string) => {
+    if (saving) return;
+    setSaving(true);
+    const result = await setTodayMood(key, label);
+    setSaving(false);
+    if (result.ok) setSelected(key);
+    else toast.error(result.message || "Mood belum berhasil disimpan.");
   };
 
-  const handleSave = () => {
-    setTodayNote(note);
+  const handleSave = async () => {
+    if (saving) return;
+    setSaving(true);
+    const result = await setTodayNote(note);
+    setSaving(false);
+    if (!result.ok) {
+      toast.error(result.message || "Catatan belum berhasil disimpan.");
+      return;
+    }
     setSaved(true);
     toast.success("Catatan tersimpan");
     setTimeout(() => setSaved(false), 2000);
@@ -52,7 +64,8 @@ export default function MoodCard() {
         {moods.map((m) => (
           <motion.button
             key={m.key}
-            onClick={() => pickMood(m.key, m.label)}
+            onClick={() => void pickMood(m.key, m.label)}
+            disabled={saving}
             whileHover={{ scale: 1.08, y: -2 }}
             whileTap={{ scale: 0.94 }}
             className={`flex flex-col items-center gap-1.5 rounded-2xl border px-2 py-3 transition-colors ${
@@ -87,13 +100,16 @@ export default function MoodCard() {
       />
 
       <motion.button
-        onClick={handleSave}
+        onClick={() => void handleSave()}
+        disabled={saving}
         whileHover={{ scale: 1.01 }}
         whileTap={{ scale: 0.98 }}
         className="relative mt-4 overflow-hidden rounded-xl bg-gradient-to-br from-teal-400 to-blue-500 py-3 font-bold text-zinc-900 shadow-lg shadow-teal-500/20"
       >
         <AnimatePresence mode="wait">
-          {saved ? (
+          {saving ? (
+            <motion.span key="saving" className="flex items-center justify-center gap-2">Menyimpan…</motion.span>
+          ) : saved ? (
             <motion.span
               key="saved"
               initial={{ opacity: 0, y: 8 }}

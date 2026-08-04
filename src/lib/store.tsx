@@ -511,6 +511,15 @@ function normalizeUserData(remote?: Partial<UserData>): UserData {
   return result;
 }
 
+const FIRESTORE_DOCUMENT_WARNING_BYTES = 850_000;
+
+class DocumentSizeLimitError extends Error {}
+
+function approximateDocumentBytes(value: unknown): number {
+  const json = JSON.stringify(value);
+  return new TextEncoder().encode(json).length;
+}
+
 export function removeUndefinedDeep<T>(value: T): T {
   if (Array.isArray(value)) {
     return value.map((item) => removeUndefinedDeep(item)) as T;
@@ -720,10 +729,13 @@ function useDuitStoreInternal() {
           const current = snapshot.exists()
             ? normalizeUserData(snapshot.data() as Partial<UserData>)
             : createDefaultData();
-          const next = updater(current);
-          // Firestore rejects `undefined` even for optional UI fields such as
-          // schedule description/end time. Keep optional fields absent instead.
-          transaction.set(ref, removeUndefinedDeep(next));
+          const next = removeUndefinedDeep(updater(current));
+          // Firestore documents have a hard 1 MiB limit. Fail early with a
+          // useful error before Firestore rejects every future write.
+          if (approximateDocumentBytes(next) > FIRESTORE_DOCUMENT_WARNING_BYTES) {
+            throw new DocumentSizeLimitError("Data DUIT sudah terlalu besar untuk satu dokumen cloud. Export dan arsipkan transaksi lama terlebih dahulu.");
+          }
+          transaction.set(ref, next);
         });
       });
 
@@ -735,7 +747,9 @@ function useDuitStoreInternal() {
         .catch((error) => {
           console.error("Firestore write error:", error);
           if (!(error instanceof GoalFundingError)) {
-            setSyncError("Perubahan belum tersimpan ke cloud. Coba lagi saat koneksi stabil.");
+            setSyncError(error instanceof DocumentSizeLimitError
+              ? error.message
+              : "Perubahan belum tersimpan ke cloud. Coba lagi saat koneksi stabil.");
           }
         })
         .finally(() => {
@@ -996,14 +1010,16 @@ function useDuitStoreInternal() {
   );
 
   const delTx = useCallback(
-    (id: number) =>
-      updateData((previous) => {
+    async (id: number): Promise<{ ok: boolean; message?: string }> => {
+      if (!uid || loadedUserId !== uid) return { ok: false, message: "Data akun masih dimuat. Coba lagi sebentar." };
+      try {
+        await enqueueFirestoreUpdate((previous) => {
         const tx = previous.txs.find((t) => t.id === id);
-        if (!tx) return previous;
+        if (!tx) throw new Error("Transaksi tidak ditemukan.");
 
         // Carry-forward and goal transactions are managed by their dedicated
         // flows, never through the generic transaction delete action.
-        if (tx.isCarryForward || tx.goalId) return previous;
+        if (tx.isCarryForward || tx.goalId) throw new Error("Transaksi ini tidak dapat dihapus dari sini.");
 
         // Collect IDs to remove: the target tx + any paired transfer
         const idsToRemove = new Set([id]);
@@ -1034,8 +1050,14 @@ function useDuitStoreInternal() {
           txs: previous.txs.filter((t) => !idsToRemove.has(t.id)),
           goals,
         };
-      }),
-    [updateData]
+        });
+        return { ok: true };
+      } catch (error) {
+        console.error("Transaction delete error:", error);
+        return { ok: false, message: "Transaksi belum berhasil dihapus dari cloud. Coba lagi saat koneksi stabil." };
+      }
+    },
+    [enqueueFirestoreUpdate, loadedUserId, uid]
   );
 
   const updateTx = useCallback(
@@ -1203,15 +1225,24 @@ function useDuitStoreInternal() {
   );
 
   const delGoal = useCallback(
-    (id: number) =>
-      updateData((previous) => ({
-        ...previous,
-        goals: previous.goals.filter((goal) => goal.id !== id),
-        // Removing the goal also reverses its internal transfers, restoring
-        // the derived balance of the original source wallet(s).
-        txs: previous.txs.filter((transaction) => transaction.goalId !== id),
-      })),
-    [updateData]
+    async (id: number): Promise<{ ok: boolean; message?: string }> => {
+      if (!uid || loadedUserId !== uid) return { ok: false, message: "Data akun masih dimuat. Coba lagi sebentar." };
+      try {
+        await enqueueFirestoreUpdate((previous) => {
+          if (!previous.goals.some((goal) => goal.id === id)) throw new Error("Goal tidak ditemukan.");
+          return {
+            ...previous,
+            goals: previous.goals.filter((goal) => goal.id !== id),
+            txs: previous.txs.filter((transaction) => transaction.goalId !== id),
+          };
+        });
+        return { ok: true };
+      } catch (error) {
+        console.error("Goal delete error:", error);
+        return { ok: false, message: "Goal belum berhasil dihapus dari cloud. Coba lagi saat koneksi stabil." };
+      }
+    },
+    [enqueueFirestoreUpdate, loadedUserId, uid]
   );
 
   const updateGoal = useCallback(
@@ -1398,8 +1429,11 @@ function useDuitStoreInternal() {
   );
 
   const delWallet = useCallback(
-    (id: number) =>
-      updateData((previous) => {
+    async (id: number): Promise<{ ok: boolean; message?: string }> => {
+      if (!uid || loadedUserId !== uid) return { ok: false, message: "Data akun masih dimuat. Coba lagi sebentar." };
+      try {
+        await enqueueFirestoreUpdate((previous) => {
+          if (!previous.wallets.some((wallet) => wallet.id === id)) throw new Error("Dompet tidak ditemukan.");
         // Find all transferIds originating from this wallet so we can
         // remove the paired transaction on the other wallet too.
         const walletTransferIds = new Set(
@@ -1453,8 +1487,14 @@ function useDuitStoreInternal() {
           txs,
           goals,
         };
-      }),
-    [updateData]
+        });
+        return { ok: true };
+      } catch (error) {
+        console.error("Wallet delete error:", error);
+        return { ok: false, message: "Dompet belum berhasil dihapus dari cloud. Coba lagi saat koneksi stabil." };
+      }
+    },
+    [enqueueFirestoreUpdate, loadedUserId, uid]
   );
 
   const updateWallet = useCallback(
@@ -1552,39 +1592,33 @@ function useDuitStoreInternal() {
      MOODS
      ══════════════════════════════════════════════════════════ */
   const setTodayMood = useCallback(
-    (mood: string, label: string) => {
+    async (mood: string, label: string): Promise<{ ok: boolean; message?: string }> => {
+      if (!uid || loadedUserId !== uid) return { ok: false, message: "Data akun masih dimuat. Coba lagi sebentar." };
       const date = todayStr();
-      updateData((previous) => ({
-        ...previous,
-        moods: {
-          ...previous.moods,
-          [date]: {
-            mood,
-            label,
-            note: previous.moods[date]?.note || "",
-          },
-        },
-      }));
+      try {
+        await enqueueFirestoreUpdate((previous) => ({ ...previous, moods: { ...previous.moods, [date]: { mood, label, note: previous.moods[date]?.note || "" } } }));
+        return { ok: true };
+      } catch (error) {
+        console.error("Mood update error:", error);
+        return { ok: false, message: "Mood belum berhasil disimpan ke cloud." };
+      }
     },
-    [updateData]
+    [enqueueFirestoreUpdate, loadedUserId, uid]
   );
 
   const setTodayNote = useCallback(
-    (note: string) => {
+    async (note: string): Promise<{ ok: boolean; message?: string }> => {
+      if (!uid || loadedUserId !== uid) return { ok: false, message: "Data akun masih dimuat. Coba lagi sebentar." };
       const date = todayStr();
-      updateData((previous) => ({
-        ...previous,
-        moods: {
-          ...previous.moods,
-          [date]: {
-            mood: previous.moods[date]?.mood || "🙂",
-            label: previous.moods[date]?.label || "Biasa",
-            note,
-          },
-        },
-      }));
+      try {
+        await enqueueFirestoreUpdate((previous) => ({ ...previous, moods: { ...previous.moods, [date]: { mood: previous.moods[date]?.mood || "🙂", label: previous.moods[date]?.label || "Biasa", note } } }));
+        return { ok: true };
+      } catch (error) {
+        console.error("Mood note error:", error);
+        return { ok: false, message: "Catatan belum berhasil disimpan ke cloud." };
+      }
     },
-    [updateData]
+    [enqueueFirestoreUpdate, loadedUserId, uid]
   );
 
   /* ══════════════════════════════════════════════════════════

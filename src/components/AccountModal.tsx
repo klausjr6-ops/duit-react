@@ -223,7 +223,7 @@ export default function AccountModal({ open, onClose }: AccountModalProps) {
       const result = await updateSettings({ calendarToken: createCalendarToken() });
       setConfirmCalendarReset(false);
       if (result.ok) showCalendarNotice("Link kalender lama sudah dicabut. Salin link baru untuk subscribe ulang.");
-      else showCalendarNotice(result.message || "Link kalender belum berhasil diperbarui.");
+      else toast.error(result.message || "Link kalender belum berhasil diperbarui.");
     } finally {
       setCalendarRegenerating(false);
     }

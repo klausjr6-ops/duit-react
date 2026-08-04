@@ -22,6 +22,7 @@ export default function GoalsView() {
   const [withdrawGoalState, setWithdrawGoalState] = useState<Goal | null>(null);
   const [goalToEdit, setGoalToEdit] = useState<Goal | null>(null);
   const [goalToDelete, setGoalToDelete] = useState<Goal | null>(null);
+  const [deletingGoal, setDeletingGoal] = useState(false);
 
   const formatDeadline = (d: string) => {
     const [year, month, day] = d.split("-").map(Number);
@@ -150,12 +151,20 @@ export default function GoalsView() {
         confirmLabel="Ya, Hapus"
         onClose={() => setGoalToDelete(null)}
         onConfirm={() => {
-          if (goalToDelete) {
-            delGoal(goalToDelete.id);
-            toast.success(`Goal "${goalToDelete.name}" dihapus`);
-          }
-          setGoalToDelete(null);
+          void (async () => {
+            if (!goalToDelete || deletingGoal) return;
+            setDeletingGoal(true);
+            const result = await delGoal(goalToDelete.id);
+            setDeletingGoal(false);
+            if (result.ok) {
+              toast.success(`Goal "${goalToDelete.name}" dihapus`);
+              setGoalToDelete(null);
+            } else {
+              toast.error(result.message || "Goal belum berhasil dihapus.");
+            }
+          })();
         }}
+        busy={deletingGoal}
         isDark={isDark}
       />
     </motion.div>

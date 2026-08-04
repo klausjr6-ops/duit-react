@@ -25,6 +25,7 @@ export default function WalletManager({ onClose }: Props) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [walletToDelete, setWalletToDelete] = useState<Wallet | null>(null);
+  const [deletingWallet, setDeletingWallet] = useState(false);
   const [walletToEdit, setWalletToEdit] = useState<Wallet | null>(null);
   const [showTransfer, setShowTransfer] = useState(false);
   const [transferFrom, setTransferFrom] = useState<Wallet | undefined>(undefined);
@@ -234,12 +235,20 @@ export default function WalletManager({ onClose }: Props) {
         confirmLabel="Ya, Hapus"
         onClose={() => setWalletToDelete(null)}
         onConfirm={() => {
-          if (walletToDelete) {
-            delWallet(walletToDelete.id);
-            toast.success(`Dompet "${walletToDelete.name}" dihapus`);
-          }
-          setWalletToDelete(null);
+          void (async () => {
+            if (!walletToDelete || deletingWallet) return;
+            setDeletingWallet(true);
+            const result = await delWallet(walletToDelete.id);
+            setDeletingWallet(false);
+            if (result.ok) {
+              toast.success(`Dompet "${walletToDelete.name}" dihapus`);
+              setWalletToDelete(null);
+            } else {
+              toast.error(result.message || "Dompet belum berhasil dihapus.");
+            }
+          })();
         }}
+        busy={deletingWallet}
         isDark={isDark}
       />
     </>
