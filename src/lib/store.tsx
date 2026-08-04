@@ -730,10 +730,11 @@ function useDuitStoreInternal() {
             ? normalizeUserData(snapshot.data() as Partial<UserData>)
             : createDefaultData();
           const next = removeUndefinedDeep(updater(current));
-          // Firestore documents have a hard 1 MiB limit. Fail early with a
-          // useful error before Firestore rejects every future write.
+          // Keep an early diagnostic for the single-document architecture, but
+          // do not reject a write below Firestore's actual 1 MiB hard limit.
+          // A conservative client threshold previously blocked valid writes.
           if (approximateDocumentBytes(next) > FIRESTORE_DOCUMENT_WARNING_BYTES) {
-            throw new DocumentSizeLimitError("Data DUIT sudah terlalu besar untuk satu dokumen cloud. Export dan arsipkan transaksi lama terlebih dahulu.");
+            console.warn("DUIT data document is approaching the Firestore size limit.");
           }
           transaction.set(ref, next);
         });
