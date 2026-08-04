@@ -362,12 +362,21 @@ function sanitizeWallet(value: unknown): Wallet | null {
   };
 }
 
+const MAX_STORED_AVATAR_BYTES = 160 * 1024;
+
+function dataUrlBytes(value: string): number {
+  const base64 = value.split(",")[1] || "";
+  return Math.floor((base64.length * 3) / 4);
+}
+
 function sanitizeSettings(value: unknown): Partial<Settings> {
   if (!isRecord(value)) return { name: "Kamu", themeMode: "time" };
 
   const themeMode = toThemeMode(value.themeMode);
   const dashboardMode = toDashboardMode(value.dashboardMode);
-  const avatar = typeof value.avatar === "string" && value.avatar.startsWith("data:image/")
+  // Imported/legacy avatars can be much larger than the current 160 KB UI
+  // limit and can push the single Firestore document past its hard 1 MiB cap.
+  const avatar = typeof value.avatar === "string" && value.avatar.startsWith("data:image/") && dataUrlBytes(value.avatar) <= MAX_STORED_AVATAR_BYTES
     ? value.avatar
     : undefined;
   const calendarToken = typeof value.calendarToken === "string" && value.calendarToken.length <= 200
