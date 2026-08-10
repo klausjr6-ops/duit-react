@@ -1002,6 +1002,10 @@ function useDuitStoreInternal() {
       }
       if (!uid || loadedUserId !== uid) return { ok: false, message: "Data akun masih dimuat. Coba lagi sebentar." };
       const transaction: Transaction = { ...tx, id: createId(), createdAt: Date.now() };
+      // Keep data entry responsive. The transaction appears immediately while
+      // Firestore commit remains the source of truth; a failed write rolls
+      // back only this optimistic transaction.
+      setData((previous) => ({ ...previous, txs: [transaction, ...previous.txs] }));
       try {
         await enqueueFirestoreUpdate((previous) => {
           // Double-check every invariant against fresh transaction data.
@@ -1019,6 +1023,7 @@ function useDuitStoreInternal() {
         });
         return { ok: true };
       } catch (error) {
+        setData((previous) => ({ ...previous, txs: previous.txs.filter((item) => item.id !== transaction.id) }));
         console.error("Transaction add error:", error);
         return { ok: false, message: "Transaksi belum berhasil disimpan ke cloud. Coba lagi saat koneksi stabil." };
       }
