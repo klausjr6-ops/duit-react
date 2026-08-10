@@ -638,11 +638,15 @@ function useDuitStoreInternal() {
   const dataRef = useRef(data);
   dataRef.current = data;
   const pendingWriteCountRef = useRef(0);
+  // IDs added optimistically by addTx. Snapshot data is merged with these
+  // until Firestore confirms the matching transaction is present.
+  const optimisticTxIdsRef = useRef(new Set<number>());
   const initializingUidRef = useRef<string | null>(null);
 
   /* ─── Subscribe real-time ke Firestore ──────────────────── */
   useEffect(() => {
     let active = true;
+    optimisticTxIdsRef.current.clear();
 
     if (!uid) {
       setData(createDefaultData());
@@ -665,7 +669,13 @@ function useDuitStoreInternal() {
         if (!active) return;
 
         if (snap.exists()) {
-          setData(normalizeUserData(snap.data() as Partial<UserData>));
+          const remote = normalizeUserData(snap.data() as Partial<UserData>);
+          const confirmedIds = new Set(remote.txs.map((tx) => tx.id));
+          for (const id of confirmedIds) optimisticTxIdsRef.current.delete(id);
+          const pendingTransactions = dataRef.current.txs.filter(
+            (tx) => optimisticTxIdsRef.current.has(tx.id) && !confirmedIds.has(tx.id)
+          );
+          setData(pendingTransactions.length ? { ...remote, txs: [...pendingTransactions, ...remote.txs] } : remote);
           setLoading(false);
           setLoadedUserId(uid);
           return;
@@ -1002,9 +1012,9 @@ function useDuitStoreInternal() {
       }
       if (!uid || loadedUserId !== uid) return { ok: false, message: "Data akun masih dimuat. Coba lagi sebentar." };
       const transaction: Transaction = { ...tx, id: createId(), createdAt: Date.now() };
-      // Keep data entry responsive. The transaction appears immediately while
-      // Firestore commit remains the source of truth; a failed write rolls
-      // back only this optimistic transaction.
+      // Keep data entry responsive. A stale remote snapshot must not erase
+      // this row before Firestore confirms it, so track its ID explicitly.
+      optimisticTxIdsRef.current.add(transaction.id);
       setData((previous) => ({ ...previous, txs: [transaction, ...previous.txs] }));
       try {
         await enqueueFirestoreUpdate((previous) => {
@@ -1023,6 +1033,7 @@ function useDuitStoreInternal() {
         });
         return { ok: true };
       } catch (error) {
+        optimisticTxIdsRef.current.delete(transaction.id);
         setData((previous) => ({ ...previous, txs: previous.txs.filter((item) => item.id !== transaction.id) }));
         console.error("Transaction add error:", error);
         return { ok: false, message: "Transaksi belum berhasil disimpan ke cloud. Coba lagi saat koneksi stabil." };
