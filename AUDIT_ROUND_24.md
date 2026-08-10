@@ -79,6 +79,15 @@
 
 `npm audit` sempat menemukan high vulnerability pada `nanoid` transitif dari PostCSS. `npm audit fix` telah memperbarui dependency lock dan menghilangkan high tersebut. Tersisa 8 moderate transitif Firebase Admin/Google Cloud yang rekomendasi otomatisnya mengarah ke downgrade incompatible.
 
-## Status
+## Status perbaikan — 2026-08-01
 
-Audit Round 24: **belum clean** — 2 MEDIUM dan 3 LOW. Perubahan dependency `nanoid` patch sudah diterapkan oleh `npm audit fix`; source aplikasi tidak diubah oleh audit ini.
+| ID | Status | Perbaikan |
+|---|---|---|
+| R24-01 | Fixed | FAB membedakan click keyboard (`detail === 0`) dari synthetic pointer click berbasis expiry timestamp. |
+| R24-02 | Fixed | Semua contoh AI Action sekarang menggunakan JSON konkret dan valid. |
+| R24-03 | Fixed | Pull-to-refresh menampilkan toast sukses atau error server. |
+| R24-04 | Fixed | Global `MotionConfig reducedMotion="user"` ditambahkan di entry React. |
+| R24-05 | Fixed | Input Login menggunakan id/htmlFor dan password control memiliki aria-label. |
+| R24 dependency | Fixed | `npm audit fix` memperbarui nanoid transitif; tidak ada high/critical. |
+
+Validasi pascaperbaikan: `npm test` **9/9 lulus**, TypeScript, production build, dan `git diff --check` semuanya lulus. Tersisa 8 moderate transitif Firebase Admin/Google Cloud.

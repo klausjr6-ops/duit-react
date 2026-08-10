@@ -96,7 +96,11 @@ function LoginForm({ onSwitchToRegister }: { onSwitchToRegister: () => void }) {
     if (!email || !password) return setError("Email dan password wajib diisi");
     setLoading(true);
     try { await loginEmail(email, password); } 
-    catch (err: any) { setError(mapFirebaseError(err.code)); }
+    catch (err: any) {
+      setPassword("");
+      setShowPass(false);
+      setError(mapFirebaseError(err.code));
+    }
     finally { setLoading(false); }
   }
   async function handleGoogle() {
