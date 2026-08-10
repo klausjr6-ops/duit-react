@@ -388,13 +388,8 @@ export default async function handler(req, res) {
     });
   } else {
     console.error('[AI] All providers failed:', errors);
-    res.status(200).json({
-      content: [
-        {
-          type: 'text',
-          text: 'Yah, aku lagi susah nyambung nih 😅 Semua provider AI-ku lagi bermasalah. Coba lagi beberapa menit ya, biasanya cepet balik normal 🙏',
-        },
-      ],
+    res.status(503).json({
+      error: "DUIT lagi susah terhubung ke AI. Coba lagi beberapa menit ya.",
       _meta: { errors },
     });
   }

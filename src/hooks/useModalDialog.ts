@@ -9,6 +9,12 @@ const FOCUSABLE_SELECTOR = [
   "[tabindex]:not([tabindex='-1'])",
 ].join(",");
 
+// Nested dialogs (Account → avatar preview / confirm dialog) share one body
+// scroll lock. A reference count prevents an inner dialog from restoring
+// scrolling while its parent remains open.
+let scrollLockCount = 0;
+let originalBodyOverflow = "";
+
 function getFocusableElements(container: HTMLElement): HTMLElement[] {
   return Array.from(container.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR)).filter(
     (element) => !element.hasAttribute("hidden") && element.getAttribute("aria-hidden") !== "true"
@@ -39,8 +45,11 @@ export function useModalDialog(
       ? document.activeElement
       : null;
 
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
+    if (scrollLockCount === 0) {
+      originalBodyOverflow = document.body.style.overflow;
+      document.body.style.overflow = "hidden";
+    }
+    scrollLockCount += 1;
 
     const frame = window.requestAnimationFrame(() => {
       const initialTarget = initialFocusRef?.current || dialogRef.current?.querySelector<HTMLElement>(FOCUSABLE_SELECTOR);
@@ -59,7 +68,8 @@ export function useModalDialog(
     return () => {
       window.cancelAnimationFrame(frame);
       document.removeEventListener("keydown", handleEscape);
-      document.body.style.overflow = previousOverflow;
+      scrollLockCount = Math.max(0, scrollLockCount - 1);
+      if (scrollLockCount === 0) document.body.style.overflow = originalBodyOverflow;
       previouslyFocusedRef.current?.focus();
     };
   }, [initialFocusRef, open]);

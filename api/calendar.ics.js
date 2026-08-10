@@ -164,6 +164,12 @@ export default async function handler(req, res) {
     res.status(401).json({ error: "A private calendar feed URL is required" });
     return;
   }
+  // Firebase UID is a single path segment. Reject malformed capability URLs
+  // before constructing an Admin SDK document path.
+  if (typeof uid !== "string" || !/^[A-Za-z0-9_-]{1,128}$/.test(uid)) {
+    res.status(404).json({ error: "Calendar feed not found" });
+    return;
+  }
 
   try {
     const db = getDb();
