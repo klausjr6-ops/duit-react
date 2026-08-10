@@ -1,5 +1,5 @@
 // src/components/LoginScreen.tsx
-import { useState, useEffect, useId } from "react";
+import { useState, useEffect, useId, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "../lib/AuthContext";
 import { useTheme } from "../lib/ThemeContext";
@@ -83,6 +83,7 @@ function LoginForm({ onSwitchToRegister }: { onSwitchToRegister: () => void }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPass, setShowPass] = useState(false);
+  const passwordRef = useRef<HTMLInputElement>(null);
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -97,9 +98,13 @@ function LoginForm({ onSwitchToRegister }: { onSwitchToRegister: () => void }) {
     setLoading(true);
     try { await loginEmail(email, password); } 
     catch (err: any) {
-      setPassword("");
-      setShowPass(false);
-      setError(mapFirebaseError(err.code));
+      const credentialError = ["auth/wrong-password", "auth/invalid-credential", "auth/user-not-found"].includes(err?.code);
+      if (credentialError) {
+        setPassword("");
+        setShowPass(false);
+        window.requestAnimationFrame(() => passwordRef.current?.focus());
+      }
+      setError(mapFirebaseError(err?.code));
     }
     finally { setLoading(false); }
   }
@@ -148,7 +153,7 @@ function LoginForm({ onSwitchToRegister }: { onSwitchToRegister: () => void }) {
           <Input label="Email" type="email" value={email} onChange={setEmail} placeholder="nama@email.com" autoComplete="email" />
             <div>
               <label className={`mb-1.5 block text-xs font-medium ${isDark ? "text-zinc-400" : "text-zinc-600"}`}>Password</label>
-              <PasswordInput value={password} onChange={setPassword} show={showPass} onToggleShow={() => setShowPass(s=>!s)} autoComplete="current-password" />
+              <PasswordInput inputRef={passwordRef} value={password} onChange={setPassword} show={showPass} onToggleShow={() => setShowPass(s=>!s)} autoComplete="current-password" />
               <div className="mt-2 flex justify-end">
                 <button
                   type="button"
@@ -304,14 +309,15 @@ function Input({ label, type, value, onChange, placeholder, autoComplete }: {
   );
 }
 
-function PasswordInput({ value, onChange, show, onToggleShow, placeholder, autoComplete }: {
-  value: string; onChange: (v: string) => void; show: boolean; onToggleShow: () => void; placeholder?: string; autoComplete?: string;
+function PasswordInput({ value, onChange, show, onToggleShow, placeholder, autoComplete, inputRef }: {
+  value: string; onChange: (v: string) => void; show: boolean; onToggleShow: () => void; placeholder?: string; autoComplete?: string; inputRef?: React.RefObject<HTMLInputElement | null>;
 }) {
   const { isDark } = useTheme();
   const inputId = useId();
   return (
     <div className="relative">
       <input
+        ref={inputRef}
         id={inputId}
         aria-label="Password"
         type={show ? "text" : "password"}
@@ -394,6 +400,8 @@ function mapFirebaseError(code: string): string {
     "auth/email-already-in-use": "Email sudah terdaftar",
     "auth/weak-password": "Password terlalu lemah (min 6 karakter)",
     "auth/popup-closed-by-user": "Login dibatalkan",
+    "auth/popup-blocked": "Popup login diblokir browser. Izinkan popup lalu coba lagi.",
+    "auth/cancelled-popup-request": "Permintaan login sebelumnya dibatalkan. Coba lagi.",
     "auth/network-request-failed": "Koneksi internet bermasalah",
     "auth/missing-email": "Email wajib diisi",
     "auth/too-many-requests": "Terlalu banyak percobaan, coba lagi nanti",

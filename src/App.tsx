@@ -49,7 +49,11 @@ export default function App() {
       try {
         sessionStorage.setItem("duit_session_expired", "1");
       } catch {}
-      logout();
+      void logout().catch((error) => {
+        console.error("Stale session logout error:", error);
+        // Do not leave the app on an infinite loader if auth storage is unavailable.
+        setSessionReady(true);
+      });
       return;
     }
 
