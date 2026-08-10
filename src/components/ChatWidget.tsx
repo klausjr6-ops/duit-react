@@ -441,7 +441,12 @@ export default function ChatWidget({ open, onClose }: ChatWidgetProps) {
             max_tokens: 1800,
           }),
         });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        if (!res.ok) {
+          const payload = await res.json().catch(() => null);
+          const requestError = new Error(payload?.error || `HTTP ${res.status}`) as Error & { status?: number };
+          requestError.status = res.status;
+          throw requestError;
+        }
         return res.json();
       };
 
@@ -481,15 +486,17 @@ export default function ChatWidget({ open, onClose }: ChatWidgetProps) {
       if (aborted) return;
 
       console.error("Chat error:", err);
-      setError("Yah, koneksi lagi bermasalah. Coba lagi bentar ya 🙏");
-      setMessages((previous) => [
-        ...previous,
-        {
-          id: Date.now() + 1,
-          role: "assistant",
-          text: "Duh, aku lagi susah nyambung ke server nih 😅 Coba lagi sebentar ya!",
-        },
-      ]);
+      const status = err && typeof err === "object" && "status" in err ? Number((err as { status?: number }).status) : 0;
+      const message = err instanceof Error && err.message ? err.message : "Yah, koneksi lagi bermasalah. Coba lagi bentar ya 🙏";
+      setError(status === 429 || status === 503 ? message : "Yah, koneksi lagi bermasalah. Coba lagi bentar ya 🙏");
+      // Service/rate errors are transient UI state, not assistant messages and
+      // must not pollute persisted conversation history.
+      if (status !== 429 && status !== 503) {
+        setMessages((previous) => [
+          ...previous,
+          { id: Date.now() + 1, role: "assistant", text: "Duh, aku lagi susah nyambung ke server nih 😅 Coba lagi sebentar ya!" },
+        ]);
+      }
     } finally {
       if (requestAbortRef.current === controller) {
         requestAbortRef.current = null;

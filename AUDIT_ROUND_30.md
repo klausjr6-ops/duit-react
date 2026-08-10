@@ -59,6 +59,13 @@
 
 ---
 
-## Status
+## Status perbaikan — 2026-08-01
 
-Audit Round 30: **not clean** — 1 HIGH, 1 MEDIUM, 2 LOW. No source code changed by this audit.
+| ID | Status | Perbaikan |
+|---|---|---|
+| R30-01 | Fixed | CSP sekarang memiliki `frame-src` Firebase/Google untuk Google Auth. |
+| R30-02 | Fixed | CSP sekarang memiliki `worker-src 'self' blob:`. |
+| R30-03 | Manual validation required | Setelah deploy, Google login harus diuji di Production karena CSP adalah browser runtime behavior. |
+| R30-04 | Accepted | Header seragam pada API route aman; route-specific refinement bersifat optional. |
+
+Validasi pascaperbaikan: `npm test` **9/9 lulus**, TypeScript, production build, dan `git diff --check` semuanya lulus.

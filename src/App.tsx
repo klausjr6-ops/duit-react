@@ -1,5 +1,6 @@
 import { lazy, Suspense, useEffect, useState } from "react";
 import LoginScreen from "./components/LoginScreen";
+import NetworkStatusBanner from "./components/NetworkStatusBanner";
 import { useAuth } from "./lib/AuthContext";
 import { useTheme } from "./lib/ThemeContext";
 import { isSessionStale, stampActivity } from "./hooks/useAutoLogout";
@@ -84,13 +85,14 @@ export default function App() {
     setSessionReady(true);
   }, [loading, user, logout]);
 
-  if (loading || !sessionReady) return <FullScreenLoader />;
-  if (sessionEndError) return <SessionEndError onRetry={() => { void retryStaleLogout(); }} retrying={sessionEndRetrying} />;
-  if (!user) return <LoginScreen />;
+  if (loading || !sessionReady) return <><NetworkStatusBanner /><FullScreenLoader /></>;
+  if (sessionEndError) return <><NetworkStatusBanner /><SessionEndError onRetry={() => { void retryStaleLogout(); }} retrying={sessionEndRetrying} /></>;
+  if (!user) return <><NetworkStatusBanner /><LoginScreen /></>;
 
-  return (
+  return <>
+    <NetworkStatusBanner />
     <Suspense fallback={<FullScreenLoader />}>
       <AuthenticatedApp />
     </Suspense>
-  );
+  </>;
 }
