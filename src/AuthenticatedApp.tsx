@@ -13,6 +13,7 @@ import PullToRefreshIndicator from "./components/PullToRefreshIndicator";
 import DraggableFAB from "./components/DraggableFAB";
 import ToastContainer from "./components/ToastContainer";
 import ViewTransitionLoader from "./components/ViewTransitionLoader";
+import { toast } from "./hooks/useToast";
 import { usePullToRefresh } from "./hooks/usePullToRefresh";
 import { useAutoLogout } from "./hooks/useAutoLogout";
 import { StoreProvider, useStore } from "./lib/store";
@@ -164,7 +165,12 @@ function DashboardApp() {
   // Pull-to-refresh asks Firestore for a fresh server document instead of
   // merely replaying a local animation.
   const refreshData = useCallback(async () => {
-    await refreshFromServer();
+    try {
+      await refreshFromServer();
+      toast.info("Data sudah diperbarui dari server.");
+    } catch {
+      toast.error("Tidak dapat memeriksa pembaruan dari server.");
+    }
   }, [refreshFromServer]);
 
   const {

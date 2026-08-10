@@ -117,8 +117,9 @@ export default function TransferModal({ fromWallet, onClose }: Props) {
         <div className="space-y-4">
           {/* From wallet */}
           <div>
-            <label className={labelCls}>Dari Dompet</label>
+            <label htmlFor="transfer-from-wallet" className={labelCls}>Dari Dompet</label>
             <select
+              id="transfer-from-wallet"
               value={fromId}
               disabled={saving}
               onChange={(e) => {
@@ -164,8 +165,9 @@ export default function TransferModal({ fromWallet, onClose }: Props) {
 
           {/* To wallet */}
           <div>
-            <label className={labelCls}>Ke Dompet</label>
+            <label htmlFor="transfer-to-wallet" className={labelCls}>Ke Dompet</label>
             <select
+              id="transfer-to-wallet"
               value={toId}
               disabled={saving}
               onChange={(e) => setToId(e.target.value)}
@@ -184,8 +186,9 @@ export default function TransferModal({ fromWallet, onClose }: Props) {
 
           {/* Amount */}
           <div>
-            <label className={labelCls}>Jumlah (Rp)</label>
+            <label htmlFor="transfer-amount" className={labelCls}>Jumlah (Rp)</label>
             <input
+              id="transfer-amount"
               type="text"
               inputMode="numeric"
               value={amt ? `Rp ${formatInputRupiah(amt)}` : ""}
