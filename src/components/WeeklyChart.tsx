@@ -86,7 +86,7 @@ export default function WeeklyChart() {
           role="img"
           aria-label="Grafik pemasukan dan pengeluaran tujuh hari terakhir"
           onMouseMove={(event) => {
-            if (!(event.target instanceof SVGRectElement)) setHovered(null);
+            if (!(event.target instanceof Element) || event.target.tagName.toLowerCase() !== "rect") setHovered(null);
           }}
         >
           {Array.from({ length: gridLines + 1 }).map((_, index) => {

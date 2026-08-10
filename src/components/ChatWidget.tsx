@@ -135,8 +135,10 @@ function readChatHistory(uid: string): Message[] {
     const envelope = parsed && typeof parsed === "object" && !Array.isArray(parsed)
       ? parsed as { savedAt?: unknown; messages?: unknown }
       : null;
-    if (envelope?.savedAt && typeof envelope.savedAt === "number" && Date.now() - envelope.savedAt > CHAT_HISTORY_MAX_AGE_MS) {
-      return [defaultGreeting()];
+    if (envelope?.savedAt && typeof envelope.savedAt === "number") {
+      const age = Date.now() - envelope.savedAt;
+      // Treat large forward/backward device-clock skew as a fresh session.
+      if (age > CHAT_HISTORY_MAX_AGE_MS || age < -5 * 60 * 1000) return [defaultGreeting()];
     }
     // Legacy array-only history has no trustworthy savedAt, so do not reuse
     // it as AI context after this privacy/TTL upgrade.

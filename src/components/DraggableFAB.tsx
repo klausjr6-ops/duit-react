@@ -304,10 +304,17 @@ export default function DraggableFAB({ onOpenChat, inMonth, outMonth, score, hid
 
       <button
         ref={btnRef}
+        onKeyDown={(event) => {
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            onOpenChat();
+          }
+        }}
         onClick={(event) => {
-          // event.detail === 0 is keyboard activation and must always work.
+          // Pointer release already opened chat; ignore only its short-lived
+          // synthetic click. Keyboard activation is handled explicitly above.
           if (event.detail !== 0 && Date.now() < suppressPointerClickUntilRef.current) return;
-          onOpenChat();
+          if (event.detail !== 0) onOpenChat();
         }}
         className={`group/fab fab-btn flex ${desk ? "h-14 w-14" : "h-12 w-12"} items-center justify-center rounded-full bg-gradient-to-br ${gradient} text-zinc-900 shadow-lg ${glow} transition-shadow select-none outline-none ${
           dragging ? "cursor-grabbing fab-dragging" : "cursor-grab"
