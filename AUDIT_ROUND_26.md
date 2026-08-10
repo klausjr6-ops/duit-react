@@ -59,6 +59,13 @@
 
 ---
 
-## Status
+## Status perbaikan — 2026-08-01
 
-Audit Round 26: **belum clean** — 1 MEDIUM dan 3 LOW. Tidak ada source aplikasi yang diubah oleh audit ini.
+| ID | Status | Perbaikan |
+|---|---|---|
+| R26-01 | Fixed | Stale logout failure menampilkan layar sesi perlu diakhiri, tidak pernah membuka dashboard authenticated. |
+| R26-02 | Fixed | FAB memakai keydown eksplisit untuk Enter/Space dan suppress hanya untuk synthetic pointer click. |
+| R26-03 | Fixed | TTL chat menangani forward/backward clock skew lebih dari 5 menit. |
+| R26-04 | Fixed | Tooltip chart memakai `Element.tagName === rect`, bukan global SVGRectElement. |
+
+Validasi pascaperbaikan: `npm test` **9/9 lulus**, TypeScript, production build, dan `git diff --check` semuanya lulus. Dependency audit tetap 8 moderate transitif Firebase Admin, tanpa high/critical.

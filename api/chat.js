@@ -30,7 +30,7 @@ function getFirebaseAdminAuth() {
   return getAuth();
 }
 
-async function hasValidFirebaseSession(req) {
+async function getFirebaseSessionUid(req) {
   const adminAuth = getFirebaseAdminAuth();
   // Chat is private: a deployment without Firebase Admin configuration must
   // fail closed instead of exposing a paid AI endpoint to anonymous traffic.
@@ -38,24 +38,25 @@ async function hasValidFirebaseSession(req) {
   const token = typeof authorization === "string" && authorization.startsWith("Bearer ")
     ? authorization.slice("Bearer ".length)
     : "";
-  if (!token) return false;
+  if (!token) return null;
 
   try {
-    await adminAuth.verifyIdToken(token);
-    return true;
+    const decoded = await adminAuth.verifyIdToken(token);
+    return decoded.uid || null;
   } catch {
-    return false;
+    return null;
   }
 }
 
-function getClientKey(req) {
+function getClientKey(req, uid) {
   const forwarded = req.headers?.["x-forwarded-for"];
   const ip = Array.isArray(forwarded) ? forwarded[0] : forwarded?.split(",")[0]?.trim();
-  return ip || req.headers?.["x-real-ip"] || "unknown";
+  const clientIp = ip || req.headers?.["x-real-ip"] || "unknown";
+  return uid ? `uid:${uid}|ip:${clientIp}` : `ip:${clientIp}`;
 }
 
-function isRateLimited(req) {
-  const key = getClientKey(req);
+function isRateLimited(req, uid) {
+  const key = getClientKey(req, uid);
   const now = Date.now();
   const activeRequests = (requestBuckets.get(key) || []).filter(
     (timestamp) => now - timestamp < RATE_LIMIT_WINDOW_MS
@@ -132,19 +133,21 @@ function sanitizeRequest(body) {
 }
 
 // Timeout wrapper — auto-fail kalau provider lambat > X ms
-function withTimeout(promise, ms, label) {
-  return Promise.race([
-    promise,
-    new Promise((_, reject) =>
-      setTimeout(() => reject(new Error(`${label} timeout after ${ms}ms`)), ms)
-    ),
-  ]);
+function withTimeout(promise, ms, label, controller) {
+  let timeoutId;
+  const timeout = new Promise((_, reject) => {
+    timeoutId = setTimeout(() => {
+      controller?.abort();
+      reject(new Error(`${label} timeout after ${ms}ms`));
+    }, ms);
+  });
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timeoutId));
 }
 
 // ─────────────────────────────────────────────────────────────
 // PROVIDER 1: GEMINI 2.5 FLASH (Primary)
 // ─────────────────────────────────────────────────────────────
-async function callGemini({ system, messages, max_tokens }) {
+async function callGemini({ system, messages, max_tokens, signal }) {
   const model = 'gemini-2.5-flash';
 
   const contents = (messages || []).map((m) => {
@@ -196,6 +199,7 @@ async function callGemini({ system, messages, max_tokens }) {
         'x-goog-api-key': process.env.GEMINI_API_KEY,
       },
       body: JSON.stringify(body),
+      signal,
     }
   );
 
@@ -227,7 +231,7 @@ async function callGemini({ system, messages, max_tokens }) {
 // ─────────────────────────────────────────────────────────────
 // PROVIDER 2: GROQ LLAMA 3.3 70B (Fallback)
 // ─────────────────────────────────────────────────────────────
-async function callGroq({ system, messages, max_tokens }) {
+async function callGroq({ system, messages, max_tokens, signal }) {
   const groqMessages = [];
 
   if (system) {
@@ -264,6 +268,7 @@ async function callGroq({ system, messages, max_tokens }) {
       Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
     },
     body: JSON.stringify(body),
+    signal,
   });
 
   const data = await response.json();
@@ -300,8 +305,10 @@ export default async function handler(req, res) {
     return;
   }
 
+  let sessionUid = null;
   try {
-    if (!(await hasValidFirebaseSession(req))) {
+    sessionUid = await getFirebaseSessionUid(req);
+    if (!sessionUid) {
       res.status(401).json({ error: "Sesi tidak valid. Silakan login ulang." });
       return;
     }
@@ -316,7 +323,7 @@ export default async function handler(req, res) {
     return;
   }
 
-  if (isRateLimited(req)) {
+  if (isRateLimited(req, sessionUid)) {
     res.setHeader("Retry-After", "60");
     res.status(429).json({ error: "Terlalu banyak pesan. Coba lagi sebentar ya." });
     return;
@@ -337,7 +344,8 @@ export default async function handler(req, res) {
   if (process.env.GEMINI_API_KEY) {
     try {
       console.log('[AI] Trying Gemini...');
-      const result = await withTimeout(callGemini(params), 15000, 'Gemini');
+      const controller = new AbortController();
+      const result = await withTimeout(callGemini({ ...params, signal: controller.signal }), 15000, 'Gemini', controller);
       finalText = result.text;
       usedProvider = result.provider;
       truncated = Boolean(result.truncated);
@@ -356,7 +364,8 @@ export default async function handler(req, res) {
   if (!finalText && process.env.GROQ_API_KEY) {
     try {
       console.log('[AI] Falling back to Groq...');
-      const result = await withTimeout(callGroq(params), 15000, 'Groq');
+      const controller = new AbortController();
+      const result = await withTimeout(callGroq({ ...params, signal: controller.signal }), 15000, 'Groq', controller);
       finalText = result.text;
       usedProvider = result.provider;
       truncated = Boolean(result.truncated);

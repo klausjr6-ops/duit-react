@@ -91,6 +91,24 @@ function escapeText(value) {
     .replace(/\r?\n/g, "\\n");
 }
 
+// RFC 5545 limits a content line to 75 octets. Continuation lines begin
+// with one whitespace character. Iterate by code point to avoid splitting
+// multi-byte Indonesian text in the middle.
+function foldIcalLine(line) {
+  const folded = [];
+  let current = "";
+  for (const char of String(line)) {
+    if (Buffer.byteLength(current + char, "utf8") > 75) {
+      folded.push(current);
+      current = ` ${char}`;
+    } else {
+      current += char;
+    }
+  }
+  if (current) folded.push(current);
+  return folded.join("\r\n");
+}
+
 function dayIndexFromDateKey(dateKey) {
   const [year, month, day] = dateKey.split("-").map(Number);
   return new Date(Date.UTC(year, month - 1, day)).getUTCDay();
@@ -214,7 +232,7 @@ export default async function handler(req, res) {
     res.setHeader("Cache-Control", "private, no-store, max-age=0");
     res.setHeader("Content-Type", "text/calendar; charset=utf-8");
     res.setHeader("Content-Disposition", 'inline; filename="jadwal-duit.ics"');
-    res.status(200).send(lines.join("\r\n"));
+    res.status(200).send(lines.map(foldIcalLine).join("\r\n"));
   } catch (error) {
     console.error("Calendar feed error:", error);
     const notConfigured = error instanceof Error && error.message === "Calendar service account is not configured";

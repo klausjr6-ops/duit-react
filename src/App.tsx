@@ -23,10 +23,10 @@ function FullScreenLoader() {
   );
 }
 
-function SessionEndError() {
+function SessionEndError({ onRetry, retrying }: { onRetry: () => void; retrying: boolean }) {
   const { isDark } = useTheme();
   return <div className={isDark ? "min-h-screen bg-slate-950 text-slate-200 flex items-center justify-center p-6" : "min-h-screen bg-[#f5f5f7] text-zinc-800 flex items-center justify-center p-6"}>
-    <div className="max-w-sm text-center"><h1 className="text-xl font-bold">Sesi perlu diakhiri</h1><p className={isDark ? "mt-2 text-sm text-slate-400" : "mt-2 text-sm text-zinc-500"}>DUIT tidak dapat mengakhiri sesi lama dengan aman. Muat ulang halaman lalu coba login kembali.</p><button type="button" onClick={() => window.location.reload()} className="mt-5 rounded-xl bg-gradient-to-br from-teal-400 to-blue-500 px-4 py-2.5 text-sm font-bold text-zinc-900">Muat Ulang</button></div>
+    <div className="max-w-sm text-center"><h1 className="text-xl font-bold">Sesi perlu diakhiri</h1><p className={isDark ? "mt-2 text-sm text-slate-400" : "mt-2 text-sm text-zinc-500"}>DUIT tidak dapat mengakhiri sesi lama dengan aman. Coba keluar lagi sebelum memuat ulang halaman.</p><div className="mt-5 flex justify-center gap-3"><button type="button" onClick={onRetry} disabled={retrying} className="rounded-xl bg-gradient-to-br from-teal-400 to-blue-500 px-4 py-2.5 text-sm font-bold text-zinc-900 disabled:opacity-60">{retrying ? "Mengakhiri sesi…" : "Coba Keluar Lagi"}</button><button type="button" onClick={() => window.location.reload()} className={isDark ? "rounded-xl bg-white/10 px-4 py-2.5 text-sm font-bold text-white" : "rounded-xl bg-zinc-200 px-4 py-2.5 text-sm font-bold text-zinc-800"}>Muat Ulang</button></div></div>
   </div>;
 }
 
@@ -37,6 +37,19 @@ export default function App() {
   // the user briefly sees the dashboard (1 frame) before being logged out.
   const [sessionReady, setSessionReady] = useState(false);
   const [sessionEndError, setSessionEndError] = useState(false);
+  const [sessionEndRetrying, setSessionEndRetrying] = useState(false);
+
+  const retryStaleLogout = async () => {
+    setSessionEndRetrying(true);
+    try {
+      await logout();
+      setSessionEndError(false);
+    } catch (error) {
+      console.error("Retry stale session logout error:", error);
+    } finally {
+      setSessionEndRetrying(false);
+    }
+  };
 
   useEffect(() => {
     if (loading) return;
@@ -72,7 +85,7 @@ export default function App() {
   }, [loading, user, logout]);
 
   if (loading || !sessionReady) return <FullScreenLoader />;
-  if (sessionEndError) return <SessionEndError />;
+  if (sessionEndError) return <SessionEndError onRetry={() => { void retryStaleLogout(); }} retrying={sessionEndRetrying} />;
   if (!user) return <LoginScreen />;
 
   return (
