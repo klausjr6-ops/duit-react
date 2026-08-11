@@ -349,7 +349,10 @@ export default function ChatWidget({ open, onClose }: ChatWidgetProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const requestAbortRef = useRef<AbortController | null>(null);
-  const { dialogRef, onDialogKeyDown } = useModalDialog(open, onClose, inputRef);
+  // A confirmed data action must remain visible until its write finishes.
+  // Regular chat requests can still be closed and will be aborted below.
+  const guardedClose = () => { if (actionSavingId === null) onClose(); };
+  const { dialogRef, onDialogKeyDown } = useModalDialog(open, guardedClose, inputRef);
 
   // A conversation is private to the signed-in browser account and survives
   // refreshes. It is intentionally capped and never stored in shared state.
@@ -590,7 +593,7 @@ export default function ChatWidget({ open, onClose }: ChatWidgetProps) {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.2 }}
-            onClick={onClose}
+            onClick={guardedClose}
             className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm"
           />
           <div className="fixed inset-0 z-50 flex items-center justify-center p-0 md:p-6 pointer-events-none">
@@ -637,9 +640,10 @@ export default function ChatWidget({ open, onClose }: ChatWidgetProps) {
                   </div>
                 </div>
                 <button
-                  onClick={onClose}
-                  className={`w-9 h-9 rounded-full flex items-center justify-center transition-colors ${closeBtn}`}
-                  aria-label="Close chat"
+                  onClick={guardedClose}
+                  disabled={actionSavingId !== null}
+                  className={`w-9 h-9 rounded-full flex items-center justify-center transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${closeBtn}`}
+                  aria-label="Tutup chat"
                 >
                   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <line x1="18" y1="6" x2="6" y2="18" />

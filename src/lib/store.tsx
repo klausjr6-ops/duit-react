@@ -580,6 +580,7 @@ function getWalletBalance(data: UserData, walletId: number): number | null {
 }
 
 class GoalFundingError extends Error {}
+class WalletBalanceError extends Error {}
 
 /* ══════════════════════════════════════════════════════════════
    LOCALSTORAGE MIGRATION (one-time)
@@ -654,6 +655,32 @@ function useDuitStoreInternal() {
   const optimisticUpdatedTxRef = useRef(new Map<number, Transaction>());
   const initializingUidRef = useRef<string | null>(null);
 
+  // Both the real-time listener and pull-to-refresh may receive an older
+  // server document while a local transaction write is still in flight.
+  // Keep the same optimistic reconciliation for both paths.
+  const mergeRemoteWithOptimisticTransactions = useCallback((remote: UserData): UserData => {
+    const confirmedIds = new Set(remote.txs.map((tx) => tx.id));
+    for (const id of confirmedIds) optimisticTxIdsRef.current.delete(id);
+    for (const id of [...optimisticDeletedTxIdsRef.current]) {
+      if (!confirmedIds.has(id)) optimisticDeletedTxIdsRef.current.delete(id);
+    }
+    const pendingTransactions = dataRef.current.txs.filter(
+      (tx) => optimisticTxIdsRef.current.has(tx.id) && !confirmedIds.has(tx.id)
+    );
+    const visibleRemoteTransactions = remote.txs
+      .filter((tx) => !optimisticDeletedTxIdsRef.current.has(tx.id))
+      .map((tx) => {
+        const optimistic = optimisticUpdatedTxRef.current.get(tx.id);
+        if (!optimistic) return tx;
+        if (sameTransaction(tx, optimistic)) {
+          optimisticUpdatedTxRef.current.delete(tx.id);
+          return tx;
+        }
+        return optimistic;
+      });
+    return { ...remote, txs: [...pendingTransactions, ...visibleRemoteTransactions] };
+  }, []);
+
   /* ─── Subscribe real-time ke Firestore ──────────────────── */
   useEffect(() => {
     let active = true;
@@ -683,29 +710,7 @@ function useDuitStoreInternal() {
 
         if (snap.exists()) {
           const remote = normalizeUserData(snap.data() as Partial<UserData>);
-          const confirmedIds = new Set(remote.txs.map((tx) => tx.id));
-          for (const id of confirmedIds) optimisticTxIdsRef.current.delete(id);
-          for (const id of [...optimisticDeletedTxIdsRef.current]) {
-            if (!confirmedIds.has(id)) optimisticDeletedTxIdsRef.current.delete(id);
-          }
-          const pendingTransactions = dataRef.current.txs.filter(
-            (tx) => optimisticTxIdsRef.current.has(tx.id) && !confirmedIds.has(tx.id)
-          );
-          const visibleRemoteTransactions = remote.txs
-            .filter((tx) => !optimisticDeletedTxIdsRef.current.has(tx.id))
-            .map((tx) => {
-              const optimistic = optimisticUpdatedTxRef.current.get(tx.id);
-              if (!optimistic) return tx;
-              // Once the server echoes the exact edit, normal snapshot data
-              // becomes authoritative again.
-              if (sameTransaction(tx, optimistic)) {
-                optimisticUpdatedTxRef.current.delete(tx.id);
-                return tx;
-              }
-              return optimistic;
-            });
-          const merged = { ...remote, txs: [...pendingTransactions, ...visibleRemoteTransactions] };
-          setData(merged);
+          setData(mergeRemoteWithOptimisticTransactions(remote));
           setLoading(false);
           setLoadedUserId(uid);
           return;
@@ -758,14 +763,14 @@ function useDuitStoreInternal() {
       active = false;
       unsub();
     };
-  }, [uid]);
+  }, [mergeRemoteWithOptimisticTransactions, uid]);
 
   const refreshFromServer = useCallback(async (): Promise<void> => {
     if (!uid) return;
     const ref = doc(db, "users", uid, "data", "main");
     const snapshot = await getDocFromServer(ref);
-    if (snapshot.exists()) setData(normalizeUserData(snapshot.data() as Partial<UserData>));
-  }, [uid]);
+    if (snapshot.exists()) setData(mergeRemoteWithOptimisticTransactions(normalizeUserData(snapshot.data() as Partial<UserData>)));
+  }, [mergeRemoteWithOptimisticTransactions, uid]);
 
   /* ─── Serialized, transactional Firestore updates ───────── */
   const enqueueFirestoreUpdate = useCallback(
@@ -1582,10 +1587,16 @@ function useDuitStoreInternal() {
           if (!current) throw new Error("Dompet tidak valid.");
           const finalBalance = patch.balance ?? current.balance;
           if (!Number.isFinite(finalBalance) || finalBalance < 0) throw new Error("Dompet tidak valid.");
-          return { ...previous, wallets: previous.wallets.map((wallet) => wallet.id === id ? { ...wallet, ...patch } : wallet) };
+          const wallets = previous.wallets.map((wallet) => wallet.id === id ? { ...wallet, ...patch } : wallet);
+          const resultingBalance = getWalletBalance({ ...previous, wallets }, id);
+          if (resultingBalance === null || resultingBalance < 0) {
+            throw new WalletBalanceError("Perubahan saldo awal membuat saldo dompet menjadi negatif.");
+          }
+          return { ...previous, wallets };
         });
         return { ok: true };
       } catch (error) {
+        if (error instanceof WalletBalanceError) return { ok: false, message: error.message };
         console.error("Wallet update error:", error);
         return { ok: false, message: "Dompet belum berhasil disimpan ke cloud. Coba lagi saat koneksi stabil." };
       }

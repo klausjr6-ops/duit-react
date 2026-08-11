@@ -154,20 +154,20 @@ function scheduleRule(schedule, startDate) {
 
 export default async function handler(req, res) {
   if (req.method !== "GET") {
-    res.status(405).json({ error: "Method not allowed" });
+    res.status(405).json({ error: "Metode permintaan tidak didukung." });
     return;
   }
 
   const uid = getSingleQueryValue(req.query.uid);
   const token = getSingleQueryValue(req.query.token);
   if (!uid || !token) {
-    res.status(401).json({ error: "A private calendar feed URL is required" });
+    res.status(401).json({ error: "URL feed kalender pribadi diperlukan." });
     return;
   }
   // Firebase UID is a single path segment. Reject malformed capability URLs
   // before constructing an Admin SDK document path.
   if (typeof uid !== "string" || !/^[A-Za-z0-9_-]{1,128}$/.test(uid)) {
-    res.status(404).json({ error: "Calendar feed not found" });
+    res.status(404).json({ error: "Feed kalender tidak ditemukan." });
     return;
   }
 
@@ -175,14 +175,14 @@ export default async function handler(req, res) {
     const db = getDb();
     const snapshot = await db.doc(`users/${uid}/data/main`).get();
     if (!snapshot.exists) {
-      res.status(404).json({ error: "Calendar data not found" });
+      res.status(404).json({ error: "Data kalender tidak ditemukan." });
       return;
     }
 
     const data = snapshot.data() || {};
     if (!hasValidToken(token, data.settings?.calendarToken)) {
       // Do not reveal whether a uid exists or whether only the token is wrong.
-      res.status(404).json({ error: "Calendar feed not found" });
+      res.status(404).json({ error: "Feed kalender tidak ditemukan." });
       return;
     }
 
@@ -244,8 +244,8 @@ export default async function handler(req, res) {
     const notConfigured = error instanceof Error && error.message === "Calendar service account is not configured";
     res.status(notConfigured ? 503 : 500).json({
       error: notConfigured
-        ? "Calendar feed is not configured on this deployment"
-        : "Calendar feed is temporarily unavailable",
+        ? "Feed kalender belum dikonfigurasi pada deployment ini."
+        : "Feed kalender sedang tidak tersedia.",
     });
   }
 }

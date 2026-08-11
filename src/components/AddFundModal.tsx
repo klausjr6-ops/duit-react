@@ -21,7 +21,8 @@ export default function AddFundModal({ goal, onClose }: Props) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-  const { dialogRef, onDialogKeyDown } = useModalDialog(true, onClose, inputRef);
+  const guardedClose = () => { if (!saving) onClose(); };
+  const { dialogRef, onDialogKeyDown } = useModalDialog(true, guardedClose, inputRef);
 
   const remaining = Math.max(goal.target - goal.current, 0);
 
@@ -45,16 +46,18 @@ export default function AddFundModal({ goal, onClose }: Props) {
     }
 
     setSaving(true);
-    const result = await fundGoal(goal.id, parseInt(walletId, 10), parsedAmount);
-    setSaving(false);
+    try {
+      const result = await fundGoal(goal.id, parseInt(walletId, 10), parsedAmount);
+      if (!result.ok) {
+        setError(result.message);
+        return;
+      }
 
-    if (!result.ok) {
-      setError(result.message);
-      return;
+      toast.success("Dana berhasil ditabung ke goal");
+      onClose();
+    } finally {
+      setSaving(false);
     }
-
-    toast.success("Dana berhasil ditabung ke goal");
-    onClose();
   };
 
   const panelClass = isDark
@@ -80,7 +83,7 @@ export default function AddFundModal({ goal, onClose }: Props) {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      onClick={onClose}
+      onClick={guardedClose}
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
     >
       <motion.div
@@ -103,7 +106,7 @@ export default function AddFundModal({ goal, onClose }: Props) {
           <button
             type="button"
             aria-label="Tutup modal nabung ke goal"
-            onClick={onClose}
+            onClick={guardedClose}
             disabled={saving}
             className={closeClass}
           >

@@ -22,7 +22,9 @@ export default function GoalModal({ onClose }: Props) {
   const [deadline, setDeadline] = useState("");
   const [icon, setIcon] = useState(GOAL_ICONS[0].key);
   const [error, setError] = useState<string | null>(null);
-  const { dialogRef, onDialogKeyDown } = useModalDialog(true, onClose);
+  const [saving, setSaving] = useState(false);
+  const guardedClose = () => { if (!saving) onClose(); };
+  const { dialogRef, onDialogKeyDown } = useModalDialog(true, guardedClose);
 
   const formatInputRupiah = (val: string) => {
     const num = val.replace(/\D/g, "");
@@ -30,6 +32,7 @@ export default function GoalModal({ onClose }: Props) {
   };
 
   const handleSubmit = async () => {
+    if (saving) return;
     setError(null);
     if (!name.trim()) {
       setError("Nama goal harus diisi.");
@@ -50,22 +53,27 @@ export default function GoalModal({ onClose }: Props) {
       return;
     }
 
-    const result = await addGoal({
-      name: name.trim(),
-      target: targetNum,
-      current: currentNum,
-      deadline: deadline || undefined,
-      icon,
-      ...(currentNum > 0 ? { walletId: parseInt(walletId, 10) } : {}),
-    });
+    setSaving(true);
+    try {
+      const result = await addGoal({
+        name: name.trim(),
+        target: targetNum,
+        current: currentNum,
+        deadline: deadline || undefined,
+        icon,
+        ...(currentNum > 0 ? { walletId: parseInt(walletId, 10) } : {}),
+      });
 
-    if (!result.ok) {
-      setError(result.message || "Gagal menambahkan goal.");
-      return;
+      if (!result.ok) {
+        setError(result.message || "Gagal menambahkan goal.");
+        return;
+      }
+
+      toast.success(`Goal "${name.trim()}" berhasil ditambahkan`);
+      onClose();
+    } finally {
+      setSaving(false);
     }
-
-    toast.success(`Goal "${name.trim()}" berhasil ditambahkan`);
-    onClose();
   };
 
   const panel = isDark
@@ -83,7 +91,7 @@ export default function GoalModal({ onClose }: Props) {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      onClick={onClose}
+      onClick={guardedClose}
       className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
     >
       <motion.div
@@ -100,13 +108,13 @@ export default function GoalModal({ onClose }: Props) {
       >
         <div className="flex justify-between items-center mb-6">
           <h2 id="goal-dialog-title" className={titleCls}>Tambah Goal</h2>
-          <button aria-label="Tutup modal tambah goal" onClick={onClose} className={closeCls}><IconClose size={20} /></button>
+          <button aria-label="Tutup modal tambah goal" onClick={guardedClose} disabled={saving} className={`${closeCls} disabled:cursor-not-allowed disabled:opacity-40`}><IconClose size={20} /></button>
         </div>
 
         <div className="space-y-4">
           <div>
             <label className={labelCls}>Nama Goal</label>
-            <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Misal: Liburan ke Bali" className={inputCls} />
+            <input value={name} disabled={saving} onChange={(e) => setName(e.target.value)} placeholder="Misal: Liburan ke Bali" className={inputCls} />
           </div>
           <div>
             <label className={labelCls}>Icon</label>
@@ -115,9 +123,9 @@ export default function GoalModal({ onClose }: Props) {
                 <button
                   key={ic.key}
                   type="button"
-                  onClick={() => setIcon(ic.key)}
+                  onClick={() => setIcon(ic.key)} disabled={saving}
                   title={ic.label}
-                  className={`flex flex-col items-center gap-1 p-2 rounded-lg border transition-all ${
+                  className={`flex flex-col items-center gap-1 p-2 rounded-lg border transition-all disabled:cursor-not-allowed disabled:opacity-50 ${
                     icon === ic.key
                       ? "border-teal-400 bg-teal-500/10 text-teal-500"
                       : isDark
@@ -133,16 +141,16 @@ export default function GoalModal({ onClose }: Props) {
           </div>
           <div>
             <label className={labelCls}>Target Tabungan (Rp)</label>
-            <input type="text" inputMode="numeric" value={target ? `Rp ${formatInputRupiah(target)}` : ""} onChange={(e) => setTarget(e.target.value.replace(/\D/g, ""))} placeholder="Rp 0" className={inputCls} />
+            <input type="text" inputMode="numeric" value={target ? `Rp ${formatInputRupiah(target)}` : ""} disabled={saving} onChange={(e) => setTarget(e.target.value.replace(/\D/g, ""))} placeholder="Rp 0" className={inputCls} />
           </div>
           <div>
             <label className={labelCls}>Tabungan Awal (opsional)</label>
-            <input type="text" inputMode="numeric" value={current ? `Rp ${formatInputRupiah(current)}` : ""} onChange={(e) => setCurrent(e.target.value.replace(/\D/g, ""))} placeholder="Rp 0" className={inputCls} />
+            <input type="text" inputMode="numeric" value={current ? `Rp ${formatInputRupiah(current)}` : ""} disabled={saving} onChange={(e) => setCurrent(e.target.value.replace(/\D/g, ""))} placeholder="Rp 0" className={inputCls} />
           </div>
           {parseInt(current.replace(/\D/g, "") || "0", 10) > 0 && (
             <div>
               <label className={labelCls}>Dompet Sumber</label>
-              <select value={walletId} onChange={(e) => setWalletId(e.target.value)} className={inputCls}>
+              <select value={walletId} disabled={saving} onChange={(e) => setWalletId(e.target.value)} className={inputCls}>
                 <option value="">-- Pilih Dompet --</option>
                 {wallets.map((w) => (
                   <option key={w.id} value={w.id}>{w.name} · {formatRupiah(w.balance)}</option>
@@ -155,13 +163,13 @@ export default function GoalModal({ onClose }: Props) {
           )}
           <div>
             <label className={labelCls}>Target Tanggal (opsional)</label>
-            <input type="date" value={deadline} onChange={(e) => setDeadline(e.target.value)} className={inputCls} />
+            <input type="date" value={deadline} disabled={saving} onChange={(e) => setDeadline(e.target.value)} className={inputCls} />
           </div>
           {error && (
             <p role="alert" className="rounded-lg border border-rose-400/30 bg-rose-400/10 px-3 py-2 text-xs text-rose-500">{error}</p>
           )}
-          <button type="button" onClick={handleSubmit} className="w-full bg-gradient-to-br from-teal-400 to-blue-500 text-zinc-900 font-bold py-3 rounded-xl hover:brightness-105 transition-all">
-            Simpan Goal
+          <button type="button" onClick={handleSubmit} disabled={saving} className="w-full bg-gradient-to-br from-teal-400 to-blue-500 text-zinc-900 font-bold py-3 rounded-xl hover:brightness-105 transition-all">
+            {saving ? "Menyimpan Goal…" : "Simpan Goal"}
           </button>
         </div>
       </motion.div>
