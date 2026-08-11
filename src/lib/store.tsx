@@ -33,6 +33,13 @@ export interface Transaction {
   isCarryForward?: boolean;
 }
 
+function sameTransaction(a: Transaction, b: Transaction): boolean {
+  return a.id === b.id && a.type === b.type && a.amt === b.amt && a.cat === b.cat &&
+    a.desc === b.desc && a.date === b.date && a.createdAt === b.createdAt &&
+    a.walletId === b.walletId && a.goalId === b.goalId && a.transferId === b.transferId &&
+    a.isCarryForward === b.isCarryForward;
+}
+
 export interface ScheduleItem {
   id: number;
   name: string;
@@ -641,12 +648,18 @@ function useDuitStoreInternal() {
   // IDs added optimistically by addTx. Snapshot data is merged with these
   // until Firestore confirms the matching transaction is present.
   const optimisticTxIdsRef = useRef(new Set<number>());
+  const optimisticDeletedTxIdsRef = useRef(new Set<number>());
+  // Latest locally edited transaction per id. This prevents a stale snapshot
+  // from undoing an edit while its transactional write is still in flight.
+  const optimisticUpdatedTxRef = useRef(new Map<number, Transaction>());
   const initializingUidRef = useRef<string | null>(null);
 
   /* ─── Subscribe real-time ke Firestore ──────────────────── */
   useEffect(() => {
     let active = true;
     optimisticTxIdsRef.current.clear();
+    optimisticDeletedTxIdsRef.current.clear();
+    optimisticUpdatedTxRef.current.clear();
 
     if (!uid) {
       setData(createDefaultData());
@@ -672,10 +685,27 @@ function useDuitStoreInternal() {
           const remote = normalizeUserData(snap.data() as Partial<UserData>);
           const confirmedIds = new Set(remote.txs.map((tx) => tx.id));
           for (const id of confirmedIds) optimisticTxIdsRef.current.delete(id);
+          for (const id of [...optimisticDeletedTxIdsRef.current]) {
+            if (!confirmedIds.has(id)) optimisticDeletedTxIdsRef.current.delete(id);
+          }
           const pendingTransactions = dataRef.current.txs.filter(
             (tx) => optimisticTxIdsRef.current.has(tx.id) && !confirmedIds.has(tx.id)
           );
-          setData(pendingTransactions.length ? { ...remote, txs: [...pendingTransactions, ...remote.txs] } : remote);
+          const visibleRemoteTransactions = remote.txs
+            .filter((tx) => !optimisticDeletedTxIdsRef.current.has(tx.id))
+            .map((tx) => {
+              const optimistic = optimisticUpdatedTxRef.current.get(tx.id);
+              if (!optimistic) return tx;
+              // Once the server echoes the exact edit, normal snapshot data
+              // becomes authoritative again.
+              if (sameTransaction(tx, optimistic)) {
+                optimisticUpdatedTxRef.current.delete(tx.id);
+                return tx;
+              }
+              return optimistic;
+            });
+          const merged = { ...remote, txs: [...pendingTransactions, ...visibleRemoteTransactions] };
+          setData(merged);
           setLoading(false);
           setLoadedUserId(uid);
           return;
@@ -1045,6 +1075,11 @@ function useDuitStoreInternal() {
   const delTx = useCallback(
     async (id: number): Promise<{ ok: boolean; message?: string }> => {
       if (!uid || loadedUserId !== uid) return { ok: false, message: "Data akun masih dimuat. Coba lagi sebentar." };
+      const optimisticTx = dataRef.current.txs.find((tx) => tx.id === id);
+      if (optimisticTx && !optimisticTx.isCarryForward && !optimisticTx.goalId && !optimisticTx.transferId) {
+        optimisticDeletedTxIdsRef.current.add(id);
+        setData((previous) => ({ ...previous, txs: previous.txs.filter((tx) => tx.id !== id) }));
+      }
       try {
         await enqueueFirestoreUpdate((previous) => {
         const tx = previous.txs.find((t) => t.id === id);
@@ -1086,6 +1121,12 @@ function useDuitStoreInternal() {
         });
         return { ok: true };
       } catch (error) {
+        if (optimisticTx) {
+          optimisticDeletedTxIdsRef.current.delete(id);
+          setData((previous) => previous.txs.some((tx) => tx.id === id)
+            ? previous
+            : { ...previous, txs: [optimisticTx, ...previous.txs] });
+        }
         console.error("Transaction delete error:", error);
         return { ok: false, message: "Transaksi belum berhasil dihapus dari cloud. Coba lagi saat koneksi stabil." };
       }
@@ -1094,60 +1135,58 @@ function useDuitStoreInternal() {
   );
 
   const updateTx = useCallback(
-    (id: number, patch: Partial<Omit<Transaction, "id" | "goalId">>) =>
-      updateData((previous) => {
-        const existing = previous.txs.find((t) => t.id === id);
-        if (!existing) return previous;
+    async (id: number, patch: Partial<Omit<Transaction, "id" | "goalId">>): Promise<{ ok: boolean; message?: string }> => {
+      if (!uid || loadedUserId !== uid) return { ok: false, message: "Data akun masih dimuat. Coba lagi sebentar." };
+      const original = dataRef.current.txs.find((tx) => tx.id === id);
+      if (!original || original.transferId || original.goalId || original.isCarryForward) {
+        return { ok: false, message: "Transaksi ini tidak dapat diedit dari sini." };
+      }
+      const updated = { ...original, ...patch };
+      if ((updated.type !== "in" && updated.type !== "out") || !Number.isFinite(updated.amt) || updated.amt <= 0 || !isValidDateKey(updated.date)) {
+        return { ok: false, message: "Data transaksi tidak valid." };
+      }
+      if (updated.walletId !== undefined && !dataRef.current.wallets.some((wallet) => wallet.id === updated.walletId)) {
+        return { ok: false, message: "Dompet transaksi tidak ditemukan." };
+      }
 
-        // Block editing of transfer transactions
-        if (existing.transferId) return previous;
+      optimisticUpdatedTxRef.current.set(id, updated);
+      setData((previous) => ({ ...previous, txs: previous.txs.map((tx) => tx.id === id ? updated : tx) }));
+      try {
+        await enqueueFirestoreUpdate((previous) => {
+          const existing = previous.txs.find((tx) => tx.id === id);
+          if (!existing || existing.transferId || existing.goalId || existing.isCarryForward) throw new Error("Transaksi tidak dapat diedit.");
+          const final = { ...existing, ...patch };
+          if ((final.type !== "in" && final.type !== "out") || !Number.isFinite(final.amt) || final.amt <= 0 || !isValidDateKey(final.date)) throw new Error("Data transaksi tidak valid.");
+          if (final.walletId !== undefined && !previous.wallets.some((wallet) => wallet.id === final.walletId)) throw new Error("Dompet transaksi tidak ditemukan.");
 
-        // Block editing of goal transactions (use fund/withdraw instead)
-        if (existing.goalId) return previous;
-
-        // Block editing of carry-forward entries (auto-generated)
-        if (existing.isCarryForward) return previous;
-
-        // Determine the FINAL type after patch is applied
-        const finalType = patch.type ?? existing.type;
-        const finalWalletId = patch.walletId ?? existing.walletId;
-        const finalAmt = patch.amt ?? existing.amt;
-
-        // Validate the wallet(s) independently. When a transaction moves to a
-        // different wallet, its old contribution must be undone in the OLD
-        // wallet — never in the destination wallet.
-        const contributionOld = existing.type === "in" ? existing.amt : -existing.amt;
-        const contributionNew = finalType === "in" ? finalAmt : -finalAmt;
-
-        if (!Number.isFinite(finalAmt) || finalAmt <= 0) return previous;
-        if (finalWalletId !== undefined && !previous.wallets.some((wallet) => wallet.id === finalWalletId)) {
-          return previous;
-        }
-
-        if (existing.walletId === finalWalletId) {
-          if (finalWalletId !== undefined) {
-            const walletBalance = getWalletBalance(previous, finalWalletId);
-            if (walletBalance === null || walletBalance + contributionNew - contributionOld < 0) {
-              return previous;
+          const oldContribution = existing.type === "in" ? existing.amt : -existing.amt;
+          const newContribution = final.type === "in" ? final.amt : -final.amt;
+          if (existing.walletId === final.walletId) {
+            if (final.walletId !== undefined) {
+              const balance = getWalletBalance(previous, final.walletId);
+              if (balance === null || balance + newContribution - oldContribution < 0) throw new Error("Saldo dompet tidak mencukupi.");
+            }
+          } else {
+            if (existing.walletId !== undefined) {
+              const oldBalance = getWalletBalance(previous, existing.walletId);
+              if (oldBalance === null || oldBalance - oldContribution < 0) throw new Error("Saldo dompet tidak mencukupi.");
+            }
+            if (final.walletId !== undefined) {
+              const newBalance = getWalletBalance(previous, final.walletId);
+              if (newBalance === null || newBalance + newContribution < 0) throw new Error("Saldo dompet tidak mencukupi.");
             }
           }
-        } else {
-          if (existing.walletId !== undefined) {
-            const oldWalletBalance = getWalletBalance(previous, existing.walletId);
-            if (oldWalletBalance === null || oldWalletBalance - contributionOld < 0) return previous;
-          }
-          if (finalWalletId !== undefined) {
-            const newWalletBalance = getWalletBalance(previous, finalWalletId);
-            if (newWalletBalance === null || newWalletBalance + contributionNew < 0) return previous;
-          }
-        }
-
-        return {
-          ...previous,
-          txs: previous.txs.map((t) => (t.id === id ? { ...t, ...patch } : t)),
-        };
-      }),
-    [updateData]
+          return { ...previous, txs: previous.txs.map((tx) => tx.id === id ? final : tx) };
+        });
+        return { ok: true };
+      } catch (error) {
+        optimisticUpdatedTxRef.current.delete(id);
+        setData((previous) => ({ ...previous, txs: previous.txs.map((tx) => tx.id === id ? original : tx) }));
+        console.error("Transaction update error:", error);
+        return { ok: false, message: "Transaksi belum berhasil diperbarui di cloud. Coba lagi saat koneksi stabil." };
+      }
+    },
+    [enqueueFirestoreUpdate, loadedUserId, uid]
   );
 
   /* ══════════════════════════════════════════════════════════

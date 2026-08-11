@@ -26,8 +26,10 @@ export default function EditTransactionModal({ tx, onClose }: Props) {
   const [desc, setDesc] = useState(tx.desc);
   const [date, setDate] = useState(tx.date);
   const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
-  const { dialogRef, onDialogKeyDown } = useModalDialog(true, onClose, inputRef);
+  const guardedClose = () => { if (!saving) onClose(); };
+  const { dialogRef, onDialogKeyDown } = useModalDialog(true, guardedClose, inputRef);
 
   const isGoalTx = Boolean(tx.goalId);
   const isGoalWithdrawal = Boolean(tx.goalId && tx.type === "in");
@@ -39,7 +41,7 @@ export default function EditTransactionModal({ tx, onClose }: Props) {
     return num ? parseInt(num).toLocaleString("id-ID") : "";
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
     if (isGoalTx) { setError("Transaksi Goal tidak bisa diedit di sini. Gunakan menu Tarik/Nabung Goal."); return; }
@@ -71,7 +73,13 @@ export default function EditTransactionModal({ tx, onClose }: Props) {
         return;
       }
     }
-    updateTx(tx.id, { type, cat, desc: desc || cat, amt: numAmt, date, walletId: parseInt(walletId, 10) });
+    setSaving(true);
+    const result = await updateTx(tx.id, { type, cat, desc: desc || cat, amt: numAmt, date, walletId: parseInt(walletId, 10) });
+    setSaving(false);
+    if (!result.ok) {
+      setError(result.message || "Transaksi belum berhasil diperbarui.");
+      return;
+    }
     toast.success("Transaksi berhasil diperbarui");
     onClose();
   };
@@ -83,9 +91,9 @@ export default function EditTransactionModal({ tx, onClose }: Props) {
   const closeCls = isDark ? "text-slate-400 hover:text-white" : "text-zinc-500 hover:text-zinc-900";
 
   return (
-    <motion.div initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}} onClick={onClose} className="fixed inset-0 z-[70] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+    <motion.div initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}} onClick={guardedClose} className="fixed inset-0 z-[70] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
       <motion.div ref={dialogRef} role="dialog" aria-modal="true" onKeyDown={onDialogKeyDown} initial={{scale:0.95,y:20}} animate={{scale:1,y:0}} exit={{scale:0.95,y:20}} onClick={e=>e.stopPropagation()} className={panel}>
-        <div className="flex justify-between items-center mb-5"><h2 className={titleCls}>Edit Transaksi</h2><button aria-label="Tutup" onClick={onClose} className={closeCls}><IconClose size={20} /></button></div>
+        <div className="flex justify-between items-center mb-5"><h2 className={titleCls}>Edit Transaksi</h2><button aria-label="Tutup" onClick={guardedClose} disabled={saving} className={closeCls}><IconClose size={20} /></button></div>
         {isGoalTx ? (
           <div className="rounded-xl border border-amber-400/30 bg-amber-400/10 p-4 text-sm text-amber-700 dark:text-amber-300">
             {isGoalWithdrawal
@@ -132,7 +140,7 @@ export default function EditTransactionModal({ tx, onClose }: Props) {
             <input type="date" value={date} onChange={e=>setDate(e.target.value)} className={inputCls} />
           </div>
           {error && <p role="alert" className="rounded-lg border border-rose-400/30 bg-rose-400/10 px-3 py-2 text-xs text-rose-500">{error}</p>}
-          <button type="submit" className="w-full bg-gradient-to-br from-teal-400 to-blue-500 text-zinc-900 font-bold py-3 rounded-xl hover:brightness-105">Simpan Perubahan</button>
+          <button type="submit" disabled={saving} className="w-full bg-gradient-to-br from-teal-400 to-blue-500 text-zinc-900 font-bold py-3 rounded-xl hover:brightness-105 disabled:opacity-60 disabled:cursor-wait">{saving ? "Menyimpan…" : "Simpan Perubahan"}</button>
         </form>
         )}
       </motion.div>
