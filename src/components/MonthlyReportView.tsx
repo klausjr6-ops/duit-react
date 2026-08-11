@@ -77,9 +77,9 @@ export default function MonthlyReportView() {
     </div>
 
     <div className={`flex items-center justify-between gap-3 rounded-2xl p-3 ${panel}`}>
-      <button className={`rounded-xl border px-3 py-2 text-sm font-bold ${button}`} onClick={() => setMonth((value) => shiftMonth(value, -1))}>← Prev</button>
+      <button className={`rounded-xl border px-3 py-2 text-sm font-bold ${button}`} onClick={() => setMonth((value) => shiftMonth(value, -1))}>← Sebelumnya</button>
       <div className={`flex items-center gap-2 text-base font-extrabold ${text}`}><IconCalendar size={17} /> {monthLabel(month)}</div>
-      <button disabled={!canGoNext} className={`rounded-xl border px-3 py-2 text-sm font-bold disabled:cursor-not-allowed disabled:opacity-35 ${button}`} onClick={() => setMonth((value) => shiftMonth(value, 1))}>Next →</button>
+      <button disabled={!canGoNext} className={`rounded-xl border px-3 py-2 text-sm font-bold disabled:cursor-not-allowed disabled:opacity-35 ${button}`} onClick={() => setMonth((value) => shiftMonth(value, 1))}>Berikutnya →</button>
     </div>
 
     <div className="grid grid-cols-1 gap-5 md:grid-cols-3">

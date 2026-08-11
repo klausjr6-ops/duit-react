@@ -38,10 +38,6 @@ export default function ScheduleModal({ onClose }: Props) {
       setError("Tanggal dan jam mulai harus diisi.");
       return;
     }
-    if (end && end <= start) {
-      setError("Jam selesai harus setelah jam mulai.");
-      return;
-    }
     if (recurring && !untilDate) {
       setError("Isi tanggal batas pengulangan.");
       return;
@@ -132,6 +128,7 @@ export default function ScheduleModal({ onClose }: Props) {
           <div>
             <label className={labelCls}>Jam Selesai (opsional)</label>
             <input type="time" value={end} onChange={(e) => setEnd(e.target.value)} className={inputCls} />
+            {end && end <= start && <p className="mt-1 text-[10px] text-teal-600">Berakhir pada hari berikutnya.</p>}
           </div>
           <div>
             <label className={labelCls}>Deskripsi (opsional)</label>

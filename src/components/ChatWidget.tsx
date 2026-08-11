@@ -246,13 +246,13 @@ export function extractAssistantAction(text: string): { text: string; action?: A
     if (raw.type === "schedule" && typeof raw.name === "string" && /^\d{4}-\d{2}-\d{2}$/.test(String(raw.date)) && /^\d{2}:\d{2}$/.test(String(raw.start))) {
       return { text: cleanText, action: { type: "schedule", name: raw.name, date: String(raw.date), start: String(raw.start), ...(typeof raw.end === "string" ? { end: raw.end } : {}), ...(typeof raw.desc === "string" ? { desc: raw.desc } : {}), recurring: raw.recurring === true, ...(typeof raw.untilDate === "string" ? { untilDate: raw.untilDate } : {}) } };
     }
-    if (raw.type === "transaction" && (raw.transactionType === "in" || raw.transactionType === "out") && Number.isFinite(Number(raw.amount)) && Number(raw.amount) > 0 && typeof raw.category === "string" && typeof raw.walletName === "string" && /^\d{4}-\d{2}-\d{2}$/.test(String(raw.date))) {
+    if (raw.type === "transaction" && (raw.transactionType === "in" || raw.transactionType === "out") && Number.isSafeInteger(Number(raw.amount)) && Number(raw.amount) > 0 && typeof raw.category === "string" && typeof raw.walletName === "string" && /^\d{4}-\d{2}-\d{2}$/.test(String(raw.date))) {
       return { text: cleanText, action: { type: "transaction", transactionType: raw.transactionType, amount: Number(raw.amount), category: raw.category, walletName: raw.walletName, date: String(raw.date), ...(typeof raw.desc === "string" ? { desc: raw.desc } : {}) } };
     }
-    if (raw.type === "goalFund" && typeof raw.goalName === "string" && typeof raw.walletName === "string" && Number.isFinite(Number(raw.amount)) && Number(raw.amount) > 0) {
+    if (raw.type === "goalFund" && typeof raw.goalName === "string" && typeof raw.walletName === "string" && Number.isSafeInteger(Number(raw.amount)) && Number(raw.amount) > 0) {
       return { text: cleanText, action: { type: "goalFund", goalName: raw.goalName, walletName: raw.walletName, amount: Number(raw.amount) } };
     }
-    if (raw.type === "transfer" && typeof raw.fromWalletName === "string" && typeof raw.toWalletName === "string" && Number.isFinite(Number(raw.amount)) && Number(raw.amount) > 0) {
+    if (raw.type === "transfer" && typeof raw.fromWalletName === "string" && typeof raw.toWalletName === "string" && Number.isSafeInteger(Number(raw.amount)) && Number(raw.amount) > 0) {
       return { text: cleanText, action: { type: "transfer", fromWalletName: raw.fromWalletName, toWalletName: raw.toWalletName, amount: Number(raw.amount) } };
     }
     if (raw.type === "scheduleUpdate" && typeof raw.scheduleName === "string") {

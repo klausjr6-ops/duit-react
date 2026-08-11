@@ -89,6 +89,7 @@ export default function MoodCard() {
       <p className={`mb-2 mt-6 text-xs font-semibold tracking-widest ${muted}`}>CATATAN SINGKAT</p>
       <textarea
         value={note}
+        maxLength={500}
         onChange={(e) => setNote(e.target.value)}
         placeholder="Apa yang terjadi hari ini..."
         rows={4}

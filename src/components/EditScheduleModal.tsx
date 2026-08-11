@@ -29,7 +29,6 @@ export default function EditScheduleModal({ sched, onClose }: Props) {
     setError(null);
     if (!name.trim()) { setError("Nama jadwal harus diisi."); return; }
     if (!date || !start) { setError("Tanggal dan jam mulai harus diisi."); return; }
-    if (end && end <= start) { setError("Jam selesai harus setelah jam mulai."); return; }
     if (recurring && !untilDate) { setError("Isi tanggal batas pengulangan."); return; }
     if (recurring && untilDate < date) { setError("Tanggal batas tidak boleh sebelum tanggal mulai."); return; }
     setSaving(true);
@@ -88,7 +87,7 @@ export default function EditScheduleModal({ sched, onClose }: Props) {
             <div><label className={labelCls}>Tanggal</label><input type="date" value={date} onChange={e=>setDate(e.target.value)} className={inputCls} /></div>
             <div><label className={labelCls}>Jam Mulai</label><input type="time" value={start} onChange={e=>setStart(e.target.value)} className={inputCls} /></div>
           </div>
-          <div><label className={labelCls}>Jam Selesai</label><input type="time" value={end} onChange={e=>setEnd(e.target.value)} className={inputCls} /></div>
+          <div><label className={labelCls}>Jam Selesai</label><input type="time" value={end} onChange={e=>setEnd(e.target.value)} className={inputCls} />{end && end <= start && <p className="mt-1 text-[10px] text-teal-600">Berakhir pada hari berikutnya.</p>}</div>
           <div><label className={labelCls}>Deskripsi</label><input value={desc} onChange={e=>setDesc(e.target.value)} className={inputCls} /></div>
           <label className={isDark?"flex items-center gap-3 cursor-pointer bg-white/5 rounded-xl p-3":"flex items-center gap-3 cursor-pointer bg-zinc-50 border border-zinc-200 rounded-xl p-3"}>
             <input type="checkbox" checked={recurring} onChange={e=>setRecurring(e.target.checked)} className="w-4 h-4 accent-teal-500" />

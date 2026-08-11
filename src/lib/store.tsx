@@ -225,8 +225,9 @@ function toFiniteNumber(value: unknown, fallback = 0): number {
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
-function toPositiveNumber(value: unknown, fallback = 0): number {
-  return Math.max(0, toFiniteNumber(value, fallback));
+/** Nominal Rupiah harus berupa bilangan bulat positif yang aman. */
+function isPositiveRupiah(value: unknown): value is number {
+  return typeof value === "number" && Number.isSafeInteger(value) && value > 0;
 }
 
 function toStringValue(value: unknown, fallback = ""): string {
@@ -267,8 +268,8 @@ function validateScheduleInput(schedule: Omit<ScheduleItem, "id">): string | nul
   if (!isValidDateKey(schedule.date) || !isValidTime(schedule.start)) {
     return "Tanggal atau jam mulai tidak valid.";
   }
-  if (schedule.end && (!isValidTime(schedule.end) || schedule.end <= schedule.start)) {
-    return "Jam selesai harus setelah jam mulai.";
+  if (schedule.end && !isValidTime(schedule.end)) {
+    return "Jam selesai tidak valid.";
   }
   if (schedule.untilDate && (!isValidDateKey(schedule.untilDate) || schedule.untilDate < schedule.date)) {
     return "Tanggal batas pengulangan tidak valid.";
@@ -289,8 +290,8 @@ function toDashboardMode(value: unknown): DashboardMode | undefined {
 function sanitizeTransaction(value: unknown): Transaction | null {
   if (!isRecord(value)) return null;
   const type = value.type === "in" || value.type === "out" ? value.type : null;
-  const amt = toPositiveNumber(value.amt);
-  if (!type || amt <= 0) return null;
+  const amt = toFiniteNumber(value.amt, NaN);
+  if (!type || !Number.isSafeInteger(amt) || amt <= 0) return null;
 
   const walletId = value.walletId === undefined ? undefined : toFiniteNumber(value.walletId, NaN);
   const goalId = value.goalId === undefined ? undefined : toFiniteNumber(value.goalId, NaN);
@@ -340,8 +341,8 @@ function sanitizeSchedule(value: unknown): ScheduleItem | null {
 function sanitizeGoal(value: unknown): Goal | null {
   if (!isRecord(value)) return null;
   const name = toStringValue(value.name).trim();
-  const target = toPositiveNumber(value.target);
-  if (!name || target <= 0) return null;
+  const target = toFiniteNumber(value.target, NaN);
+  if (!name || !Number.isSafeInteger(target) || target <= 0) return null;
 
   const deadline = typeof value.deadline === "string" && value.deadline ? toDateKey(value.deadline) : undefined;
 
@@ -349,7 +350,7 @@ function sanitizeGoal(value: unknown): Goal | null {
     id: toFiniteNumber(value.id, createId()),
     name: name.slice(0, 120),
     target,
-    current: Math.min(toPositiveNumber(value.current), target),
+    current: Math.min(Math.max(0, Number.isSafeInteger(toFiniteNumber(value.current, NaN)) ? toFiniteNumber(value.current) : 0), target),
     ...(deadline ? { deadline } : {}),
     icon: toStringValue(value.icon, "target").slice(0, 12),
   };
@@ -360,10 +361,13 @@ function sanitizeWallet(value: unknown): Wallet | null {
   const name = toStringValue(value.name).trim();
   if (!name) return null;
 
+  const balance = toFiniteNumber(value.balance, NaN);
+  if (!Number.isSafeInteger(balance) || balance < 0) return null;
+
   return {
     id: toFiniteNumber(value.id, createId()),
     name: name.slice(0, 80),
-    balance: toFiniteNumber(value.balance),
+    balance,
     icon: toStringValue(value.icon, "card").slice(0, 12),
     color: toStringValue(value.color, "emerald").slice(0, 120),
   };
@@ -432,6 +436,35 @@ export function sanitizeImportedUserData(value: unknown): UserData {
   assertUniqueIds(scheds, "jadwal");
   assertUniqueIds(goals, "goal");
   assertUniqueIds(wallets, "dompet");
+
+  const walletIds = new Set(wallets.map((wallet) => wallet.id));
+  const goalIds = new Set(goals.map((goal) => goal.id));
+  for (const transaction of txs) {
+    if (transaction.walletId !== undefined && !walletIds.has(transaction.walletId)) {
+      throw new Error("Backup memiliki transaksi yang merujuk dompet tidak ada.");
+    }
+    if (transaction.goalId !== undefined && !goalIds.has(transaction.goalId)) {
+      throw new Error("Backup memiliki transaksi yang merujuk goal tidak ada.");
+    }
+  }
+  const transferGroups = new Map<number, Transaction[]>();
+  for (const transaction of txs) {
+    if (transaction.transferId === undefined) continue;
+    const group = transferGroups.get(transaction.transferId) ?? [];
+    group.push(transaction);
+    transferGroups.set(transaction.transferId, group);
+  }
+  for (const group of transferGroups.values()) {
+    if (
+      group.length !== 2 ||
+      group[0].type === group[1].type ||
+      group[0].amt !== group[1].amt ||
+      group[0].walletId === undefined || group[1].walletId === undefined ||
+      group[0].walletId === group[1].walletId
+    ) {
+      throw new Error("Backup memiliki pasangan transfer yang tidak valid.");
+    }
+  }
 
   // Goal balances have one source of truth: their funding/withdrawal
   // transactions. Never trust an editable backup's `current` field alone.
@@ -642,6 +675,9 @@ function useDuitStoreInternal() {
   const [loadedUserId, setLoadedUserId] = useState<string | null>(null);
   const [syncing, setSyncing] = useState(false);
   const [syncError, setSyncError] = useState<string | null>(null);
+  // Re-render the store when the Jakarta calendar day changes so automatic
+  // carry-forward generation also runs in an app left open across midnight.
+  const [jakartaToday, setJakartaToday] = useState(todayStr);
   const writeQueueRef = useRef<Promise<void>>(Promise.resolve());
   const dataRef = useRef(data);
   dataRef.current = data;
@@ -679,6 +715,14 @@ function useDuitStoreInternal() {
         return optimistic;
       });
     return { ...remote, txs: [...pendingTransactions, ...visibleRemoteTransactions] };
+  }, []);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      const next = todayStr();
+      setJakartaToday((current) => current === next ? current : next);
+    }, 30_000);
+    return () => window.clearInterval(timer);
   }, []);
 
   /* ─── Subscribe real-time ke Firestore ──────────────────── */
@@ -851,7 +895,7 @@ function useDuitStoreInternal() {
     if (cfProcessingRef.current) return; // prevent re-entrancy
 
     const currentData = dataRef.current;
-    const currentMonth = todayStr().slice(0, 7);
+    const currentMonth = jakartaToday.slice(0, 7);
 
     // Collect all months that should have CF entries
     const walletMonths = new Map<string, Set<string>>(); // walletId → Set of months
@@ -998,7 +1042,7 @@ function useDuitStoreInternal() {
     // Release processing flag after Firestore write settles
     // (setTimeout ensures the flag is held through the current React render cycle)
     setTimeout(() => { cfProcessingRef.current = false; }, 5000);
-  }, [loadedUserId, uid, loading, data.txs, data.wallets]);
+  }, [loadedUserId, uid, loading, data.txs, data.wallets, jakartaToday]);
 
   /* ─── Derived: settings dengan default ─────────────────────── */
   const settings: Settings = useMemo(
@@ -1024,12 +1068,16 @@ function useDuitStoreInternal() {
      TRANSACTIONS
      ══════════════════════════════════════════════════════════ */
   const addTx = useCallback(
-    async (tx: Omit<Transaction, "id">): Promise<{ ok: boolean; message?: string }> => {
-      if ((tx.type !== "in" && tx.type !== "out") || !Number.isFinite(tx.amt) || tx.amt <= 0) {
+    async (tx: Omit<Transaction, "id" | "goalId" | "transferId" | "isCarryForward">): Promise<{ ok: boolean; message?: string }> => {
+      if ((tx.type !== "in" && tx.type !== "out") || !isPositiveRupiah(tx.amt)) {
         return { ok: false, message: "Data transaksi atau nominal tidak valid." };
       }
       if (!isValidDateKey(tx.date)) {
         return { ok: false, message: "Tanggal transaksi tidak valid." };
+      }
+      const special = tx as Partial<Transaction>;
+      if (special.goalId !== undefined || special.transferId !== undefined || special.isCarryForward) {
+        return { ok: false, message: "Transaksi khusus harus dibuat melalui fitur Goal atau Transfer." };
       }
       // Validate wallet exists for any transaction with walletId
       if (tx.walletId !== undefined) {
@@ -1056,7 +1104,7 @@ function useDuitStoreInternal() {
           // Double-check every invariant against fresh transaction data.
           if (
             (transaction.type !== "in" && transaction.type !== "out") ||
-            !Number.isFinite(transaction.amt) || transaction.amt <= 0 ||
+            !isPositiveRupiah(transaction.amt) ||
             !isValidDateKey(transaction.date) ||
             (transaction.walletId !== undefined && !previous.wallets.some((wallet) => wallet.id === transaction.walletId))
           ) throw new Error("Data transaksi tidak valid.");
@@ -1092,17 +1140,11 @@ function useDuitStoreInternal() {
 
         // Carry-forward and goal transactions are managed by their dedicated
         // flows, never through the generic transaction delete action.
-        if (tx.isCarryForward || tx.goalId) throw new Error("Transaksi ini tidak dapat dihapus dari sini.");
-
-        // Collect IDs to remove: the target tx + any paired transfer
-        const idsToRemove = new Set([id]);
-        if (tx.transferId) {
-          for (const t of previous.txs) {
-            if (t.transferId === tx.transferId && t.id !== id) {
-              idsToRemove.add(t.id);
-            }
-          }
+        if (tx.isCarryForward || tx.goalId || tx.transferId) {
+          throw new Error("Transaksi khusus ini tidak dapat dihapus dari sini.");
         }
+
+        const idsToRemove = new Set([id]);
 
         // Adjust goal.current for deleted goal transactions:
         //   "out" (funding)   → was +amt to goal, undo by -amt
@@ -1140,14 +1182,18 @@ function useDuitStoreInternal() {
   );
 
   const updateTx = useCallback(
-    async (id: number, patch: Partial<Omit<Transaction, "id" | "goalId">>): Promise<{ ok: boolean; message?: string }> => {
+    async (id: number, patch: Partial<Omit<Transaction, "id" | "goalId" | "transferId" | "isCarryForward">>): Promise<{ ok: boolean; message?: string }> => {
       if (!uid || loadedUserId !== uid) return { ok: false, message: "Data akun masih dimuat. Coba lagi sebentar." };
       const original = dataRef.current.txs.find((tx) => tx.id === id);
       if (!original || original.transferId || original.goalId || original.isCarryForward) {
         return { ok: false, message: "Transaksi ini tidak dapat diedit dari sini." };
       }
+      const patchSpecial = patch as Partial<Transaction>;
+      if (patchSpecial.goalId !== undefined || patchSpecial.transferId !== undefined || patchSpecial.isCarryForward !== undefined) {
+        return { ok: false, message: "Atribut transaksi khusus tidak dapat diubah dari sini." };
+      }
       const updated = { ...original, ...patch };
-      if ((updated.type !== "in" && updated.type !== "out") || !Number.isFinite(updated.amt) || updated.amt <= 0 || !isValidDateKey(updated.date)) {
+      if ((updated.type !== "in" && updated.type !== "out") || !isPositiveRupiah(updated.amt) || !isValidDateKey(updated.date)) {
         return { ok: false, message: "Data transaksi tidak valid." };
       }
       if (updated.walletId !== undefined && !dataRef.current.wallets.some((wallet) => wallet.id === updated.walletId)) {
@@ -1161,7 +1207,7 @@ function useDuitStoreInternal() {
           const existing = previous.txs.find((tx) => tx.id === id);
           if (!existing || existing.transferId || existing.goalId || existing.isCarryForward) throw new Error("Transaksi tidak dapat diedit.");
           const final = { ...existing, ...patch };
-          if ((final.type !== "in" && final.type !== "out") || !Number.isFinite(final.amt) || final.amt <= 0 || !isValidDateKey(final.date)) throw new Error("Data transaksi tidak valid.");
+          if ((final.type !== "in" && final.type !== "out") || !isPositiveRupiah(final.amt) || !isValidDateKey(final.date)) throw new Error("Data transaksi tidak valid.");
           if (final.walletId !== undefined && !previous.wallets.some((wallet) => wallet.id === final.walletId)) throw new Error("Dompet transaksi tidak ditemukan.");
 
           const oldContribution = existing.type === "in" ? existing.amt : -existing.amt;
@@ -1248,7 +1294,7 @@ function useDuitStoreInternal() {
           if (!current || validateScheduleInput({ ...current, ...patch })) throw new Error("Data jadwal tidak valid.");
           return {
             ...previous,
-            scheds: previous.scheds.map((schedule) => schedule.id === id ? { ...schedule, ...patch, name: candidate.name.trim() } : schedule),
+            scheds: previous.scheds.map((schedule) => schedule.id === id ? { ...schedule, ...patch, ...(patch.name !== undefined ? { name: patch.name.trim() } : {}) } : schedule),
           };
         });
         return { ok: true };
@@ -1267,7 +1313,7 @@ function useDuitStoreInternal() {
     async (goal: Omit<Goal, "id"> & { walletId?: number }): Promise<{ ok: boolean; message?: string }> => {
       const currentAmt = goal.current || 0;
       const walletId = goal.walletId;
-      if (!goal.name?.trim() || !Number.isFinite(goal.target) || goal.target <= 0 || !Number.isFinite(currentAmt) || currentAmt < 0 || currentAmt > goal.target) {
+      if (!goal.name?.trim() || !Number.isSafeInteger(goal.target) || goal.target <= 0 || !Number.isSafeInteger(currentAmt) || currentAmt < 0 || currentAmt > goal.target) {
         return { ok: false, message: "Data goal tidak valid." };
       }
       if (goal.deadline && !isValidDateKey(goal.deadline)) return { ok: false, message: "Tanggal target goal tidak valid." };
@@ -1327,14 +1373,14 @@ function useDuitStoreInternal() {
       const existing = dataRef.current.goals.find((goal) => goal.id === id);
       if (!existing) return { ok: false, message: "Goal tidak ditemukan." };
       const target = patch.target ?? existing.target;
-      if (!Number.isFinite(target) || target <= 0 || target < existing.current) return { ok: false, message: "Target goal tidak valid atau lebih kecil dari tabungan terkumpul." };
+      if (!Number.isSafeInteger(target) || target <= 0 || target < existing.current) return { ok: false, message: "Target goal tidak valid atau lebih kecil dari tabungan terkumpul." };
       if (!uid || loadedUserId !== uid) return { ok: false, message: "Data akun masih dimuat. Coba lagi sebentar." };
       try {
         await enqueueFirestoreUpdate((previous) => {
           const current = previous.goals.find((goal) => goal.id === id);
           if (!current) throw new Error("Goal tidak valid.");
           const finalTarget = patch.target ?? current.target;
-          if (!Number.isFinite(finalTarget) || finalTarget <= 0 || finalTarget < current.current) throw new Error("Goal tidak valid.");
+          if (!Number.isSafeInteger(finalTarget) || finalTarget <= 0 || finalTarget < current.current) throw new Error("Goal tidak valid.");
           return { ...previous, goals: previous.goals.map((goal) => goal.id === id ? { ...goal, ...patch } : goal) };
         });
         return { ok: true };
@@ -1351,7 +1397,7 @@ function useDuitStoreInternal() {
       if (!uid || loadedUserId !== uid) {
         return { ok: false as const, message: "Data akun masih dimuat. Coba lagi sebentar." };
       }
-      if (!Number.isFinite(amount) || amount <= 0) {
+      if (!isPositiveRupiah(amount)) {
         return { ok: false as const, message: "Jumlah tabungan tidak valid." };
       }
 
@@ -1420,7 +1466,7 @@ function useDuitStoreInternal() {
       if (!uid || loadedUserId !== uid) {
         return { ok: false as const, message: "Data akun masih dimuat. Coba lagi sebentar." };
       }
-      if (!Number.isFinite(amount) || amount <= 0) {
+      if (!isPositiveRupiah(amount)) {
         return { ok: false as const, message: "Jumlah penarikan tidak valid." };
       }
 
@@ -1606,7 +1652,7 @@ function useDuitStoreInternal() {
 
   const transferWallet = useCallback(
     async (fromId: number, toId: number, amount: number): Promise<{ ok: boolean; message?: string }> => {
-      if (!Number.isFinite(amount) || amount <= 0) {
+      if (!isPositiveRupiah(amount)) {
         return { ok: false, message: "Jumlah transfer tidak valid." };
       }
       if (fromId === toId) {
@@ -1657,7 +1703,7 @@ function useDuitStoreInternal() {
           // Double-check every invariant against fresh transaction data.
           const bal = getWalletBalance(previous, fromId);
           const destinationExists = previous.wallets.some((wallet) => wallet.id === toId);
-          if (!Number.isFinite(amount) || amount <= 0 || fromId === toId || bal === null || !destinationExists || bal < amount) {
+          if (!isPositiveRupiah(amount) || fromId === toId || bal === null || !destinationExists || bal < amount) {
             throw new Error("Transfer tidak valid atau saldo tidak mencukupi.");
           }
           return { ...previous, txs: [outTx, inTx, ...previous.txs] };
@@ -1679,6 +1725,7 @@ function useDuitStoreInternal() {
       if (!uid || loadedUserId !== uid) return { ok: false, message: "Data akun masih dimuat. Coba lagi sebentar." };
       const date = todayStr();
       try {
+        if (mood.length > 12 || label.length > 80) return { ok: false, message: "Data mood tidak valid." };
         await enqueueFirestoreUpdate((previous) => ({ ...previous, moods: { ...previous.moods, [date]: { mood, label, note: previous.moods[date]?.note || "" } } }));
         return { ok: true };
       } catch (error) {
@@ -1693,6 +1740,7 @@ function useDuitStoreInternal() {
     async (note: string): Promise<{ ok: boolean; message?: string }> => {
       if (!uid || loadedUserId !== uid) return { ok: false, message: "Data akun masih dimuat. Coba lagi sebentar." };
       const date = todayStr();
+      if (note.length > 500) return { ok: false, message: "Catatan mood maksimal 500 karakter." };
       try {
         await enqueueFirestoreUpdate((previous) => ({ ...previous, moods: { ...previous.moods, [date]: { mood: previous.moods[date]?.mood || "🙂", label: previous.moods[date]?.label || "Biasa", note } } }));
         return { ok: true };
@@ -1713,7 +1761,7 @@ function useDuitStoreInternal() {
       try {
         await enqueueFirestoreUpdate((previous) => ({
           ...previous,
-          settings: { ...previous.settings, ...patch },
+          settings: sanitizeSettings({ ...previous.settings, ...patch }),
         }));
         return { ok: true };
       } catch (error) {
