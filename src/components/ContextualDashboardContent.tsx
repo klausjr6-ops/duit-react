@@ -62,6 +62,7 @@ export default function ContextualDashboardContent(props: Props) {
       actionLabel={heroAction}
       onAction={onHeroAction}
       onExpenseClick={props.onExpenseClick}
+      showExpenseAction={heroAction !== "Catat pengeluaran"}
       isDark={isDark}
     />
 
@@ -112,14 +113,14 @@ export default function ContextualDashboardContent(props: Props) {
   </div>;
 }
 
-function ContextHero({ contextTitle, contextText, motivation, next, actionLabel, onAction, onExpenseClick, isDark }: { contextTitle: string; contextText: string; motivation: string; next?: { start: string; name: string; desc?: string }; actionLabel: string; onAction: () => void; onExpenseClick: () => void; isDark: boolean }) {
+function ContextHero({ contextTitle, contextText, motivation, next, actionLabel, onAction, onExpenseClick, showExpenseAction, isDark }: { contextTitle: string; contextText: string; motivation: string; next?: { start: string; name: string; desc?: string }; actionLabel: string; onAction: () => void; onExpenseClick: () => void; showExpenseAction: boolean; isDark: boolean }) {
   return <section className={`relative overflow-hidden rounded-3xl border p-6 sm:p-7 ${isDark ? "border-teal-400/15 bg-gradient-to-br from-teal-400/10 via-slate-900 to-blue-500/10" : "border-teal-100 bg-gradient-to-br from-teal-50 via-white to-blue-50 shadow-sm"}`}>
     <div className="pointer-events-none absolute -right-20 -top-24 h-64 w-64 rounded-full bg-teal-400/15 blur-3xl" />
     <p className={`relative text-[10px] font-extrabold tracking-[0.16em] ${isDark ? "text-teal-300" : "text-teal-700"}`}>{contextTitle}</p>
     <h2 className={`relative mt-2 max-w-2xl text-2xl font-extrabold tracking-tight sm:text-3xl ${isDark ? "text-white" : "text-zinc-900"}`}>{motivation.split(". ")[0]}.</h2>
     <p className={`relative mt-2 max-w-2xl text-sm leading-relaxed ${isDark ? "text-slate-300" : "text-zinc-600"}`}>{contextText}</p>
     {next && <div className={`relative mt-4 inline-flex items-center gap-3 rounded-xl border px-3 py-2 text-xs ${isDark ? "border-white/10 bg-black/10 text-slate-200" : "border-teal-100 bg-white/80 text-zinc-700"}`}><span className="h-2 w-2 rounded-full bg-teal-400 shadow-[0_0_0_4px_rgba(45,212,191,.15)]"/><b>{next.start} · {next.name}</b><span className="hidden sm:inline">{next.desc || "Agenda berikutnya"}</span></div>}
-    <div className="relative mt-5 flex flex-wrap gap-3"><button type="button" onClick={onAction} className={`${isDark ? "bg-teal-300 text-slate-950" : "bg-teal-600 text-white"} rounded-xl px-4 py-2.5 text-sm font-bold transition-transform hover:scale-[1.02]`}>{actionLabel} →</button><button type="button" onClick={onExpenseClick} className={`${isDark ? "bg-white/10 text-slate-100" : "bg-white text-teal-700 border border-teal-100"} rounded-xl px-4 py-2.5 text-sm font-bold`}>↓ Catat pengeluaran</button></div>
+    <div className="relative mt-5 flex flex-wrap gap-3"><button type="button" onClick={onAction} className={`${isDark ? "bg-teal-300 text-slate-950" : "bg-teal-600 text-white"} rounded-xl px-4 py-2.5 text-sm font-bold transition-transform hover:scale-[1.02]`}>{actionLabel} →</button>{showExpenseAction && <button type="button" onClick={onExpenseClick} className={`${isDark ? "bg-white/10 text-slate-100" : "bg-white text-teal-700 border border-teal-100"} rounded-xl px-4 py-2.5 text-sm font-bold`}>↓ Catat pengeluaran</button>}</div>
   </section>;
 }
 function InteractiveStat({ label, value, detail, accent, onClick, isDark }: { label: string; value: number; detail: string; accent: string; onClick: () => void; isDark: boolean }) { return <button type="button" onClick={onClick} className={`${isDark ? "border-white/10 bg-white/5 hover:bg-white/10" : "border-zinc-200 bg-white hover:border-teal-200 hover:shadow-md"} relative overflow-hidden rounded-2xl border p-4 text-left transition-all hover:-translate-y-0.5`}><span className={`absolute inset-x-0 top-0 h-1 ${accent}`}/><p className={`${isDark ? "text-slate-500" : "text-zinc-500"} text-[10px] font-extrabold tracking-widest`}>{label}</p><p className={`${isDark ? "text-white" : "text-zinc-900"} mt-2 text-xl font-extrabold tracking-tight sm:text-2xl`}>{formatRupiah(value)}</p><p className="mt-2 text-[11px] font-semibold text-teal-600">{detail} →</p></button>; }
