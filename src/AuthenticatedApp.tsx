@@ -284,6 +284,7 @@ function DashboardApp() {
                   onExpenseClick={() => openQuickTransaction("out")}
                   onScheduleClick={() => setActive("calendar")}
                   onGoalClick={() => setActive("target")}
+                  onFinanceClick={() => setActive("wallet")}
                 />
               ) : (
                 <>

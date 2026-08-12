@@ -18,13 +18,14 @@ interface Props {
   onExpenseClick: () => void;
   onScheduleClick: () => void;
   onGoalClick: () => void;
+  onFinanceClick: () => void;
 }
 
 type Context = "morning" | "afternoon" | "evening" | "monthEnd";
 
 export default function ContextualDashboardContent(props: Props) {
   const { isDark } = useTheme();
-  const { wallets, goals, todaySchedules, todayMood, moods } = useStore();
+  const { wallets, goals, txs, todaySchedules, todayMood, moods } = useStore();
   const { hour } = jakartaTimeParts(props.now);
   const todayKey = dateKeyInJakarta(props.now);
   const previousNightMood = moods[addDaysToDateKey(todayKey, -1)];
@@ -41,21 +42,54 @@ export default function ContextualDashboardContent(props: Props) {
   const contextText = context === "morning" ? "Prioritasmu adalah ritme, agenda, dan ruang aman hari ini." : context === "afternoon" ? "Fokus pada apa yang sudah berjalan dan yang masih tersisa hari ini." : context === "evening" ? "Tidak perlu mengejar semuanya. Lihat hari ini dengan tenang." : "Fokus pada arus kas, ruang yang tersisa, dan langkah bulan berikutnya.";
   const motivation = getContextualMotivation({ context, dateKey: todayKey, scheduleCount: todaySchedules.length, todayExpense: props.todayExpense, inMonth: props.inMonth, outMonth: props.outMonth, moodLabel: todayMood?.label, previousMoodLabel: previousNightMood?.label });
 
+  const todayTransactions = txs
+    .filter((transaction) => transaction.date === todayKey && !transaction.isCarryForward)
+    .slice(0, 3);
+  const heroAction = context === "morning" || context === "afternoon"
+    ? (next ? "Lihat agenda" : "Catat pengeluaran")
+    : context === "evening" ? "Lihat jadwal" : "Buka laporan";
+  const onHeroAction = context === "morning" || context === "afternoon"
+    ? (next ? props.onScheduleClick : props.onExpenseClick)
+    : context === "evening" ? props.onScheduleClick : props.onFinanceClick;
+  const needsAttention = props.inMonth > 0 && props.outMonth >= props.inMonth * 0.8;
+
   return <div className="space-y-6">
-    <section className={`rounded-2xl border px-4 py-3 sm:px-5 ${isDark ? "border-white/10 bg-white/5" : "border-teal-100 bg-teal-50/70"}`}>
-      <p className={`text-[10px] font-extrabold tracking-[0.14em] ${isDark ? "text-teal-300" : "text-teal-700"}`}>{contextTitle}</p>
-      <p className={`mt-1 text-sm ${muted}`}>{contextText}</p>
-    </section>
+    <ContextHero
+      contextTitle={contextTitle}
+      contextText={contextText}
+      motivation={motivation}
+      next={next}
+      actionLabel={heroAction}
+      onAction={onHeroAction}
+      onExpenseClick={props.onExpenseClick}
+      isDark={isDark}
+    />
+
+    {needsAttention && (
+      <button type="button" onClick={props.onFinanceClick} className={`flex w-full items-center justify-between gap-4 rounded-2xl border p-4 text-left transition-transform hover:-translate-y-0.5 ${isDark ? "border-amber-400/20 bg-amber-400/10" : "border-amber-200 bg-amber-50"}`}>
+        <span className="flex items-center gap-3"><span className="grid h-10 w-10 place-items-center rounded-xl bg-amber-400/20 text-lg">⚠️</span><span><span className={`block text-sm font-bold ${main}`}>Pengeluaran bulan ini mendekati pemasukan</span><span className={`mt-1 block text-xs ${muted}`}>Sisa ruang kas sekitar {formatRupiah(Math.max(0, props.inMonth - props.outMonth))}. Ketuk untuk melihat rinciannya.</span></span></span>
+        <span className="shrink-0 text-xs font-bold text-amber-600">Lihat rincian →</span>
+      </button>
+    )}
+
+    <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <InteractiveStat label="MASUK HARI INI" value={props.todayIncome} accent="bg-emerald-500" detail="Buka transaksi" onClick={props.onFinanceClick} isDark={isDark}/>
+      <InteractiveStat label="KELUAR HARI INI" value={props.todayExpense} accent="bg-rose-500" detail="Buka transaksi" onClick={props.onFinanceClick} isDark={isDark}/>
+      <InteractiveStat label="TOTAL SALDO" value={props.balance} accent="bg-blue-500" detail={`${wallets.length} dompet`} onClick={props.onFinanceClick} isDark={isDark}/>
+      <InteractiveStat label="TABUNGAN GOAL" value={goals.reduce((sum, goal) => sum + goal.current, 0)} accent="bg-amber-500" detail={`${goals.length} goal aktif`} onClick={props.onGoalClick} isDark={isDark}/>
+    </div>
+
+    <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1.25fr_0.75fr]">
+      <ActivityToday transactions={todayTransactions} next={next} main={main} muted={muted} isDark={isDark} onFinanceClick={props.onFinanceClick} onScheduleClick={props.onScheduleClick}/>
+      <Card><p className={`text-xs font-semibold tracking-widest ${label}`}>AKSI CEPAT</p><div className="mt-4 grid grid-cols-2 gap-3"><Action icon={<IconArrowDown size={18}/>} label="Catat keluar" onClick={props.onExpenseClick}/><Action icon={<IconArrowUp size={18}/>} label="Catat masuk" onClick={props.onIncomeClick}/><Action icon={<IconCalendar size={18}/>} label="Buka agenda" onClick={props.onScheduleClick}/><Action icon={<IconWallet size={18}/>} label="Kelola dompet" onClick={props.onFinanceClick}/></div></Card>
+    </div>
 
     {context === "morning" && <>
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <Card accent={accent}><p className={`text-xs font-semibold tracking-widest ${label}`}>SALDO AMAN HARI INI</p><p className={`mt-2 text-3xl font-extrabold ${main}`}>{formatRupiah(Math.max(0, props.balance - props.todayExpense))}</p><p className={`mt-2 text-xs ${muted}`}>Saldo tersedia setelah transaksi yang sudah dicatat hari ini.</p></Card>
         <Card accent="linear-gradient(90deg,#f59e0b,#f97316)"><p className={`text-xs font-semibold tracking-widest ${label}`}>AGENDA BERIKUTNYA</p>{next ? <Agenda item={next} main={main} muted={muted}/> : <p className={`mt-3 text-sm ${muted}`}>Belum ada agenda untuk hari ini.</p>}</Card>
       </div>
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <Card><p className={`text-xs font-semibold tracking-widest ${label}`}>AKSI CEPAT</p><div className="mt-4 grid grid-cols-3 gap-3"><Action icon={<IconArrowDown size={18}/>} label="Catat keluar" onClick={props.onExpenseClick}/><Action icon={<IconArrowUp size={18}/>} label="Catat masuk" onClick={props.onIncomeClick}/><Action icon={<IconCalendar size={18}/>} label="Buka agenda" onClick={props.onScheduleClick}/></div></Card>
-        <Insight label="MOTIVASI PAGI" text={motivation} accent="linear-gradient(90deg,#2dd4bf,#60a5fa)" />
-      </div>
+      <Insight label="MOTIVASI PAGI" text={motivation} accent="linear-gradient(90deg,#2dd4bf,#60a5fa)" />
     </>}
 
     {context === "afternoon" && <>
@@ -77,6 +111,19 @@ export default function ContextualDashboardContent(props: Props) {
     </>}
   </div>;
 }
+
+function ContextHero({ contextTitle, contextText, motivation, next, actionLabel, onAction, onExpenseClick, isDark }: { contextTitle: string; contextText: string; motivation: string; next?: { start: string; name: string; desc?: string }; actionLabel: string; onAction: () => void; onExpenseClick: () => void; isDark: boolean }) {
+  return <section className={`relative overflow-hidden rounded-3xl border p-6 sm:p-7 ${isDark ? "border-teal-400/15 bg-gradient-to-br from-teal-400/10 via-slate-900 to-blue-500/10" : "border-teal-100 bg-gradient-to-br from-teal-50 via-white to-blue-50 shadow-sm"}`}>
+    <div className="pointer-events-none absolute -right-20 -top-24 h-64 w-64 rounded-full bg-teal-400/15 blur-3xl" />
+    <p className={`relative text-[10px] font-extrabold tracking-[0.16em] ${isDark ? "text-teal-300" : "text-teal-700"}`}>{contextTitle}</p>
+    <h2 className={`relative mt-2 max-w-2xl text-2xl font-extrabold tracking-tight sm:text-3xl ${isDark ? "text-white" : "text-zinc-900"}`}>{motivation.split(". ")[0]}.</h2>
+    <p className={`relative mt-2 max-w-2xl text-sm leading-relaxed ${isDark ? "text-slate-300" : "text-zinc-600"}`}>{contextText}</p>
+    {next && <div className={`relative mt-4 inline-flex items-center gap-3 rounded-xl border px-3 py-2 text-xs ${isDark ? "border-white/10 bg-black/10 text-slate-200" : "border-teal-100 bg-white/80 text-zinc-700"}`}><span className="h-2 w-2 rounded-full bg-teal-400 shadow-[0_0_0_4px_rgba(45,212,191,.15)]"/><b>{next.start} · {next.name}</b><span className="hidden sm:inline">{next.desc || "Agenda berikutnya"}</span></div>}
+    <div className="relative mt-5 flex flex-wrap gap-3"><button type="button" onClick={onAction} className={`${isDark ? "bg-teal-300 text-slate-950" : "bg-teal-600 text-white"} rounded-xl px-4 py-2.5 text-sm font-bold transition-transform hover:scale-[1.02]`}>{actionLabel} →</button><button type="button" onClick={onExpenseClick} className={`${isDark ? "bg-white/10 text-slate-100" : "bg-white text-teal-700 border border-teal-100"} rounded-xl px-4 py-2.5 text-sm font-bold`}>↓ Catat pengeluaran</button></div>
+  </section>;
+}
+function InteractiveStat({ label, value, detail, accent, onClick, isDark }: { label: string; value: number; detail: string; accent: string; onClick: () => void; isDark: boolean }) { return <button type="button" onClick={onClick} className={`${isDark ? "border-white/10 bg-white/5 hover:bg-white/10" : "border-zinc-200 bg-white hover:border-teal-200 hover:shadow-md"} relative overflow-hidden rounded-2xl border p-4 text-left transition-all hover:-translate-y-0.5`}><span className={`absolute inset-x-0 top-0 h-1 ${accent}`}/><p className={`${isDark ? "text-slate-500" : "text-zinc-500"} text-[10px] font-extrabold tracking-widest`}>{label}</p><p className={`${isDark ? "text-white" : "text-zinc-900"} mt-2 text-xl font-extrabold tracking-tight sm:text-2xl`}>{formatRupiah(value)}</p><p className="mt-2 text-[11px] font-semibold text-teal-600">{detail} →</p></button>; }
+function ActivityToday({ transactions, next, main, muted, isDark, onFinanceClick, onScheduleClick }: { transactions: ReturnType<typeof useStore>["txs"]; next?: { start: string; name: string; desc?: string }; main: string; muted: string; isDark: boolean; onFinanceClick: () => void; onScheduleClick: () => void }) { return <Card><div className="flex items-center justify-between"><p className={`text-xs font-semibold tracking-widest ${muted}`}>AKTIVITAS HARI INI</p><button type="button" onClick={onFinanceClick} className="text-xs font-bold text-teal-600">Lihat semua →</button></div><div className={`mt-3 divide-y ${isDark ? "divide-white/10" : "divide-zinc-100"}`}>{transactions.length === 0 && !next ? <p className={`py-6 text-sm ${muted}`}>Belum ada aktivitas hari ini.</p> : <>{transactions.map((transaction) => <button type="button" key={transaction.id} onClick={onFinanceClick} className="flex w-full items-center gap-3 py-3 text-left"><span className={`h-2.5 w-2.5 rounded-full ${transaction.type === "in" ? "bg-emerald-500" : "bg-rose-500"}`}/><span className={`min-w-0 flex-1 truncate text-sm font-bold ${main}`}>{transaction.desc || transaction.cat}</span><span className={`text-xs font-bold ${transaction.type === "in" ? "text-emerald-500" : "text-rose-500"}`}>{transaction.type === "in" ? "+" : "−"}{formatRupiah(transaction.amt)}</span></button>)}{next && <button type="button" onClick={onScheduleClick} className="flex w-full items-center gap-3 py-3 text-left"><span className="h-2.5 w-2.5 rounded-full bg-amber-400"/><span className={`min-w-0 flex-1 truncate text-sm font-bold ${main}`}>{next.name}</span><span className={`text-xs font-bold ${muted}`}>{next.start}</span></button>}</>}</div></Card>; }
 
 function Agenda({ item, main, muted }: { item: { start: string; name: string; desc?: string }; main: string; muted: string }) { return <div className="mt-4 flex items-center gap-3"><span className="rounded-lg bg-teal-500/10 px-2.5 py-1.5 font-mono text-sm font-bold text-teal-600">{item.start}</span><div><p className={`font-bold ${main}`}>{item.name}</p><p className={`text-xs ${muted}`}>{item.desc || "Jadwal hari ini"}</p></div></div>; }
 function Action({ icon, label, onClick }: { icon: ReactNode; label: string; onClick: () => void }) { const { isDark } = useTheme(); return <button type="button" onClick={onClick} className={`flex flex-col items-center gap-2 rounded-xl border p-3 text-xs font-bold ${isDark ? "border-white/10 bg-white/5 text-slate-200" : "border-zinc-200 bg-zinc-50 text-zinc-700"}`}><span className="text-teal-500">{icon}</span>{label}</button>; }
