@@ -263,8 +263,27 @@ function isValidTime(value: unknown): value is string {
   return typeof value === "string" && toTimeValue(value, "") === value;
 }
 
+function validateText(value: unknown, maxLength: number, label: string, required = false): string | null {
+  if (typeof value !== "string") return `${label} tidak valid.`;
+  if (required && !value.trim()) return `${label} harus diisi.`;
+  return value.length <= maxLength ? null : `${label} maksimal ${maxLength} karakter.`;
+}
+
+function normalizeComparableName(value: string): string {
+  return value.trim().toLocaleLowerCase("id-ID");
+}
+
+function validateTransactionText(transaction: Pick<Transaction, "cat" | "desc">): string | null {
+  return validateText(transaction.cat, 80, "Kategori", true) || validateText(transaction.desc, 240, "Deskripsi");
+}
+
 function validateScheduleInput(schedule: Omit<ScheduleItem, "id">): string | null {
-  if (!schedule.name?.trim()) return "Nama jadwal harus diisi.";
+  const nameError = validateText(schedule.name, 120, "Nama jadwal", true);
+  if (nameError) return nameError;
+  const descError = schedule.desc === undefined ? null : validateText(schedule.desc, 240, "Deskripsi");
+  if (descError) return descError;
+  const iconError = schedule.icon === undefined ? null : validateText(schedule.icon, 12, "Ikon");
+  if (iconError) return iconError;
   if (!isValidDateKey(schedule.date) || !isValidTime(schedule.start)) {
     return "Tanggal atau jam mulai tidak valid.";
   }
@@ -1079,6 +1098,8 @@ function useDuitStoreInternal() {
       if (special.goalId !== undefined || special.transferId !== undefined || special.isCarryForward) {
         return { ok: false, message: "Transaksi khusus harus dibuat melalui fitur Goal atau Transfer." };
       }
+      const textError = validateTransactionText(tx);
+      if (textError) return { ok: false, message: textError };
       // Validate wallet exists for any transaction with walletId
       if (tx.walletId !== undefined) {
         const walletExists = dataRef.current.wallets.some((w) => w.id === tx.walletId);
@@ -1106,6 +1127,7 @@ function useDuitStoreInternal() {
             (transaction.type !== "in" && transaction.type !== "out") ||
             !isPositiveRupiah(transaction.amt) ||
             !isValidDateKey(transaction.date) ||
+            validateTransactionText(transaction) !== null ||
             (transaction.walletId !== undefined && !previous.wallets.some((wallet) => wallet.id === transaction.walletId))
           ) throw new Error("Data transaksi tidak valid.");
           if (transaction.type === "out" && transaction.walletId !== undefined) {
@@ -1196,6 +1218,8 @@ function useDuitStoreInternal() {
       if ((updated.type !== "in" && updated.type !== "out") || !isPositiveRupiah(updated.amt) || !isValidDateKey(updated.date)) {
         return { ok: false, message: "Data transaksi tidak valid." };
       }
+      const textError = validateTransactionText(updated);
+      if (textError) return { ok: false, message: textError };
       if (updated.walletId !== undefined && !dataRef.current.wallets.some((wallet) => wallet.id === updated.walletId)) {
         return { ok: false, message: "Dompet transaksi tidak ditemukan." };
       }
@@ -1207,7 +1231,7 @@ function useDuitStoreInternal() {
           const existing = previous.txs.find((tx) => tx.id === id);
           if (!existing || existing.transferId || existing.goalId || existing.isCarryForward) throw new Error("Transaksi tidak dapat diedit.");
           const final = { ...existing, ...patch };
-          if ((final.type !== "in" && final.type !== "out") || !isPositiveRupiah(final.amt) || !isValidDateKey(final.date)) throw new Error("Data transaksi tidak valid.");
+          if ((final.type !== "in" && final.type !== "out") || !isPositiveRupiah(final.amt) || !isValidDateKey(final.date) || validateTransactionText(final) !== null) throw new Error("Data transaksi tidak valid.");
           if (final.walletId !== undefined && !previous.wallets.some((wallet) => wallet.id === final.walletId)) throw new Error("Dompet transaksi tidak ditemukan.");
 
           const oldContribution = existing.type === "in" ? existing.amt : -existing.amt;
@@ -1316,6 +1340,11 @@ function useDuitStoreInternal() {
       if (!goal.name?.trim() || !Number.isSafeInteger(goal.target) || goal.target <= 0 || !Number.isSafeInteger(currentAmt) || currentAmt < 0 || currentAmt > goal.target) {
         return { ok: false, message: "Data goal tidak valid." };
       }
+      const nameError = validateText(goal.name, 120, "Nama goal", true);
+      if (nameError) return { ok: false, message: nameError };
+      const iconError = validateText(goal.icon, 12, "Ikon");
+      if (iconError) return { ok: false, message: iconError };
+      if (dataRef.current.goals.some((item) => normalizeComparableName(item.name) === normalizeComparableName(goal.name))) return { ok: false, message: "Nama goal sudah digunakan." };
       if (goal.deadline && !isValidDateKey(goal.deadline)) return { ok: false, message: "Tanggal target goal tidak valid." };
       if (currentAmt > 0 && !walletId) return { ok: false, message: "Pilih dompet sumber untuk tabungan awal." };
       if (!uid || loadedUserId !== uid) return { ok: false, message: "Data akun masih dimuat. Coba lagi sebentar." };
@@ -1330,6 +1359,7 @@ function useDuitStoreInternal() {
 
       try {
         await enqueueFirestoreUpdate((previous) => {
+          if (previous.goals.some((existing) => normalizeComparableName(existing.name) === normalizeComparableName(item.name))) throw new Error("Nama goal sudah digunakan.");
           if (fundingTx) {
             const bal = getWalletBalance(previous, fundingTx.walletId!);
             if (bal === null) throw new GoalFundingError("Dompet sumber tidak ditemukan.");
@@ -1374,14 +1404,20 @@ function useDuitStoreInternal() {
       if (!existing) return { ok: false, message: "Goal tidak ditemukan." };
       const target = patch.target ?? existing.target;
       if (!Number.isSafeInteger(target) || target <= 0 || target < existing.current) return { ok: false, message: "Target goal tidak valid atau lebih kecil dari tabungan terkumpul." };
+      const goalName = patch.name ?? existing.name;
+      const nameError = validateText(goalName, 120, "Nama goal", true);
+      if (nameError) return { ok: false, message: nameError };
+      if (patch.icon !== undefined && validateText(patch.icon, 12, "Ikon")) return { ok: false, message: "Ikon tidak valid." };
+      if (dataRef.current.goals.some((item) => item.id !== id && normalizeComparableName(item.name) === normalizeComparableName(goalName))) return { ok: false, message: "Nama goal sudah digunakan." };
       if (!uid || loadedUserId !== uid) return { ok: false, message: "Data akun masih dimuat. Coba lagi sebentar." };
       try {
         await enqueueFirestoreUpdate((previous) => {
           const current = previous.goals.find((goal) => goal.id === id);
           if (!current) throw new Error("Goal tidak valid.");
           const finalTarget = patch.target ?? current.target;
-          if (!Number.isSafeInteger(finalTarget) || finalTarget <= 0 || finalTarget < current.current) throw new Error("Goal tidak valid.");
-          return { ...previous, goals: previous.goals.map((goal) => goal.id === id ? { ...goal, ...patch } : goal) };
+          const finalName = patch.name ?? current.name;
+          if (!Number.isSafeInteger(finalTarget) || finalTarget <= 0 || finalTarget < current.current || validateText(finalName, 120, "Nama goal", true) || (patch.icon !== undefined && validateText(patch.icon, 12, "Ikon")) || previous.goals.some((goal) => goal.id !== id && normalizeComparableName(goal.name) === normalizeComparableName(finalName))) throw new Error("Goal tidak valid.");
+          return { ...previous, goals: previous.goals.map((goal) => goal.id === id ? { ...goal, ...patch, ...(patch.name !== undefined ? { name: patch.name.trim() } : {}) } : goal) };
         });
         return { ok: true };
       } catch (error) {
@@ -1532,14 +1568,18 @@ function useDuitStoreInternal() {
      ══════════════════════════════════════════════════════════ */
   const addWallet = useCallback(
     async (wallet: Omit<Wallet, "id">): Promise<{ ok: boolean; message?: string }> => {
-      if (!wallet.name?.trim() || !Number.isFinite(wallet.balance) || wallet.balance < 0) {
+      if (!wallet.name?.trim() || !Number.isSafeInteger(wallet.balance) || wallet.balance < 0) {
         return { ok: false, message: "Data dompet atau saldo awal tidak valid." };
       }
+      const nameError = validateText(wallet.name, 80, "Nama dompet", true);
+      if (nameError) return { ok: false, message: nameError };
+      if (validateText(wallet.icon, 12, "Ikon") || validateText(wallet.color, 120, "Warna")) return { ok: false, message: "Data dompet tidak valid." };
+      if (dataRef.current.wallets.some((item) => normalizeComparableName(item.name) === normalizeComparableName(wallet.name))) return { ok: false, message: "Nama dompet sudah digunakan." };
       if (!uid || loadedUserId !== uid) return { ok: false, message: "Data akun masih dimuat. Coba lagi sebentar." };
       const item: Wallet = { ...wallet, name: wallet.name.trim(), id: createId() };
       try {
         await enqueueFirestoreUpdate((previous) => {
-          if (!item.name || !Number.isFinite(item.balance) || item.balance < 0) throw new Error("Data dompet tidak valid.");
+          if (!item.name || !Number.isSafeInteger(item.balance) || item.balance < 0 || previous.wallets.some((existing) => normalizeComparableName(existing.name) === normalizeComparableName(item.name))) throw new Error("Data dompet tidak valid.");
           return { ...previous, wallets: [...previous.wallets, item] };
         });
         return { ok: true };
@@ -1557,20 +1597,12 @@ function useDuitStoreInternal() {
       try {
         await enqueueFirestoreUpdate((previous) => {
           if (!previous.wallets.some((wallet) => wallet.id === id)) throw new Error("Dompet tidak ditemukan.");
-        // Find all transferIds originating from this wallet so we can
-        // remove the paired transaction on the other wallet too.
-        const walletTransferIds = new Set(
-          previous.txs
-            .filter((t) => t.walletId === id && t.transferId)
-            .map((t) => t.transferId)
+        // Remove only records owned by the deleted wallet. A transfer's
+        // surviving counterpart represents real money in/out of another
+        // wallet, so it must remain and be converted to a regular record.
+        const idsToRemove = new Set(
+          previous.txs.filter((transaction) => transaction.walletId === id).map((transaction) => transaction.id)
         );
-
-        // Collect all transaction IDs to remove
-        const idsToRemove = new Set<number>();
-        for (const t of previous.txs) {
-          if (t.walletId === id) idsToRemove.add(t.id);
-          if (t.transferId && walletTransferIds.has(t.transferId)) idsToRemove.add(t.id);
-        }
 
         // Adjust goal.current for deleted goal transactions
         let goals = previous.goals;
@@ -1584,24 +1616,16 @@ function useDuitStoreInternal() {
           );
         }
 
-        // For orphaned transfer "in" tx on surviving wallets (partner deleted):
-        // The money legitimately arrived in that wallet, so keep the transaction
-        // but remove the transferId so it no longer looks like a paired transfer.
-        // It will render as a regular income transaction instead.
-        const orphanedTransferIds = new Set<number>();
-        for (const t of previous.txs) {
-          if (t.transferId && !idsToRemove.has(t.id) && idsToRemove.has(
-            previous.txs.find((p) => p.transferId === t.transferId && p.id !== t.id)?.id ?? -1
-          )) {
-            orphanedTransferIds.add(t.id);
-          }
-        }
-
+        const transferIdsWithDeletedPartner = new Set(
+          previous.txs
+            .filter((transaction) => idsToRemove.has(transaction.id) && transaction.transferId !== undefined)
+            .map((transaction) => transaction.transferId!)
+        );
         const txs = previous.txs
-          .filter((t) => !idsToRemove.has(t.id))
-          .map((t) => orphanedTransferIds.has(t.id)
-            ? { ...t, transferId: undefined }
-            : t
+          .filter((transaction) => !idsToRemove.has(transaction.id))
+          .map((transaction) => transaction.transferId !== undefined && transferIdsWithDeletedPartner.has(transaction.transferId)
+            ? { ...transaction, transferId: undefined }
+            : transaction
           );
 
         return {
@@ -1625,15 +1649,22 @@ function useDuitStoreInternal() {
       const existing = dataRef.current.wallets.find((wallet) => wallet.id === id);
       if (!existing) return { ok: false, message: "Dompet tidak ditemukan." };
       const balance = patch.balance ?? existing.balance;
-      if (!Number.isFinite(balance) || balance < 0) return { ok: false, message: "Saldo awal dompet tidak valid." };
+      if (!Number.isSafeInteger(balance) || balance < 0) return { ok: false, message: "Saldo awal dompet tidak valid." };
+      const walletName = patch.name ?? existing.name;
+      const nameError = validateText(walletName, 80, "Nama dompet", true);
+      if (nameError) return { ok: false, message: nameError };
+      if (patch.icon !== undefined && validateText(patch.icon, 12, "Ikon")) return { ok: false, message: "Ikon tidak valid." };
+      if (patch.color !== undefined && validateText(patch.color, 120, "Warna")) return { ok: false, message: "Warna tidak valid." };
+      if (dataRef.current.wallets.some((item) => item.id !== id && normalizeComparableName(item.name) === normalizeComparableName(walletName))) return { ok: false, message: "Nama dompet sudah digunakan." };
       if (!uid || loadedUserId !== uid) return { ok: false, message: "Data akun masih dimuat. Coba lagi sebentar." };
       try {
         await enqueueFirestoreUpdate((previous) => {
           const current = previous.wallets.find((wallet) => wallet.id === id);
           if (!current) throw new Error("Dompet tidak valid.");
           const finalBalance = patch.balance ?? current.balance;
-          if (!Number.isFinite(finalBalance) || finalBalance < 0) throw new Error("Dompet tidak valid.");
-          const wallets = previous.wallets.map((wallet) => wallet.id === id ? { ...wallet, ...patch } : wallet);
+          const finalName = patch.name ?? current.name;
+          if (!Number.isSafeInteger(finalBalance) || finalBalance < 0 || validateText(finalName, 80, "Nama dompet", true) || (patch.icon !== undefined && validateText(patch.icon, 12, "Ikon")) || (patch.color !== undefined && validateText(patch.color, 120, "Warna")) || previous.wallets.some((wallet) => wallet.id !== id && normalizeComparableName(wallet.name) === normalizeComparableName(finalName))) throw new Error("Dompet tidak valid.");
+          const wallets = previous.wallets.map((wallet) => wallet.id === id ? { ...wallet, ...patch, ...(patch.name !== undefined ? { name: patch.name.trim() } : {}) } : wallet);
           const resultingBalance = getWalletBalance({ ...previous, wallets }, id);
           if (resultingBalance === null || resultingBalance < 0) {
             throw new WalletBalanceError("Perubahan saldo awal membuat saldo dompet menjadi negatif.");

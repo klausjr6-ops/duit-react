@@ -51,7 +51,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const registerEmail = async (email: string, password: string, name: string) => {
     const cred = await createUserWithEmailAndPassword(auth, email, password);
     if (name.trim()) {
-      await updateProfile(cred.user, { displayName: name.trim() });
+      try {
+        await updateProfile(cred.user, { displayName: name.trim() });
+      } catch (error) {
+        // Akun sudah berhasil dibuat. Jangan membuat pengguna terjebak hanya
+        // karena penyimpanan nama profil gagal sementara.
+        console.warn("Nama profil belum berhasil disimpan:", error);
+      }
     }
     stampActivity();
   };

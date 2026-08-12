@@ -526,7 +526,14 @@ export default function ChatWidget({ open, onClose }: ChatWidgetProps) {
     setError(null);
     try {
       const byName = (name: string) => name.trim().toLocaleLowerCase("id-ID");
-      const findWallet = (name: string) => wallets.find((item) => byName(item.name) === byName(name));
+      const findWallet = (name: string) => {
+        const matches = wallets.filter((item) => byName(item.name) === byName(name));
+        return matches.length === 1 ? matches[0] : null;
+      };
+      const findGoal = (name: string) => {
+        const matches = goals.filter((item) => byName(item.name) === byName(name));
+        return matches.length === 1 ? matches[0] : null;
+      };
       const findSchedule = (name: string, date?: string, start?: string) => {
         const matches = scheds.filter((item) => byName(item.name) === byName(name) && (!date || item.date === date) && (!start || item.start === start));
         return matches.length === 1 ? matches[0] : null;
@@ -536,11 +543,11 @@ export default function ChatWidget({ open, onClose }: ChatWidgetProps) {
         result = await addSched({ name: action.name.trim(), date: action.date, start: action.start, ...(action.end ? { end: action.end } : {}), ...(action.desc ? { desc: action.desc } : {}), recurring: action.recurring === true, ...(action.untilDate ? { untilDate: action.untilDate } : {}), icon: "pin" });
       } else if (action.type === "transaction") {
         const wallet = findWallet(action.walletName);
-        result = !wallet ? { ok: false, message: `Dompet “${action.walletName}” tidak ditemukan. Pilih dompet yang tersedia dulu ya.` } : await addTx({ type: action.transactionType, amt: action.amount, cat: action.category.trim() || "Lainnya", desc: action.desc?.trim() || action.category, date: action.date, walletId: wallet.id });
+        result = !wallet ? { ok: false, message: `Dompet “${action.walletName}” tidak ditemukan atau namanya ambigu. Pilih nama dompet yang unik dulu ya.` } : await addTx({ type: action.transactionType, amt: action.amount, cat: action.category.trim() || "Lainnya", desc: action.desc?.trim() || action.category, date: action.date, walletId: wallet.id });
       } else if (action.type === "goalFund") {
-        const goal = goals.find((item) => byName(item.name) === byName(action.goalName));
+        const goal = findGoal(action.goalName);
         const wallet = findWallet(action.walletName);
-        result = !goal ? { ok: false, message: `Goal “${action.goalName}” tidak ditemukan.` } : !wallet ? { ok: false, message: `Dompet “${action.walletName}” tidak ditemukan.` } : await fundGoal(goal.id, wallet.id, action.amount);
+        result = !goal ? { ok: false, message: `Goal “${action.goalName}” tidak ditemukan atau namanya ambigu.` } : !wallet ? { ok: false, message: `Dompet “${action.walletName}” tidak ditemukan.` } : await fundGoal(goal.id, wallet.id, action.amount);
       } else if (action.type === "transfer") {
         const from = findWallet(action.fromWalletName);
         const to = findWallet(action.toWalletName);
