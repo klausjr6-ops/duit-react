@@ -349,7 +349,9 @@ export default function AccountModal({ open, onClose }: AccountModalProps) {
     onClose();
   };
 
-  const { dialogRef, onDialogKeyDown } = useModalDialog(open, handleClose);
+  const accountBusy = resettingData || importingBackup || calendarRegenerating || loggingOut || avatarSaving || settingsSaving;
+  const guardedClose = () => { if (!accountBusy) handleClose(); };
+  const { dialogRef, onDialogKeyDown } = useModalDialog(open, guardedClose);
 
   const modalBg = isDark
     ? "w-full max-w-sm rounded-3xl border border-white/10 bg-slate-900/95 p-6 shadow-2xl backdrop-blur-xl max-h-[90vh] overflow-y-auto"
@@ -423,7 +425,7 @@ export default function AccountModal({ open, onClose }: AccountModalProps) {
                   </p>
                 </div>
               </div>
-              <button aria-label="Tutup pengaturan akun" onClick={handleClose} className={isDark ? "text-slate-400 hover:text-white" : "text-zinc-500 hover:text-zinc-900"}>
+              <button aria-label="Tutup pengaturan akun" onClick={guardedClose} disabled={accountBusy} className={`${isDark ? "text-slate-400 hover:text-white" : "text-zinc-500 hover:text-zinc-900"} disabled:cursor-not-allowed disabled:opacity-40`}>
                 <IconClose size={18} />
               </button>
             </div>

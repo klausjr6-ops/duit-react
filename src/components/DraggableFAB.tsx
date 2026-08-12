@@ -2,9 +2,6 @@
 // v5 — bypass store queue for position save (no sync indicator)
 
 import { useEffect, useRef, useState } from "react";
-import { doc, updateDoc } from "firebase/firestore";
-import { db } from "../lib/firebaseDb";
-import { useAuth } from "../lib/AuthContext";
 import { useStore, type FabCorner } from "../lib/store";
 import { useTheme } from "../lib/ThemeContext";
 
@@ -67,8 +64,7 @@ interface Props {
 
 export default function DraggableFAB({ onOpenChat, inMonth, outMonth, score, hidden }: Props) {
   const { isDark } = useTheme();
-  const { settings } = useStore();
-  const { user } = useAuth();
+  const { settings, updateSettings } = useStore();
   const storeCorner: FabCorner = (settings.fabCorner as FabCorner) || "bottom-right";
 
   const [corner, setCorner] = useState<FabCorner>(storeCorner);
@@ -83,8 +79,8 @@ export default function DraggableFAB({ onOpenChat, inMonth, outMonth, score, hid
 
   const onOpenChatRef = useRef(onOpenChat);
   onOpenChatRef.current = onOpenChat;
-  const uidRef = useRef(user?.uid);
-  uidRef.current = user?.uid;
+  const updateSettingsRef = useRef(updateSettings);
+  updateSettingsRef.current = updateSettings;
 
   // Debounce timer + last-saved tracker
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -100,22 +96,19 @@ export default function DraggableFAB({ onOpenChat, inMonth, outMonth, score, hid
     el.style.transform = `translate(${x}px, ${y}px)`;
   });
 
-  /* ── Write fabCorner directly to Firestore (bypasses store queue) ── */
-  const saveCornerDirectRef = useRef((nc: FabCorner) => {
+  /* ── Persist through the store queue to avoid racing full-document writes. ── */
+  const saveCornerRef = useRef((nc: FabCorner) => {
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
     if (nc === lastSavedRef.current) return;
 
     saveTimerRef.current = setTimeout(async () => {
       if (nc === lastSavedRef.current) return;
-      const uid = uidRef.current;
-      if (!uid) return;
       try {
-        const ref = doc(db, "users", uid, "data", "main");
-        // updateDoc with dot-notation only patches the nested field
-        await updateDoc(ref, { "settings.fabCorner": nc });
-        lastSavedRef.current = nc;
+        const result = await updateSettingsRef.current({ fabCorner: nc });
+        if (result.ok) lastSavedRef.current = nc;
+        else console.warn("Posisi tombol DUIT belum berhasil disimpan:", result.message);
       } catch (err) {
-        console.warn("FAB corner save failed:", err);
+        console.warn("Posisi tombol DUIT belum berhasil disimpan:", err);
       }
       saveTimerRef.current = null;
     }, DEBOUNCE_MS);
@@ -230,8 +223,7 @@ export default function DraggableFAB({ onOpenChat, inMonth, outMonth, score, hid
         const tp = getCornerXY(nc);
         setCorner(nc);
         applyPosRef.current(tp.x, tp.y, true);
-        // Direct Firestore write — bypasses store syncing indicator
-        saveCornerDirectRef.current(nc);
+        saveCornerRef.current(nc);
       } else {
         // Pointer release opens chat directly; ignore the synthetic click that
         // browsers may emit afterwards so it does not open twice.

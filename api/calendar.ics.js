@@ -160,7 +160,7 @@ export default async function handler(req, res) {
 
   const uid = getSingleQueryValue(req.query.uid);
   const token = getSingleQueryValue(req.query.token);
-  if (!uid || !token) {
+  if (!uid || !token || typeof token !== "string" || token.length > 200) {
     res.status(401).json({ error: "URL feed kalender pribadi diperlukan." });
     return;
   }

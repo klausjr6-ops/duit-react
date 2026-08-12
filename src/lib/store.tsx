@@ -785,7 +785,10 @@ function useDuitStoreInternal() {
         initializingUidRef.current = uid;
 
         const localData = getLocalStorageData();
-        const initialData = localData ?? createDefaultData();
+        // Legacy local data is untrusted just like an imported backup. Normalize
+        // it before the first cloud write so malformed or oversized fields do
+        // not bypass the current data limits.
+        const initialData = localData ? normalizeUserData(localData) : createDefaultData();
 
         try {
           const initializedData = await runTransaction(db, async (transaction) => {
