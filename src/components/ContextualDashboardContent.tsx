@@ -2,8 +2,10 @@ import type { ReactNode } from "react";
 import Card from "./Card";
 import ReportCard from "./ReportCard";
 import MoodCard from "./MoodCard";
+import FinancialInsights from "./FinancialInsights";
 import { formatRupiah, jakartaTimeParts } from "../lib/format";
 import { addDaysToDateKey, dateKeyInJakarta, useStore } from "../lib/store";
+import { getFinancialInsights } from "../lib/insights";
 import { useTheme } from "../lib/ThemeContext";
 import { IconArrowDown, IconArrowUp, IconCalendar, IconWallet } from "../utils/icons";
 
@@ -51,7 +53,14 @@ export default function ContextualDashboardContent(props: Props) {
   const onHeroAction = context === "morning" || context === "afternoon"
     ? (next ? props.onScheduleClick : props.onExpenseClick)
     : context === "evening" ? props.onScheduleClick : props.onFinanceClick;
-  const needsAttention = props.inMonth > 0 && props.outMonth >= props.inMonth * 0.8;
+  const insights = getFinancialInsights({
+    txs,
+    wallets,
+    goals,
+    todayKey,
+    inMonth: props.inMonth,
+    outMonth: props.outMonth,
+  });
 
   return <div className="space-y-6">
     <ContextHero
@@ -66,12 +75,7 @@ export default function ContextualDashboardContent(props: Props) {
       isDark={isDark}
     />
 
-    {needsAttention && (
-      <button type="button" onClick={props.onFinanceClick} className={`flex w-full items-center justify-between gap-4 rounded-2xl border p-4 text-left transition-transform hover:-translate-y-0.5 ${isDark ? "border-amber-400/20 bg-amber-400/10" : "border-amber-200 bg-amber-50"}`}>
-        <span className="flex items-center gap-3"><span className="grid h-10 w-10 place-items-center rounded-xl bg-amber-400/20 text-lg">⚠️</span><span><span className={`block text-sm font-bold ${main}`}>Pengeluaran bulan ini mendekati pemasukan</span><span className={`mt-1 block text-xs ${muted}`}>Sisa ruang kas sekitar {formatRupiah(Math.max(0, props.inMonth - props.outMonth))}. Ketuk untuk melihat rinciannya.</span></span></span>
-        <span className="shrink-0 text-xs font-bold text-amber-600">Lihat rincian →</span>
-      </button>
-    )}
+    <FinancialInsights insights={insights} onFinanceClick={props.onFinanceClick} onGoalClick={props.onGoalClick} />
 
     <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
       <InteractiveStat label="MASUK HARI INI" value={props.todayIncome} accent="bg-emerald-500" detail="Buka transaksi" onClick={props.onFinanceClick} isDark={isDark}/>
