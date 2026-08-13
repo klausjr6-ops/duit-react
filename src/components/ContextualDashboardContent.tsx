@@ -28,7 +28,7 @@ type Context = "morning" | "afternoon" | "evening" | "monthEnd";
 export default function ContextualDashboardContent(props: Props) {
   const { isDark } = useTheme();
   const { wallets, goals, txs, todaySchedules, todayMood, moods } = useStore();
-  const { hour } = jakartaTimeParts(props.now);
+  const { hour, minute } = jakartaTimeParts(props.now);
   const todayKey = dateKeyInJakarta(props.now);
   const previousNightMood = moods[addDaysToDateKey(todayKey, -1)];
   const day = Number(todayKey.slice(-2));
@@ -36,7 +36,18 @@ export default function ContextualDashboardContent(props: Props) {
   const label = isDark ? "text-slate-500" : "text-zinc-500";
   const main = isDark ? "text-white" : "text-zinc-900";
   const muted = isDark ? "text-slate-400" : "text-zinc-500";
-  const next = todaySchedules[0];
+  const nowMinutes = hour * 60 + minute;
+  // Never present an already-finished schedule as the next agenda.
+  const next = todaySchedules.find((schedule) => {
+    const [startHour, startMinute] = schedule.start.split(":").map(Number);
+    const startMinutes = startHour * 60 + startMinute;
+    if (startMinutes >= nowMinutes) return true;
+    if (!schedule.end) return false;
+    const [endHour, endMinute] = schedule.end.split(":").map(Number);
+    const endMinutes = endHour * 60 + endMinute;
+    // Cross-midnight schedules are still relevant until their end time.
+    return endMinutes < startMinutes ? nowMinutes >= startMinutes || nowMinutes <= endMinutes : nowMinutes <= endMinutes;
+  });
   const topGoal = [...goals].sort((a, b) => (b.current / b.target) - (a.current / a.target))[0];
   const accent = context === "monthEnd" ? "linear-gradient(90deg,#f59e0b,#f97316,#fb7185)" : context === "evening" ? "linear-gradient(90deg,#818cf8,#a78bfa,#64748b)" : context === "afternoon" ? "linear-gradient(90deg,#22d3ee,#3b82f6,#6366f1)" : "linear-gradient(90deg,#2dd4bf,#22d3ee,#3b82f6)";
 
@@ -117,11 +128,16 @@ export default function ContextualDashboardContent(props: Props) {
   </div>;
 }
 
+function heroHeadline(motivation: string): string {
+  const firstSentence = motivation.match(/^(.+?[.!?])(?:\s|$)/)?.[1] || motivation;
+  return /[.!?]$/.test(firstSentence) ? firstSentence : `${firstSentence}.`;
+}
+
 function ContextHero({ contextTitle, contextText, motivation, next, actionLabel, onAction, onExpenseClick, showExpenseAction, isDark }: { contextTitle: string; contextText: string; motivation: string; next?: { start: string; name: string; desc?: string }; actionLabel: string; onAction: () => void; onExpenseClick: () => void; showExpenseAction: boolean; isDark: boolean }) {
   return <section className={`relative overflow-hidden rounded-3xl border p-6 sm:p-7 ${isDark ? "border-teal-400/15 bg-gradient-to-br from-teal-400/10 via-slate-900 to-blue-500/10" : "border-teal-100 bg-gradient-to-br from-teal-50 via-white to-blue-50 shadow-sm"}`}>
     <div className="pointer-events-none absolute -right-20 -top-24 h-64 w-64 rounded-full bg-teal-400/15 blur-3xl" />
     <p className={`relative text-[10px] font-extrabold tracking-[0.16em] ${isDark ? "text-teal-300" : "text-teal-700"}`}>{contextTitle}</p>
-    <h2 className={`relative mt-2 max-w-2xl text-2xl font-extrabold tracking-tight sm:text-3xl ${isDark ? "text-white" : "text-zinc-900"}`}>{motivation.split(". ")[0]}.</h2>
+    <h2 className={`relative mt-2 max-w-2xl text-2xl font-extrabold tracking-tight sm:text-3xl ${isDark ? "text-white" : "text-zinc-900"}`}>{heroHeadline(motivation)}</h2>
     <p className={`relative mt-2 max-w-2xl text-sm leading-relaxed ${isDark ? "text-slate-300" : "text-zinc-600"}`}>{contextText}</p>
     {next && <div className={`relative mt-4 inline-flex items-center gap-3 rounded-xl border px-3 py-2 text-xs ${isDark ? "border-white/10 bg-black/10 text-slate-200" : "border-teal-100 bg-white/80 text-zinc-700"}`}><span className="h-2 w-2 rounded-full bg-teal-400 shadow-[0_0_0_4px_rgba(45,212,191,.15)]"/><b>{next.start} · {next.name}</b><span className="hidden sm:inline">{next.desc || "Agenda berikutnya"}</span></div>}
     <div className="relative mt-5 flex flex-wrap gap-3"><button type="button" onClick={onAction} className={`${isDark ? "bg-teal-300 text-slate-950" : "bg-teal-600 text-white"} rounded-xl px-4 py-2.5 text-sm font-bold transition-transform hover:scale-[1.02]`}>{actionLabel} →</button>{showExpenseAction && <button type="button" onClick={onExpenseClick} className={`${isDark ? "bg-white/10 text-slate-100" : "bg-white text-teal-700 border border-teal-100"} rounded-xl px-4 py-2.5 text-sm font-bold`}>↓ Catat pengeluaran</button>}</div>

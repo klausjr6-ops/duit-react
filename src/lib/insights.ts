@@ -120,7 +120,7 @@ export function getFinancialInsights(input: InsightInput): FinancialInsight[] {
       return { goal, daysLeft, remaining, dailyNeed: daysLeft > 0 ? Math.ceil(remaining / daysLeft) : remaining };
     })
     .filter((item) => item.daysLeft >= 0)
-    .sort((a, b) => a.daysLeft - b.daysLeft)[0];
+    .sort((a, b) => b.dailyNeed - a.dailyNeed || a.daysLeft - b.daysLeft)[0];
   if (goalAtRisk && goalAtRisk.daysLeft <= 60) {
     insights.push({
       id: `goal-pace-${goalAtRisk.goal.id}`,

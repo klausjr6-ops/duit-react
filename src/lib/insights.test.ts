@@ -35,4 +35,18 @@ describe("Insight Engine", () => {
     });
     expect(insights.some((item) => item.id === "goal-pace-1" && item.action === "goal")).toBe(true);
   });
+
+  it("prioritizes the goal with the larger daily requirement", () => {
+    const insights = getFinancialInsights({
+      ...base,
+      txs: [],
+      inMonth: 0,
+      outMonth: 0,
+      goals: [
+        { id: 1, name: "Dana kecil", current: 90000, target: 100000, deadline: "2026-08-17", icon: "target" },
+        { id: 2, name: "Laptop", current: 0, target: 5000000, deadline: "2026-08-22", icon: "laptop" },
+      ],
+    });
+    expect(insights.find((item) => item.id.startsWith("goal-pace-"))?.id).toBe("goal-pace-2");
+  });
 });
