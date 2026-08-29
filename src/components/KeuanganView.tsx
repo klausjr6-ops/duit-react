@@ -6,11 +6,12 @@ import WeeklyChart from "./WeeklyChart";
 import WalletManager from "./WalletManager";
 import EditWalletModal from "./EditWalletModal";
 const MonthlyReportView = lazy(() => import("./MonthlyReportView"));
+const ImportScreenshotModal = lazy(() => import("./ImportScreenshotModal"));
 import { formatRupiah } from "../lib/format";
 import { useStore, todayStr, type Wallet } from "../lib/store";
 import { useTheme } from "../lib/ThemeContext";
 import { walletCardStyle, walletCardHoverBorder, getWalletHex } from "../utils/walletColors";
-import { getWalletIcon, IconPlus } from "../utils/icons";
+import { getWalletIcon, IconCamera, IconPlus } from "../utils/icons";
 import { toast } from "../hooks/useToast";
 
 const CATEGORIES: Record<"in" | "out", string[]> = {
@@ -44,6 +45,7 @@ export default function KeuanganView({ quickType, quickNonce, onQuickDone, onRep
   const [date, setDate] = useState(todayStr());
   const [filterWallet, setFilterWallet] = useState<string>("all");
   const [showWalletManager, setShowWalletManager] = useState(false);
+  const [showImportModal, setShowImportModal] = useState(false);
   const [walletToEdit, setWalletToEdit] = useState<Wallet | null>(null);
   const [hoveredWallet, setHoveredWallet] = useState<number | null>(null);
   const transactionFormRef = useRef<HTMLDivElement>(null);
@@ -223,7 +225,18 @@ export default function KeuanganView({ quickType, quickNonce, onQuickDone, onRep
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div ref={transactionFormRef}>
         <Card>
-          <p className={`text-xs font-semibold mb-6 uppercase tracking-widest ${isDark ? "text-slate-400" : "text-zinc-500"}`}>Tambah Transaksi</p>
+          <div className="mb-6 flex items-center justify-between gap-3 flex-wrap">
+            <p className={`text-xs font-semibold uppercase tracking-widest ${isDark ? "text-slate-400" : "text-zinc-500"}`}>Tambah Transaksi</p>
+            <button
+              type="button"
+              onClick={() => setShowImportModal(true)}
+              className={isDark
+                ? "inline-flex items-center gap-1.5 rounded-lg border border-teal-400/30 bg-teal-400/10 px-2.5 py-1.5 text-[11px] font-bold text-teal-300 hover:bg-teal-400/20 transition-colors"
+                : "inline-flex items-center gap-1.5 rounded-lg border border-teal-500/30 bg-teal-50 px-2.5 py-1.5 text-[11px] font-bold text-teal-700 hover:bg-teal-100 transition-colors"}
+            >
+              <IconCamera size={14} /> Impor Screenshot
+            </button>
+          </div>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="grid grid-cols-2 gap-3">
               <div>
@@ -325,6 +338,11 @@ export default function KeuanganView({ quickType, quickNonce, onQuickDone, onRep
 
       <AnimatePresence>
         {showWalletManager && <WalletManager onClose={() => setShowWalletManager(false)} />}
+        {showImportModal && (
+          <Suspense fallback={null}>
+            <ImportScreenshotModal onClose={() => setShowImportModal(false)} />
+          </Suspense>
+        )}
       </AnimatePresence>
 
       {walletToEdit && <EditWalletModal wallet={walletToEdit} onClose={() => setWalletToEdit(null)} />}
