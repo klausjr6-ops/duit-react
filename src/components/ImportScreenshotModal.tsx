@@ -174,9 +174,7 @@ export default function ImportScreenshotModal({ onClose }: Props) {
   const abortRef = useRef<AbortController | null>(null);
   const txsRef = useRef<Transaction[]>(txs);
   useEffect(() => { txsRef.current = txs; }, [txs]);
-  useEffect(() => () => abortRef.current?.abort(), []);
-
-  const todayKey = useMemo(() => todayStr(), []);
+  useEffect(() => () => abortRef.current?.abort(), []);  const todayKey = useMemo(() => todayStr(), []);
 
   const rowIsValid = (row: ReviewRow): boolean => {
     if (!isValidDateKey(row.date) || row.date > todayKey) return false;
@@ -262,6 +260,52 @@ export default function ImportScreenshotModal({ onClose }: Props) {
     abortRef.current?.abort();
     abortRef.current = null;
     setProcessing(false);
+  };
+
+  /* ─── Tempel gambar seperti di WhatsApp ──────────────────────
+     Ctrl+V langsung memproses gambar dari clipboard; tombol
+     "Tempel Gambar" memakai Clipboard API bila browser mengizinkan. */
+  const handleFileRef = useRef(handleFile);
+  useEffect(() => { handleFileRef.current = handleFile; });
+
+  useEffect(() => {
+    if (step !== "pick" || processing) return;
+    const onPaste = (event: ClipboardEvent) => {
+      const items = event.clipboardData?.items;
+      if (!items) return;
+      for (const item of items) {
+        // Gambar dari screenshot/clipboard, atau PDF yang disalin dari file manager.
+        if (item.kind === "file" && (item.type.startsWith("image/") || item.type === "application/pdf")) {
+          const file = item.getAsFile();
+          if (file) {
+            event.preventDefault();
+            void handleFileRef.current(file);
+            return;
+          }
+        }
+      }
+    };
+    document.addEventListener("paste", onPaste);
+    return () => document.removeEventListener("paste", onPaste);
+  }, [step, processing]);
+
+  const pasteFromClipboard = async () => {
+    setError(null);
+    try {
+      if (typeof navigator === "undefined" || !navigator.clipboard?.read) throw new Error("unsupported");
+      const items = await navigator.clipboard.read();
+      for (const item of items) {
+        const imageType = item.types.find((type) => type.startsWith("image/"));
+        if (imageType) {
+          const blob = await item.getType(imageType);
+          await handleFileRef.current(new File([blob], `tempelan-${Date.now()}.png`, { type: imageType }));
+          return;
+        }
+      }
+      setError("Tidak ada gambar di clipboard. Screenshot dulu, lalu tekan Ctrl+V di sini.");
+    } catch {
+      setError("Browser belum mengizinkan baca clipboard otomatis — tekan Ctrl+V di modal ini untuk menempel gambar.");
+    }
   };
 
   const resetToPick = () => {
@@ -416,7 +460,7 @@ export default function ImportScreenshotModal({ onClose }: Props) {
                   <p className={`text-sm font-bold ${isDark ? "text-white" : "text-zinc-900"}`}>
                     Pilih tangkapan layar atau PDF e-Statement
                   </p>
-                  <p className={mutedCls}>Seret berkas ke sini atau klik untuk memilih (JPG / PNG / WEBP / PDF)</p>
+                  <p className={mutedCls}>Seret berkas ke sini, klik untuk memilih, atau tempel screenshot dengan Ctrl+V — seperti di WhatsApp</p>
                 </>
               )}
               <input
@@ -431,6 +475,22 @@ export default function ImportScreenshotModal({ onClose }: Props) {
                 }}
               />
             </label>
+
+            {!processing && (
+              <button
+                type="button"
+                onClick={pasteFromClipboard}
+                className={isDark
+                  ? "w-full rounded-xl border border-white/10 py-2.5 text-sm font-semibold text-slate-300 hover:border-teal-400 hover:text-teal-300 transition-colors inline-flex items-center justify-center gap-2"
+                  : "w-full rounded-xl border border-zinc-200 py-2.5 text-sm font-semibold text-zinc-600 hover:border-teal-500 hover:text-teal-600 transition-colors inline-flex items-center justify-center gap-2 bg-white"}
+              >
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" />
+                  <rect x="8" y="2" width="8" height="4" rx="1" ry="1" />
+                </svg>
+                Tempel Gambar (Ctrl+V)
+              </button>
+            )}
 
             {picked && processing && (
               <div className="flex items-center gap-3">
