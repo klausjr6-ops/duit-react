@@ -1,19 +1,23 @@
 // ═══════════════════════════════════════════════════════════════
-// Ekstraksi transaksi dari tangkapan layar m-banking (BCA)
-// Vercel Serverless Function — Gemini 2.5 Flash (vision)
+// Ekstraksi transaksi dari tangkapan layar m-banking atau
+// PDF e-Statement (BCA) — Vercel Serverless Function
+// Gemini 2.5 Flash (vision + dokumen)
 // Catatan: fallback Groq Llama 3.3 70B pada chat tidak mendukung
-// gambar, sehingga endpoint ini hanya memakai Gemini.
+// gambar/dokumen, sehingga endpoint ini hanya memakai Gemini.
 // ═══════════════════════════════════════════════════════════════
 
 import { cert, getApps, initializeApp } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
 
-const MAX_IMAGE_BASE64_LENGTH = 3_500_000; // ≈ 2,6 MB setelah decode (batas body Vercel 4,5 MB)
-const MAX_ITEMS = 40;
-const MAX_OUTPUT_TOKENS = 2048;
+const MAX_DOCUMENT_BASE64_LENGTH = 3_500_000; // ≈ 2,6 MB setelah decode (batas body Vercel 4,5 MB)
+const MAX_ITEMS_IMAGE = 40;
+const MAX_ITEMS_STATEMENT = 250;
+const MAX_OUTPUT_TOKENS_IMAGE = 2048;
+const MAX_OUTPUT_TOKENS_STATEMENT = 8192;
 const RATE_LIMIT_WINDOW_MS = 60_000;
 const RATE_LIMIT_MAX_REQUESTS = 6;
-const ALLOWED_MEDIA_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
+const ALLOWED_MEDIA_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "application/pdf"]);
+const PDF_MAGIC_BASE64_PREFIX = "JVBERi"; // awalan base64 dari "%PDF"
 const BASE64_PATTERN = /^[A-Za-z0-9+/=\s]+$/;
 const requestBuckets = new Map();
 
@@ -83,16 +87,18 @@ function isRateLimited(req, uid) {
   return false;
 }
 
-function sanitizeRequestImage(body) {
+function sanitizeRequestDocument(body) {
   const image = body?.image;
   if (!image || typeof image !== "object") return null;
 
   const mediaType = typeof image.mediaType === "string" ? image.mediaType : "";
   const data = typeof image.data === "string" ? image.data.replace(/\s+/g, "") : "";
   if (!ALLOWED_MEDIA_TYPES.has(mediaType)) return null;
-  if (!data || data.length > MAX_IMAGE_BASE64_LENGTH || !BASE64_PATTERN.test(data)) return null;
+  if (!data || data.length > MAX_DOCUMENT_BASE64_LENGTH || !BASE64_PATTERN.test(data)) return null;
+  // PDF wajib lolos magic-number check agar file rename-an tidak diteruskan ke model.
+  if (mediaType === "application/pdf" && !data.startsWith(PDF_MAGIC_BASE64_PREFIX)) return null;
 
-  return { mediaType, data };
+  return { mediaType, data, isStatement: mediaType === "application/pdf" };
 }
 
 function jakartaTodayKey() {
@@ -100,16 +106,38 @@ function jakartaTodayKey() {
   return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Jakarta" }).format(new Date());
 }
 
-function buildExtractionPrompt(todayKey) {
+function buildExtractionPrompt(todayKey, isStatement) {
+  const intro = isStatement
+    ? [
+        "Kamu adalah mesin ekstraksi transaksi dari dokumen PDF e-Statement / Mutasi Rekening resmi BCA berbahasa Indonesia.",
+        `Tanggal hari ini (WIB): ${todayKey}.`,
+        "Dokumen ini bisa berisi banyak halaman dengan tabel mutasi berisi baris transaksi harian.",
+        "",
+        "Baca SEMUA baris transaksi dari SELURUH halaman, lalu jawab HANYA dengan JSON valid berbentuk:",
+      ]
+    : [
+        "Kamu adalah mesin ekstraksi transaksi dari tangkapan layar aplikasi m-banking BCA (m-BCA / myBCA) berbahasa Indonesia.",
+        `Tanggal hari ini (WIB): ${todayKey}.`,
+        "",
+        "Baca semua baris transaksi uang yang terlihat di gambar, lalu jawab HANYA dengan JSON valid berbentuk:",
+      ];
+
+  const statementRules = isStatement
+    ? [
+        '- Pada tabel mutasi BCA, baris bertanda "DB" berarti uang keluar → type "out"; bertanda "CR" (atau kolom mutasi bernilai kredit) → type "in".',
+        "- amount: nilai kolom mutasi sebagai bilangan bulat rupiah tanpa titik, koma, maupun desimal — abaikan desimal nol seperti `,00`.",
+        "- Abaikan baris SALDO AWAL, SALDO AKHIR, TOTAL, header tabel yang berulang di setiap halaman, serta kop dan footer dokumen.",
+        '- Bunga bank dan pajak bunga adalah transaksi sah; masukkan keduanya bila ada (kategori "Investasi" untuk bunga masuk, "Lainnya" untuk pajak).',
+      ]
+    : [];
+
   return [
-    "Kamu adalah mesin ekstraksi transaksi dari tangkapan layar aplikasi m-banking BCA (m-BCA / myBCA) berbahasa Indonesia.",
-    `Tanggal hari ini (WIB): ${todayKey}.`,
-    "",
-    "Baca semua baris transaksi uang yang terlihat di gambar, lalu jawab HANYA dengan JSON valid berbentuk:",
+    ...intro,
     '{"transactions":[{"date":"YYYY-MM-DD","type":"in|out","amount":12345,"description":"...","category":"..."}]}',
     "",
     "Aturan ketat:",
     '- type: "out" untuk uang keluar (debit, DB, pembayaran, transfer keluar, tarik tunai); "in" untuk uang masuk (kredit, CR, transfer masuk, setoran).',
+    ...statementRules,
     "- amount: bilangan bulat rupiah tanpa titik, koma, maupun desimal.",
     '- date: format YYYY-MM-DD. Bila tahun tidak terlihat, gunakan tahun dari tanggal hari ini; bila tanggal benar-benar tidak terbaca, lewati baris tersebut.',
     "- description: keterangan transaksi seperti terlihat, maksimal 100 karakter.",
@@ -121,19 +149,19 @@ function buildExtractionPrompt(todayKey) {
   ].join("\n");
 }
 
-async function callGeminiVision({ prompt, image }) {
+async function callGeminiVision({ prompt, document }) {
   const body = {
     contents: [
       {
         role: "user",
         parts: [
           { text: prompt },
-          { inlineData: { mimeType: image.mediaType, data: image.data } },
+          { inlineData: { mimeType: document.mediaType, data: document.data } },
         ],
       },
     ],
     generationConfig: {
-      maxOutputTokens: MAX_OUTPUT_TOKENS,
+      maxOutputTokens: document.isStatement ? MAX_OUTPUT_TOKENS_STATEMENT : MAX_OUTPUT_TOKENS_IMAGE,
       temperature: 0.1,
       topP: 0.8,
       responseMimeType: "application/json",
@@ -205,9 +233,9 @@ function extractJsonPayload(text) {
  * Sanitasi ringan di sisi server. Validasi semantik penuh (tanggal,
  * nominal, duplikat) dilakukan ulang di klien sebelum transaksi disimpan.
  */
-function sanitizeTransactions(parsed) {
+function sanitizeTransactions(parsed, maxItems) {
   const list = Array.isArray(parsed?.transactions) ? parsed.transactions : [];
-  return list.slice(0, MAX_ITEMS).flatMap((item) => {
+  return list.slice(0, maxItems).flatMap((item) => {
     if (!item || typeof item !== "object") return [];
     const asString = (value, max) =>
       typeof value === "string" ? value.slice(0, max) : undefined;
@@ -259,9 +287,9 @@ export default async function handler(req, res) {
     return;
   }
 
-  const image = sanitizeRequestImage(req.body);
-  if (!image) {
-    res.status(400).json({ error: "Format gambar tidak valid. Gunakan JPG, PNG, atau WEBP." });
+  const document = sanitizeRequestDocument(req.body);
+  if (!document) {
+    res.status(400).json({ error: "Format berkas tidak valid. Gunakan JPG, PNG, WEBP, atau PDF e-Statement." });
     return;
   }
 
@@ -272,19 +300,29 @@ export default async function handler(req, res) {
   }
 
   try {
-    const prompt = buildExtractionPrompt(jakartaTodayKey());
-    const rawText = await callGeminiVision({ prompt, image });
+    const prompt = buildExtractionPrompt(jakartaTodayKey(), document.isStatement);
+    const rawText = await callGeminiVision({ prompt, document });
     const parsed = extractJsonPayload(rawText);
     if (!parsed) {
       console.error("[IMPORT] Model response is not valid JSON:", rawText.slice(0, 300));
       res.status(502).json({ error: "Hasil bacaan tidak bisa diproses. Coba gambar yang lebih jelas ya." });
       return;
     }
-    res.status(200).json({ transactions: sanitizeTransactions(parsed), _meta: { provider: "gemini" } });
+    const maxItems = document.isStatement ? MAX_ITEMS_STATEMENT : MAX_ITEMS_IMAGE;
+    res.status(200).json({ transactions: sanitizeTransactions(parsed, maxItems), _meta: { provider: "gemini" } });
   } catch (error) {
-    console.error("[IMPORT] Extraction failed:", error?.message || error);
+    const message = String(error?.message || error).toLowerCase();
+    console.error("[IMPORT] Extraction failed:", message);
+    if (document.isStatement && (message.includes("password") || message.includes("encrypted"))) {
+      res.status(422).json({
+        error: "PDF e-Statement ini terproteksi kata sandi. Buka PDF-nya, simpan salinan tanpa kata sandi (Cetak → Simpan sebagai PDF), lalu unggah lagi — atau pakai impor screenshot.",
+      });
+      return;
+    }
     res.status(503).json({
-      error: "DUIT lagi kesulitan membaca gambar. Coba lagi beberapa menit ya.",
+      error: document.isStatement
+        ? "DUIT lagi kesulitan membaca PDF. Coba lagi beberapa menit ya."
+        : "DUIT lagi kesulitan membaca gambar. Coba lagi beberapa menit ya.",
     });
   }
 }

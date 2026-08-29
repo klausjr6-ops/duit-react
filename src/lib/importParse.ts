@@ -13,6 +13,9 @@ export const TX_CATEGORIES: Record<"in" | "out", string[]> = {
 /** Batas baris per gambar agar screenshot panjang tetap diproses per layar. */
 export const MAX_EXTRACTED_PER_IMAGE = 30;
 
+/** Batas baris per dokumen e-Statement (mutasi sebulan bisa ratusan baris). */
+export const MAX_EXTRACTED_PER_STATEMENT = 200;
+
 /** Draft transaksi hasil normalisasi, siap direview pengguna sebelum disimpan. */
 export interface ExtractedDraft {
   date: string;
@@ -45,18 +48,33 @@ export function isValidDateKey(value: unknown): value is string {
 
 /**
  * Nominal Rupiah: bilangan bulat positif. String boleh berformat
- * "Rp 1.250.000" atau "1250000". String berkoma (desimal) ditolak agar
- * tidak ada pembulatan senyap.
+ * "Rp 1.250.000" atau "1250000". Format mutasi bank seperti
+ * "75.000,00 DB" diterima: token arah (DB/CR/DR) dibuang dan desimal
+ * hanya boleh berisi nol — selain itu ditolak agar tidak ada
+ * pembulatan senyap.
  */
 export function parseRupiahAmount(value: unknown): number | null {
   if (typeof value === "number") {
     return Number.isSafeInteger(value) && value > 0 ? value : null;
   }
   if (typeof value !== "string") return null;
-  const cleaned = value.trim().toLocaleLowerCase("id-ID").replace(/rp\.?/g, "").replace(/\s+/g, "");
-  if (!cleaned || cleaned.includes(",")) return null;
-  if (!/^\d+$/.test(cleaned) && !/^\d{1,3}(\.\d{3})+$/.test(cleaned)) return null;
-  const digits = cleaned.replace(/\./g, "");
+  const cleaned = value.trim().toLocaleLowerCase("id-ID").replace(/rp\.?/g, "").replace(/\s+/g, " ");
+  const digitsPart = cleaned
+    .split(" ")
+    .filter((token) => token && !/^(db|cr|dr)$/.test(token))
+    .join("");
+  if (!digitsPart) return null;
+
+  let integerPart = digitsPart;
+  const commaIndex = digitsPart.indexOf(",");
+  if (commaIndex !== -1) {
+    const fraction = digitsPart.slice(commaIndex + 1);
+    if (!/^0+$/.test(fraction)) return null;
+    integerPart = digitsPart.slice(0, commaIndex);
+  }
+
+  if (!/^\d+$/.test(integerPart) && !/^\d{1,3}(\.\d{3})+$/.test(integerPart)) return null;
+  const digits = integerPart.replace(/\./g, "");
   if (digits.length > 15) return null;
   const parsed = Number(digits);
   return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : null;
@@ -167,11 +185,15 @@ function normalizeCategory(value: unknown, type: "in" | "out"): string {
 /**
  * Menormalkan payload AI menjadi daftar draft yang valid.
  * Baris yang tidak lolos validasi dibuang dan dihitung sebagai `dropped`.
+ * `maxItems` membatasi banyak baris — screenshot dibatasi ketat, e-Statement
+ * boleh lebih besar karena mutasi sebulan bisa ratusan baris.
  */
 export function normalizeExtractedTransactions(
   raw: unknown,
   todayKey: string,
+  maxItems: number = MAX_EXTRACTED_PER_IMAGE,
 ): { items: ExtractedDraft[]; dropped: number } {
+  const limit = Number.isSafeInteger(maxItems) && maxItems > 0 ? Math.min(maxItems, MAX_EXTRACTED_PER_STATEMENT) : MAX_EXTRACTED_PER_IMAGE;
   const list = Array.isArray(raw)
     ? raw
     : raw && typeof raw === "object" && Array.isArray((raw as { transactions?: unknown }).transactions)
@@ -185,7 +207,7 @@ export function normalizeExtractedTransactions(
 
   for (let index = 0; index < list.length; index += 1) {
     const entry = list[index];
-    if (items.length >= MAX_EXTRACTED_PER_IMAGE) {
+    if (items.length >= limit) {
       dropped += list.length - index;
       break;
     }

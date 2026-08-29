@@ -9,6 +9,7 @@ import { formatRupiah } from "../lib/format";
 import {
   findDuplicateIndexes,
   isValidDateKey,
+  MAX_EXTRACTED_PER_STATEMENT,
   normalizeExtractedTransactions,
   parseRupiahAmount,
   TX_CATEGORIES,
@@ -19,10 +20,14 @@ interface Props {
   onClose: () => void;
 }
 
-interface PickedImage {
+interface PickedDoc {
   base64: string;
-  dataUrl: string;
   bytes: number;
+  mediaType: "image/jpeg" | "application/pdf";
+  isStatement: boolean;
+  /** Pratinjau data URL — hanya untuk gambar. */
+  dataUrl: string | null;
+  name: string;
 }
 
 interface ReviewRow {
@@ -43,6 +48,7 @@ interface ImportSummary {
 }
 
 const MAX_SOURCE_FILE_BYTES = 12 * 1024 * 1024;
+const MAX_STATEMENT_BYTES = 2_600_000; // aman di bawah batas body Vercel 4,5 MB setelah base64
 const MAX_COMPRESSED_BYTES = 1_800_000;
 const COMPRESS_ATTEMPTS: { maxSide: number; quality: number }[] = [
   { maxSide: 1600, quality: 0.85 },
@@ -90,13 +96,13 @@ async function decodeImage(file: File): Promise<ImageBitmap | HTMLImageElement> 
 }
 
 /** Kompres gambar di sisi klien supaya muat di batas body Vercel (4,5 MB). */
-async function prepareImage(file: File): Promise<PickedImage> {
+async function prepareImage(file: File): Promise<PickedDoc> {
   const source = await decodeImage(file);
   const width = "width" in source ? source.width : 0;
   const height = "height" in source ? source.height : 0;
   if (!width || !height) throw new Error("Gambar tidak bisa dibaca.");
 
-  let lastResult: PickedImage | null = null;
+  let lastResult: Omit<PickedDoc, "isStatement" | "name" | "mediaType"> & { mediaType: "image/jpeg" } | null = null;
   for (const { maxSide, quality } of COMPRESS_ATTEMPTS) {
     const scale = Math.min(1, maxSide / Math.max(width, height));
     const canvas = document.createElement("canvas");
@@ -108,14 +114,26 @@ async function prepareImage(file: File): Promise<PickedImage> {
     const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", quality));
     if (!blob) throw new Error("Gagal mengompres gambar.");
     const base64 = await blobToBase64(blob);
-    lastResult = { base64, dataUrl: `data:image/jpeg;base64,${base64}`, bytes: blob.size };
+    lastResult = { base64, dataUrl: `data:image/jpeg;base64,${base64}`, bytes: blob.size, mediaType: "image/jpeg" };
     if (blob.size <= MAX_COMPRESSED_BYTES) break;
   }
   if (source instanceof ImageBitmap) source.close();
   if (!lastResult || lastResult.bytes > MAX_COMPRESSED_BYTES) {
     throw new Error("Ukuran gambar masih terlalu besar. Coba pangkas area riwayat transaksinya saja.");
   }
-  return lastResult;
+  return { ...lastResult, isStatement: false, name: file.name };
+}
+
+/** Validasi + encode PDF e-Statement (tanpa kompres, PDF diteruskan apa adanya). */
+async function prepareStatement(file: File): Promise<PickedDoc> {
+  if (file.size > MAX_STATEMENT_BYTES) {
+    throw new Error("Ukuran PDF terlalu besar (maks ±2,5 MB). Coba unduh ulang e-Statement satu bulan saja.");
+  }
+  const base64 = await blobToBase64(file);
+  if (!base64.startsWith("JVBERi")) {
+    throw new Error("Berkas ini bukan PDF yang valid.");
+  }
+  return { base64, bytes: file.size, mediaType: "application/pdf", isStatement: true, dataUrl: null, name: file.name };
 }
 
 function buildRow(draft: { date: string; type: "in" | "out"; amt: number; desc: string; cat: string }, duplicate: boolean): ReviewRow {
@@ -139,9 +157,10 @@ export default function ImportScreenshotModal({ onClose }: Props) {
   const [step, setStep] = useState<"pick" | "review">("pick");
   const [processing, setProcessing] = useState(false);
   const [importing, setImporting] = useState(false);
+  const [importProgress, setImportProgress] = useState<{ done: number; total: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [dragOver, setDragOver] = useState(false);
-  const [picked, setPicked] = useState<PickedImage | null>(null);
+  const [picked, setPicked] = useState<PickedDoc | null>(null);
   const [rows, setRows] = useState<ReviewRow[]>([]);
   const [droppedCount, setDroppedCount] = useState(0);
   const [walletIdInput, setWalletIdInput] = useState<string>(wallets[0] ? String(wallets[0].id) : "");
@@ -179,26 +198,31 @@ export default function ImportScreenshotModal({ onClose }: Props) {
     setError(null);
     setSummary(null);
     if (!file) return;
-    if (!file.type.startsWith("image/")) {
-      setError("Berkas harus berupa gambar (JPG, PNG, atau WEBP).");
+    const isPdf = file.type === "application/pdf" || /\.pdf$/i.test(file.name);
+    if (!isPdf && !file.type.startsWith("image/")) {
+      setError("Berkas harus berupa gambar (JPG, PNG, WEBP) atau PDF e-Statement.");
       return;
     }
-    if (file.size > MAX_SOURCE_FILE_BYTES) {
+    if (isPdf && file.size > MAX_STATEMENT_BYTES) {
+      setError("Ukuran PDF terlalu besar (maks ±2,5 MB). Coba unduh ulang e-Statement satu bulan saja.");
+      return;
+    }
+    if (!isPdf && file.size > MAX_SOURCE_FILE_BYTES) {
       setError("Ukuran berkas terlalu besar. Pangkas area riwayat transaksi lalu coba lagi.");
       return;
     }
-    let prepared: PickedImage;
+    let prepared: PickedDoc;
     try {
-      prepared = await prepareImage(file);
+      prepared = isPdf ? await prepareStatement(file) : await prepareImage(file);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Gambar tidak bisa diproses. Coba format JPG atau PNG.");
+      setError(err instanceof Error ? err.message : "Berkas tidak bisa diproses. Coba format JPG, PNG, atau PDF.");
       return;
     }
     setPicked(prepared);
     await runExtraction(prepared);
   };
 
-  const runExtraction = async (image: PickedImage) => {
+  const runExtraction = async (doc: PickedDoc) => {
     setProcessing(true);
     setError(null);
     const controller = new AbortController();
@@ -212,14 +236,15 @@ export default function ImportScreenshotModal({ onClose }: Props) {
           ...(idToken ? { Authorization: `Bearer ${idToken}` } : {}),
         },
         signal: controller.signal,
-        body: JSON.stringify({ bank: "bca", image: { mediaType: "image/jpeg", data: image.base64 } }),
+        body: JSON.stringify({ bank: "bca", image: { mediaType: doc.mediaType, data: doc.base64 } }),
       });
       const payload = await response.json().catch(() => null);
       if (!response.ok) {
         setError(typeof payload?.error === "string" ? payload.error : "Server sedang bermasalah. Coba lagi nanti.");
         return;
       }
-      const { items, dropped } = normalizeExtractedTransactions(payload?.transactions, todayKey);
+      const maxItems = doc.isStatement ? MAX_EXTRACTED_PER_STATEMENT : undefined;
+      const { items, dropped } = normalizeExtractedTransactions(payload?.transactions, todayKey, maxItems);
       const duplicates = findDuplicateIndexes(items, txsRef.current);
       setRows(items.map((draft, index) => buildRow(draft, duplicates.has(index))));
       setDroppedCount(dropped);
@@ -247,6 +272,7 @@ export default function ImportScreenshotModal({ onClose }: Props) {
     setSummary(null);
     setError(null);
     setPicked(null);
+    setImportProgress(null);
   };
 
   const importSelected = async () => {
@@ -259,13 +285,17 @@ export default function ImportScreenshotModal({ onClose }: Props) {
     setError(null);
     setSummary(null);
     setImporting(true);
+    setImportProgress({ done: 0, total: ready.length });
 
     const failures: { key: number; message: string }[] = [];
     let imported = 0;
+    let done = 0;
     for (const row of ready) {
       const amt = parseRupiahAmount(row.amtInput);
       if (amt === null) {
         failures.push({ key: row.key, message: "Nominal tidak valid." });
+        done += 1;
+        setImportProgress({ done, total: ready.length });
         continue;
       }
       try {
@@ -286,9 +316,12 @@ export default function ImportScreenshotModal({ onClose }: Props) {
       } catch {
         failures.push({ key: row.key, message: "Gagal disimpan." });
       }
+      done += 1;
+      setImportProgress({ done, total: ready.length });
     }
 
     setImporting(false);
+    setImportProgress(null);
     setSummary({ imported, failed: failures.length, firstMessage: failures[0]?.message ?? null });
 
     if (failures.length === 0) {
@@ -336,8 +369,8 @@ export default function ImportScreenshotModal({ onClose }: Props) {
       >
         <div className="flex justify-between items-center mb-5">
           <div>
-            <h2 className={titleCls}>Impor dari Screenshot</h2>
-            <p className={mutedCls}>Baca riwayat transaksi m-banking BCA memakai AI</p>
+            <h2 className={titleCls}>Impor Transaksi</h2>
+            <p className={mutedCls}>Dari screenshot m-banking atau PDF e-Statement BCA, dibaca memakai AI</p>
           </div>
           <button aria-label="Tutup" onClick={guardedClose} disabled={busy} className={`${closeCls} disabled:cursor-not-allowed disabled:opacity-40`}>
             <IconClose size={20} />
@@ -366,8 +399,10 @@ export default function ImportScreenshotModal({ onClose }: Props) {
               <IconCamera size={32} className="text-teal-500" />
               {processing ? (
                 <>
-                  <p className={`text-sm font-bold ${isDark ? "text-white" : "text-zinc-900"}`}>DUIT sedang membaca tangkapan layar…</p>
-                  <p className={mutedCls}>Biasanya sekitar 5–15 detik</p>
+                  <p className={`text-sm font-bold ${isDark ? "text-white" : "text-zinc-900"}`}>
+                    DUIT sedang membaca {picked?.isStatement ? "PDF e-Statement" : "tangkapan layar"}…
+                  </p>
+                  <p className={mutedCls}>{picked?.isStatement ? "Dokumen banyak halaman bisa memakan 15–30 detik" : "Biasanya sekitar 5–15 detik"}</p>
                   <div className="h-1.5 w-40 overflow-hidden rounded-full bg-zinc-500/20">
                     <motion.div
                       className="h-full w-1/3 rounded-full bg-teal-400"
@@ -379,15 +414,15 @@ export default function ImportScreenshotModal({ onClose }: Props) {
               ) : (
                 <>
                   <p className={`text-sm font-bold ${isDark ? "text-white" : "text-zinc-900"}`}>
-                    Pilih tangkapan layar riwayat transaksi
+                    Pilih tangkapan layar atau PDF e-Statement
                   </p>
-                  <p className={mutedCls}>Seret gambar ke sini atau klik untuk memilih (JPG / PNG / WEBP)</p>
+                  <p className={mutedCls}>Seret berkas ke sini atau klik untuk memilih (JPG / PNG / WEBP / PDF)</p>
                 </>
               )}
               <input
                 ref={fileInputRef}
                 type="file"
-                accept="image/jpeg,image/png,image/webp"
+                accept="image/jpeg,image/png,image/webp,application/pdf"
                 className="hidden"
                 disabled={processing}
                 onChange={(event) => {
@@ -399,7 +434,17 @@ export default function ImportScreenshotModal({ onClose }: Props) {
 
             {picked && processing && (
               <div className="flex items-center gap-3">
-                <img src={picked.dataUrl} alt="Pratinjau tangkapan layar" className="h-16 w-16 rounded-lg object-cover border border-white/10" />
+                {picked.dataUrl ? (
+                  <img src={picked.dataUrl} alt="Pratinjau tangkapan layar" className="h-16 w-16 rounded-lg object-cover border border-white/10" />
+                ) : (
+                  <span className={`inline-flex max-w-full items-center gap-2 rounded-lg border px-3 py-2 text-xs font-semibold ${isDark ? "border-white/10 bg-slate-950 text-slate-300" : "border-zinc-200 bg-zinc-50 text-zinc-700"}`}>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 text-teal-500">
+                      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                      <polyline points="14 2 14 8 20 8" />
+                    </svg>
+                    <span className="truncate">{picked.name}</span>
+                  </span>
+                )}
                 <p className={mutedCls}>Ukuran terkirim ± {(picked.bytes / 1024).toFixed(0)} KB</p>
               </div>
             )}
@@ -416,7 +461,7 @@ export default function ImportScreenshotModal({ onClose }: Props) {
               </button>
             ) : (
               <div className={isDark ? "rounded-xl bg-teal-500/5 border border-teal-400/15 px-3 py-2.5 text-xs text-slate-400" : "rounded-xl bg-teal-50 border border-teal-100 px-3 py-2.5 text-xs text-zinc-500"}>
-                Gambar dikirim satu kali ke AI (Gemini) untuk dibaca, lalu dibuang — <span className="font-semibold">tidak disimpan di server</span>. Transaksi hanya tercatat setelah kamu memeriksa dan menekan tombol Impor. Tips: pangkas gambar agar tanggal dan nominal terlihat jelas.
+                Berkas dikirim satu kali ke AI (Gemini) untuk dibaca, lalu dibuang — <span className="font-semibold">tidak disimpan di server</span>. Transaksi hanya tercatat setelah kamu memeriksa dan menekan tombol Impor. Tips: pangkas gambar agar tanggal dan nominal terlihat jelas. PDF e-Statement yang terproteksi kata sandi perlu disimpan ulang tanpa kata sandi dulu (Cetak → Simpan sebagai PDF).
               </div>
             )}
 
@@ -445,8 +490,8 @@ export default function ImportScreenshotModal({ onClose }: Props) {
 
             {rows.length === 0 && summary === null && (
               <div className={`rounded-2xl border px-6 py-10 text-center ${isDark ? "border-white/10 text-slate-400" : "border-zinc-200 text-zinc-500"}`}>
-                <p className="text-sm font-semibold">Tidak ada transaksi yang terbaca dari gambar ini.</p>
-                <p className={`${mutedCls} mt-1`}>Coba tangkapan layar yang lebih tajam dan terang.</p>
+                <p className="text-sm font-semibold">Tidak ada transaksi yang terbaca dari berkas ini.</p>
+                <p className={`${mutedCls} mt-1`}>Coba tangkapan layar yang lebih tajam, atau e-Statement resmi dari myBCA.</p>
               </div>
             )}
 
@@ -586,7 +631,11 @@ export default function ImportScreenshotModal({ onClose }: Props) {
                   disabled={importing || selectedRows.length === 0}
                   className="rounded-xl bg-gradient-to-br from-teal-400 to-blue-500 px-5 py-2.5 text-sm font-bold text-zinc-900 hover:brightness-105 transition-all shadow-lg shadow-teal-500/10 disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  {importing ? "Menyimpan…" : `Impor ${selectedRows.length} Transaksi`}
+                  {importing
+                    ? importProgress
+                      ? `Menyimpan ${importProgress.done}/${importProgress.total}…`
+                      : "Menyimpan…"
+                    : `Impor ${selectedRows.length} Transaksi`}
                 </button>
               )}
             </div>

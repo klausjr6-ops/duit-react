@@ -234,7 +234,7 @@ export default function KeuanganView({ quickType, quickNonce, onQuickDone, onRep
                 ? "inline-flex items-center gap-1.5 rounded-lg border border-teal-400/30 bg-teal-400/10 px-2.5 py-1.5 text-[11px] font-bold text-teal-300 hover:bg-teal-400/20 transition-colors"
                 : "inline-flex items-center gap-1.5 rounded-lg border border-teal-500/30 bg-teal-50 px-2.5 py-1.5 text-[11px] font-bold text-teal-700 hover:bg-teal-100 transition-colors"}
             >
-              <IconCamera size={14} /> Impor Screenshot
+              <IconCamera size={14} /> Impor Screenshot / PDF
             </button>
           </div>
           <form onSubmit={handleSubmit} className="space-y-4">

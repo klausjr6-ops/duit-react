@@ -11,4 +11,4 @@ Run after every production deploy.
 7. Toggle Light/Dark and Default/Kontekstual dashboards.
 8. Open browser console and verify no CSP violations or uncaught errors.
 9. Verify offline banner by temporarily disabling network, then re-enable it.
-10. Di halaman Keuangan, buka "Impor Screenshot", unggah tangkapan layar riwayat m-banking BCA, periksa hasil bacaan AI, lalu impor sebagian baris dan pastikan transaksi muncul setelah refresh.
+10. Di halaman Keuangan, buka "Impor Screenshot / PDF", unggah tangkapan layar riwayat m-banking BCA serta satu PDF e-Statement, periksa hasil bacaan AI (tipe DB/CR, nominal, tanggal), konfirmasi baris duplikat otomatis tidak dicentang, lalu impor sebagian baris dan pastikan transaksi muncul setelah refresh.

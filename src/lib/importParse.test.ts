@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   findDuplicateIndexes,
   MAX_EXTRACTED_PER_IMAGE,
+  MAX_EXTRACTED_PER_STATEMENT,
   normalizeExtractedTransactions,
   normalizeTransactionDate,
   parseRupiahAmount,
@@ -27,6 +28,14 @@ describe("parseRupiahAmount", () => {
     expect(parseRupiahAmount(-5000)).toBe(null);
     expect(parseRupiahAmount(1250.75)).toBe(null);
     expect(parseRupiahAmount("bukan angka")).toBe(null);
+  });
+
+  it("accepts bank-statement formats with zero decimals and direction tokens", () => {
+    expect(parseRupiahAmount("75.000,00 DB")).toBe(75000);
+    expect(parseRupiahAmount("1.250.000,00 CR")).toBe(1250000);
+    expect(parseRupiahAmount("50.000,00")).toBe(50000);
+    expect(parseRupiahAmount("99.500,25 DB")).toBe(null);
+    expect(parseRupiahAmount("500,10 CR")).toBe(null);
   });
 });
 
@@ -102,6 +111,29 @@ describe("normalizeExtractedTransactions", () => {
     const { items, dropped } = normalizeExtractedTransactions(many, TODAY);
     expect(items).toHaveLength(MAX_EXTRACTED_PER_IMAGE);
     expect(dropped).toBe(5);
+  });
+
+  it("honours a larger cap for e-Statement documents", () => {
+    const many = Array.from({ length: 45 }, (_, i) => ({
+      date: "2026-08-20",
+      type: "out",
+      amount: 1000 + i,
+      description: `mutasi ${i}`,
+    }));
+    const { items, dropped } = normalizeExtractedTransactions(many, TODAY, MAX_EXTRACTED_PER_STATEMENT);
+    expect(items).toHaveLength(45);
+    expect(dropped).toBe(0);
+  });
+
+  it("never exceeds MAX_EXTRACTED_PER_STATEMENT even when asked", () => {
+    const many = Array.from({ length: 5 }, (_, i) => ({
+      date: "2026-08-20",
+      type: "out",
+      amount: 1000 + i,
+      description: `mutasi ${i}`,
+    }));
+    const { items } = normalizeExtractedTransactions(many, TODAY, 9999);
+    expect(items).toHaveLength(5);
   });
 
   it("removes duplicates within the same batch", () => {
